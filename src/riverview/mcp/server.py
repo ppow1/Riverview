@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP
 
 from riverview.mcp.read_model import ReadOnlyRelay
 
-SERVER_NAME = "Riverview Read-Only Relay"
+SERVER_NAME = "Riverview Comms"
 mcp = FastMCP(SERVER_NAME)
 relay = ReadOnlyRelay()
 

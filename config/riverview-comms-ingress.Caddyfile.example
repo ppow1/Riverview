@@ -1,0 +1,41 @@
+# Riverview Comms authenticated ingress template.
+# Version: 0.10.0
+# Keep the bearer secret in the Caddy service environment, never in Git.
+
+riverview-comms.example.invalid {
+    @mcp {
+        path /mcp
+        method POST OPTIONS
+    }
+
+    @health {
+        path /healthz
+        method GET
+    }
+
+    handle @health {
+        respond "riverview-comms ingress alive" 200
+    }
+
+    handle @mcp {
+        @authorized header Authorization "Bearer {env.RIVERVIEW_COMMS_CLIENT_SECRET}"
+        handle @authorized {
+            request_body {
+                max_size 256KB
+            }
+            reverse_proxy 127.0.0.1:11825 {
+                header_up Authorization {env.RIVERVIEW_COMMS_UPSTREAM_AUTH}
+                header_up X-Riverview-Comms 1
+                transport http {
+                    read_timeout 20s
+                    write_timeout 20s
+                }
+            }
+        }
+        respond "unauthorized" 401
+    }
+
+    handle {
+        respond "not found" 404
+    }
+}
