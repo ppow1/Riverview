@@ -1,4 +1,4 @@
-<!-- Version: 0.3.2 -->
+<!-- Version: 0.5.2 -->
 # RIV-BLD-0005 — Runtime-slice static acceptance failed
 
 Trigger: Ruff rejects River runtime source or tests before live acceptance.
@@ -20,3 +20,6 @@ Verification: Require Ruff, Pytest, Python compilation, database health, and Riv
 Applicability: Riverview Kernel v0.2.x River runtime slice.
 
 Observed compatibility seam: Python 3.14 does not expose `ContextManager` from `collections.abc`. Use `contextlib.AbstractContextManager` for the runtime annotation and retain `Callable` from `collections.abc`.
+
+
+Observed runner seam: `RUF100` rejects an unused `noqa` suppression when its named rule is not enabled. Remove the suppression instead of weakening unused-directive checking.

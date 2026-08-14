@@ -1,4 +1,4 @@
-<!-- Version: 0.3.0 -->
+<!-- Version: 0.5.0 -->
 # Riverview Troubleshooting Cookbook
 
 Status: Designed; initial kernel entries pending implementation evidence.
@@ -28,6 +28,7 @@ Every checkpoint records:
 - `RIV-BLD-*` — build, packaging, and dependency-environment failures
 - `RIV-EVT-*` — event acceptance and delivery
 - `RIV-WRK-*` — worker assignment, attempts, ownership, and leases
+- `RIV-RUN-*` — restricted local process execution and enforcement
 - `RIV-CME-*` — momentum detection and recovery
 - `RIV-MCP-*` — mailbox, correlation, claims, and responses
 - `RIV-PLY-*` — Playwright doorbell and conversation state
