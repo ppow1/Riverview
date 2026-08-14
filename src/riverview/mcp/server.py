@@ -1,6 +1,6 @@
-"""Local stdio MCP transport for the RV-004.4 read-only Relay.
+"""Local stdio MCP transport for the RV-004.4/RV-008.1 read-only Relay.
 
-Version: 0.9.3
+Version: 0.10.0
 """
 
 from __future__ import annotations
@@ -73,6 +73,78 @@ def recent_diagnostic_events(limit: int = 100) -> Any:
 def troubleshooting_cookbook(limit: int = 100) -> Any:
     """Return bounded Troubleshooting Cookbook projections."""
     return _safe(relay.cookbook(limit))
+
+
+@mcp.tool()
+def resource_roadmap(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
+    """Return one bounded, classification-filtered roadmap resource page."""
+    return _safe(relay.resource_roadmap(limit, cursor, classification))
+
+
+@mcp.tool()
+def resource_work(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
+    """Return one bounded, classification-filtered work resource page."""
+    return _safe(relay.resource_work(limit, cursor, classification))
+
+
+@mcp.tool()
+def resource_reports(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
+    """Return one bounded, classification-filtered report resource page."""
+    return _safe(relay.resource_reports(limit, cursor, classification))
+
+
+@mcp.tool()
+def resource_diagnostics(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
+    """Return one bounded, classification-filtered diagnostic resource page."""
+    return _safe(relay.resource_diagnostics(limit, cursor, classification))
+
+
+@mcp.tool()
+def resource_cookbook(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
+    """Return one bounded, classification-filtered Cookbook resource page."""
+    return _safe(relay.resource_cookbook(limit, cursor, classification))
+
+
+@mcp.tool()
+def resource_capacity(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
+    """Return one bounded, classification-filtered capacity resource page."""
+    return _safe(relay.resource_capacity(limit, cursor, classification))
+
+
+@mcp.resource("riverview://roadmap/{cursor}")
+def roadmap_resource(cursor: str) -> Any:
+    """Expose a bounded River roadmap resource page through the MCP resource API."""
+    return _safe(relay.resource_roadmap(cursor=int(cursor), classification="river"))
+
+
+@mcp.resource("riverview://work/{cursor}")
+def work_resource(cursor: str) -> Any:
+    """Expose a bounded River work resource page through the MCP resource API."""
+    return _safe(relay.resource_work(cursor=int(cursor), classification="river"))
+
+
+@mcp.resource("riverview://reports/{cursor}")
+def reports_resource(cursor: str) -> Any:
+    """Expose a bounded River report resource page through the MCP resource API."""
+    return _safe(relay.resource_reports(cursor=int(cursor), classification="river"))
+
+
+@mcp.resource("riverview://diagnostics/{cursor}")
+def diagnostics_resource(cursor: str) -> Any:
+    """Expose a bounded River diagnostics resource page through the MCP resource API."""
+    return _safe(relay.resource_diagnostics(cursor=int(cursor), classification="river"))
+
+
+@mcp.resource("riverview://cookbook/{cursor}")
+def cookbook_resource(cursor: str) -> Any:
+    """Expose a bounded River Cookbook resource page through the MCP resource API."""
+    return _safe(relay.resource_cookbook(cursor=int(cursor), classification="river"))
+
+
+@mcp.resource("riverview://capacity/{cursor}")
+def capacity_resource(cursor: str) -> Any:
+    """Expose a bounded River capacity resource page through the MCP resource API."""
+    return _safe(relay.resource_capacity(cursor=int(cursor), classification="river"))
 
 
 def main() -> None:

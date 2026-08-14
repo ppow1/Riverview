@@ -1,6 +1,6 @@
-"""Synchronize bounded RV-004.4 Cookbook projections into PostgreSQL.
+"""Synchronize bounded RV-004.4/RV-008 Cookbook projections into PostgreSQL.
 
-Version: 0.9.10
+Version: 0.10.0
 """
 
 from __future__ import annotations
@@ -70,14 +70,58 @@ ENTRIES = [
         "Run the complete live MCP acceptance again.",
         "docs/operations/troubleshooting/checkpoints/RIV-MCP-0006_ACCEPTANCE.md",
     ),
+    (
+        "RIV-MCP-0007",
+        "Mailbox payload rejected",
+        "A mailbox request or response is missing a bounded payload/reference or exceeds its safe limit.",
+        ["oversized-payload", "missing-payload", "unsafe-reference"],
+        ["Run mailbox contract tests and inspect only bounded request metadata."],
+        "Reject the message; keep large or protected content in classified local storage and retain only a safe reference.",
+        "Run mailbox invalid-payload acceptance and verify no request lineage was created.",
+        "docs/operations/troubleshooting/checkpoints/RIV-MCP-0007_MAILBOX_PAYLOAD.md",
+    ),
+    (
+        "RIV-MCP-0008",
+        "Mailbox correlation or lifecycle failure",
+        "A duplicate delivery, claim, acknowledgement, response, or expiry does not preserve one request/response lineage.",
+        [
+            "duplicate-delivery",
+            "duplicate-response",
+            "claim-conflict",
+            "expiry",
+            "correlation-loss",
+        ],
+        [
+            "Run python -m riverview.mailbox.live_acceptance and inspect mailbox_messages plus River events by correlation_id."
+        ],
+        "Repair the single mailbox transaction or idempotency seam; never replay work by inserting a second request.",
+        "Repeat duplicate delivery and response acceptance, then verify one request, one response, and correlated River events.",
+        "docs/operations/troubleshooting/checkpoints/RIV-MCP-0008_MAILBOX_CORRELATION.md",
+    ),
+    (
+        "RIV-PLY-0001",
+        "Doorbell boundary is not live-accepted",
+        "The bounded Playwright adapter is prepared but no real browser conversation has been opened or accepted.",
+        [
+            "invalid-selector",
+            "bounded-timeout",
+            "authentication",
+            "wrong-conversation",
+            "live-checkpoint",
+        ],
+        ["Run tests/test_doorbell_contract.py and inspect the typed request/result correlation."],
+        "Repair only the deterministic contract or harness; escalate any real browser, authentication, or conversation choice.",
+        "Deterministic harness passes; Steward separately performs the RV-008.3 live checkpoint when authorized.",
+        "docs/operations/troubleshooting/checkpoints/RIV-PLY-0001_DOORBELL_BOUNDARY.md",
+    ),
 ]
 
 
 def sync() -> dict[str, object]:
-    component = "riverview.mcp.readonly"
+    component = "riverview.mcp.readonly.mailbox"
     applicability = {
-        "kernel": ">=0.9.3",
-        "waypoint": "RV-004.4",
+        "kernel": ">=0.10.0",
+        "waypoint": "RV-008.1/RV-008.2",
         "authority": "read_only",
     }
 
@@ -109,12 +153,23 @@ def sync() -> dict[str, object]:
                     updated_at=EXCLUDED.updated_at
                 """,
                 (
-                    cookbook_entry, checkpoint_id, component, json.dumps(classes),
-                    json.dumps(list(probes)), json.dumps([repair]), json.dumps([verify]),
+                    cookbook_entry,
+                    checkpoint_id,
+                    component,
+                    json.dumps(classes),
+                    json.dumps(list(probes)),
+                    json.dumps([repair]),
+                    json.dumps([verify]),
                     json.dumps(entry_applicability),
                 ),
             )
-    return {"status": "healthy", "entries": len(ENTRIES), "version": "0.9.10", "schema": "authoritative-existing"}
+    return {
+        "status": "healthy",
+        "entries": len(ENTRIES),
+        "version": "0.10.0",
+        "schema": "authoritative-existing",
+    }
+
 
 if __name__ == "__main__":
     print(json.dumps(sync(), indent=2, sort_keys=True))
