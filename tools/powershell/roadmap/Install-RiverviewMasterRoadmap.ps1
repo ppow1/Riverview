@@ -1,0 +1,330 @@
+# Riverview Master Roadmap Installer
+# Version: 0.8.0
+# Purpose: Persist the complete bounded Riverview roadmap in GitHub and PostgreSQL.
+# Updated: 2026-08-14
+
+[CmdletBinding()]
+param([string]$RepositoryPath='A:\Riverview\repo')
+
+CLS
+$ErrorActionPreference='Stop'
+Set-StrictMode -Version Latest
+$ToolVersion='0.8.0'
+$ReportLines=[Collections.Generic.List[string]]::new()
+function Add-Line {param([Parameter(Mandatory)][AllowEmptyString()][string]$Text,[ConsoleColor]$Color='Gray');$ReportLines.Add($Text);Write-Host $Text -ForegroundColor $Color}
+function Add-Section {param([string]$Title);Add-Line '';Add-Line "=== $Title ===" Cyan}
+function Write-RepoFile {param([string]$RelativePath,[string]$Content);$Path=Join-Path $RepositoryPath $RelativePath;New-Item -ItemType Directory -Path(Split-Path -Parent $Path)-Force|Out-Null;Set-Content $Path $Content -Encoding utf8NoBOM -NoNewline;Add-Line "WRITTEN   $RelativePath" Green}
+function Invoke-Checked {param([string]$Label,[scriptblock]$Command);$global:LASTEXITCODE=0;$Output=@(& $Command 2>&1|ForEach-Object{"$_"});foreach($Line in $Output){Add-Line $Line};if($LASTEXITCODE -ne 0){throw "RIV-BLD-0005: $Label failed with exit code $LASTEXITCODE."};Add-Line "$Label passed." Green}
+function Save-Report {$Directory=Join-Path(Split-Path -Parent $RepositoryPath)'runtime\diagnostics\roadmap';New-Item -ItemType Directory -Path $Directory -Force|Out-Null;$Path=Join-Path $Directory "Master-Roadmap-$(Get-Date -Format 'yyyyMMdd-HHmmss').txt";$Report=($ReportLines-join[Environment]::NewLine)+[Environment]::NewLine;Set-Content $Path $Report -Encoding utf8NoBOM -NoNewline;if(Get-Command Set-Clipboard -ErrorAction SilentlyContinue){Set-Clipboard $Report}else{$Report|clip.exe};Write-Host "`nComplete report copied to the Windows clipboard." -ForegroundColor Cyan;Write-Host "Durable report: $Path" -ForegroundColor Green}
+
+try {
+ Add-Section 'RIVERVIEW MASTER ROADMAP VALIDATION'
+ $RepositoryPath=(Resolve-Path $RepositoryPath).Path
+ if(-not(Test-Path(Join-Path $RepositoryPath '.git'))){throw 'Riverview Git repository not found.'}
+ $Python=Join-Path $RepositoryPath '.venv\Scripts\python.exe';if(-not(Test-Path $Python)){throw 'RIV-BLD-0006: Riverview virtual environment not found.'}
+ Add-Line "Repository validated: $RepositoryPath" Green
+ Add-Section 'SELF-INSTALLATION'
+ $Installed=Join-Path $RepositoryPath 'tools\powershell\roadmap\Install-RiverviewMasterRoadmap.ps1';New-Item -ItemType Directory -Path(Split-Path -Parent $Installed)-Force|Out-Null
+ if([IO.Path]::GetFullPath($PSCommandPath) -ne [IO.Path]::GetFullPath($Installed)){Copy-Item $PSCommandPath $Installed -Force;Add-Line "Installed reusable tool: $Installed" Green}else{Add-Line "Running repository tool: $Installed" Green}
+
+ Add-Section 'MASTER ROADMAP FILES'
+ $ProjectPath=Join-Path $RepositoryPath 'pyproject.toml';$Project=Get-Content $ProjectPath -Raw;$Project=$Project.Replace('# Version: 0.7.0','# Version: 0.8.0').Replace('version = "0.7.0"','version = "0.8.0"');Write-RepoFile 'pyproject.toml' $Project
+ Write-RepoFile 'database\migrations\0007_master_roadmap.sql' @'
+-- Riverview Master Roadmap Schema
+-- Version: 0.8.0
+-- Migration: 0007
+
+BEGIN;
+ALTER TABLE roadmap_items ADD COLUMN IF NOT EXISTS depends_on jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE roadmap_items ADD COLUMN IF NOT EXISTS governing_refs jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE roadmap_items ADD COLUMN IF NOT EXISTS scope_boundary text NOT NULL DEFAULT 'Bounded by the governing Riverview architecture.';
+ALTER TABLE roadmap_items ADD COLUMN IF NOT EXISTS roadmap_revision text NOT NULL DEFAULT 'legacy';
+CREATE TABLE roadmap_revisions (
+ revision_id text PRIMARY KEY,
+ content_sha256 text NOT NULL,
+ waypoint_count integer NOT NULL CHECK(waypoint_count > 0),
+ source_path text NOT NULL,
+ applied_at timestamptz NOT NULL DEFAULT now()
+);
+COMMIT;
+'@
+
+ $Roadmap=@'
+{
+  "roadmap_revision":"RV-MASTER-2026-08-14",
+  "version":"0.8.0",
+  "governing_refs":["AI_HINTS.md","docs/architecture/RIVERVIEW_FOUNDATION.md","docs/operations/RIVERVIEW_EXECUTION_PLAN.md"],
+  "waypoints":[
+    {"id":"RV-001","parent":null,"order":10,"title":"Foundation","description":"Repository, mission boundaries, PostgreSQL authority, diagnostics-first contract, and reproducible tooling.","status":"completed","depends":[],"accept":["Verified foundation commit","Required reading and architecture decisions present"],"boundary":"No operational autonomy beyond foundation contracts.","steward":true},
+    {"id":"RV-002","parent":null,"order":20,"title":"River event runtime","description":"Transactional append, idempotent replay, correlation, and aggregate reading.","status":"completed","depends":["RV-001"],"accept":["PostgreSQL event append and replay acceptance","Idempotency verified"],"boundary":"Events record state; they do not execute arbitrary actions.","steward":false},
+    {"id":"RV-003","parent":null,"order":30,"title":"Diagnostic persistence","description":"Stable checkpoints, PostgreSQL diagnostic evidence, emergency spool, and Cookbook linkage.","status":"completed","depends":["RV-002"],"accept":["Normal persistence acceptance","Induced database fallback acceptance"],"boundary":"Emergency spool is evidence, never authoritative workflow state.","steward":false},
+    {"id":"RV-004","parent":null,"order":40,"title":"Riverview Relay","description":"Durable work orders, restricted execution, persistent worker, status visibility, and MCP mailbox.","status":"active","depends":["RV-003"],"accept":["Full mailbox-to-result loop","Failure escalates without approval drip"],"boundary":"Only registered actions cross into execution.","steward":true},
+    {"id":"RV-004.1","parent":"RV-004","order":10,"title":"Relay data foundation","description":"Waypoints, actions, work orders, attempts, leases, heartbeats, and escalations.","status":"completed","depends":["RV-003"],"accept":["Claim-heartbeat-complete-timeout lifecycle"],"boundary":"Database transitions are transactional and auditable.","steward":false},
+    {"id":"RV-004.2","parent":"RV-004","order":20,"title":"Restricted local runner","description":"Hash-pinned fixed adapters, bounded parameters, subprocess evidence, and hard timeouts.","status":"completed","depends":["RV-004.1"],"accept":["Approved no-op succeeds","Timeout terminates and escalates"],"boundary":"No database-supplied shell text or arbitrary command execution.","steward":false},
+    {"id":"RV-004.3","parent":"RV-004","order":30,"title":"Steward status view","description":"Local read-only auto-refresh view of roadmap, workers, work, diagnostics, and escalations.","status":"completed","depends":["RV-004.2"],"accept":["Local HTTP and API projection acceptance","Nonlocal bind rejected"],"boundary":"Read-only localhost surface; no execution controls.","steward":false},
+    {"id":"RV-004.4","parent":"RV-004","order":40,"title":"Read-only MCP Relay","description":"Expose bounded tools for waypoints, reports, diagnostics, Cookbook entries, workers, and escalations.","status":"pending","depends":["RV-004.3"],"accept":["New ChatGPT conversation retrieves latest verified state","Tools expose no write authority"],"boundary":"No enqueue, SQL, filesystem, secret, or Undercurrent access.","steward":true},
+    {"id":"RV-004.5","parent":"RV-004","order":50,"title":"Full-loop mailbox","description":"Correlated approved-message submission, acknowledgement, result return, timeout, and Steward paging.","status":"pending","depends":["RV-004.4","RV-008.3"],"accept":["Doorbell-to-result loop without manual copying","Timeout pages Steward exactly once"],"boundary":"Writes are typed mailbox operations, never general database access.","steward":true},
+
+    {"id":"RV-005","parent":null,"order":50,"title":"Grace and Continuous Momentum Engine","description":"Grace advances objectives through events, checkpoints, exceptions, and resumable momentum.","status":"pending","depends":["RV-004.4"],"accept":["Objective advances without routine Steward babysitting","Every stall has bounded recovery"],"boundary":"Grace coordinates progression but does not replace Steward authority.","steward":true},
+    {"id":"RV-005.1","parent":"RV-005","order":10,"title":"Grace identity and authority contract","description":"Define Grace responsibilities, prohibited powers, escalation rights, and durable identity.","status":"pending","depends":["RV-004.4"],"accept":["Authority tests reject unauthorized state changes"],"boundary":"No implicit authority inherited from conversation text.","steward":true},
+    {"id":"RV-005.2","parent":"RV-005","order":20,"title":"Objective and stage model","description":"Persist objectives, stages, readiness, required evidence, dependencies, and final outputs.","status":"pending","depends":["RV-005.1"],"accept":["Objective resumes from PostgreSQL after process restart"],"boundary":"No JSON-file workflow authority.","steward":false},
+    {"id":"RV-005.3","parent":"RV-005","order":30,"title":"Momentum evaluation loop","description":"Evaluate completed work, choose the next ready stage, enqueue approved work, and record causation.","status":"pending","depends":["RV-005.2","RV-004.5"],"accept":["Multi-stage objective advances automatically"],"boundary":"Only declared transitions and approved actions are eligible.","steward":false},
+    {"id":"RV-005.4","parent":"RV-005","order":40,"title":"Stall and stale-work detection","description":"Detect expired leases, absent providers, missing evidence, circular dependencies, and idle objectives.","status":"pending","depends":["RV-005.3"],"accept":["Each induced stall maps to a stable checkpoint"],"boundary":"Detection does not silently mutate user intent.","steward":false},
+    {"id":"RV-005.5","parent":"RV-005","order":50,"title":"Recovery and retry policy","description":"Apply retry-safe recovery, substitute providers when allowed, or escalate with complete evidence.","status":"pending","depends":["RV-005.4"],"accept":["Retry-safe work recovers once","Unsafe work requires explicit decision"],"boundary":"No unlimited retries or recursive work creation.","steward":true},
+    {"id":"RV-005.6","parent":"RV-005","order":60,"title":"Steward checkpoint routing","description":"Pause only at ideation, selected authority gates, unresolved exceptions, and final acceptance.","status":"pending","depends":["RV-005.5"],"accept":["Routine path completes without approval drip","Exceptions arrive with options and evidence"],"boundary":"The Steward remains front and center at required creative and final points.","steward":true},
+
+    {"id":"RV-006","parent":null,"order":60,"title":"Provider registry and parallel execution","description":"Capability-aware scheduling across Codex seats, RTX 4090, P100, local AI, and future providers.","status":"pending","depends":["RV-005.2"],"accept":["Parallel lanes execute without duplicated ownership","Capacity affects dispatch"],"boundary":"Provider credentials and private data stay outside ordinary task payloads.","steward":true},
+    {"id":"RV-006.1","parent":"RV-006","order":10,"title":"Capability registry","description":"Persist provider identity, supported tasks, models, context limits, restrictions, and health probes.","status":"pending","depends":["RV-005.2"],"accept":["Dispatcher can query compatible healthy providers"],"boundary":"Claims require measured evidence, not descriptive labels alone.","steward":false},
+    {"id":"RV-006.2","parent":"RV-006","order":20,"title":"Capacity and fuel telemetry","description":"Ingest seat quotas, GPU health, memory, queue depth, freshness, and reset windows.","status":"pending","depends":["RV-006.1"],"accept":["Stale readings are distinguished from current capacity"],"boundary":"Advisory indices never masquerade as physical capacity.","steward":false},
+    {"id":"RV-006.3","parent":"RV-006","order":30,"title":"Dispatch policy","description":"Choose providers by capability, cost, sensitivity, availability, expected duration, and escalation need.","status":"pending","depends":["RV-006.2"],"accept":["Deterministic routing explains every provider choice"],"boundary":"No OpenAI API model route.","steward":true},
+    {"id":"RV-006.4","parent":"RV-006","order":40,"title":"Parallel lanes and path ownership","description":"Assign independent work lanes with exclusive file/path ownership and shared correlation.","status":"pending","depends":["RV-006.3"],"accept":["Concurrent workers do not overwrite one another"],"boundary":"Parallelism requires separable work and explicit merge ownership.","steward":false},
+    {"id":"RV-006.5","parent":"RV-006","order":50,"title":"Result reconciliation","description":"Validate, compare, merge, reject, or escalate parallel results with provenance.","status":"pending","depends":["RV-006.4"],"accept":["Conflicting results produce bounded reconciliation evidence"],"boundary":"Consensus does not override acceptance tests or Steward authority.","steward":true},
+    {"id":"RV-006.6","parent":"RV-006","order":60,"title":"Backpressure and fairness","description":"Throttle queues, reserve escalation capacity, and prevent one project or provider from starving others.","status":"pending","depends":["RV-006.5"],"accept":["Capacity exhaustion pauses safely and resumes after reset"],"boundary":"No busy-loop polling or unbounded task fan-out.","steward":false},
+
+    {"id":"RV-007","parent":null,"order":70,"title":"Local execution adapters","description":"Deterministic adapters for Codex CLI, RTX 4090 local AI, P100 workloads, and evidence return.","status":"pending","depends":["RV-006.3","RV-004.5"],"accept":["Each provider completes one bounded real task","Failures return structured evidence"],"boundary":"Adapters expose named capabilities, not unrestricted shells.","steward":true},
+    {"id":"RV-007.1","parent":"RV-007","order":10,"title":"Common execution envelope","description":"Define inputs, outputs, timeout, resource request, classification, evidence, and idempotency for adapters.","status":"pending","depends":["RV-006.3"],"accept":["All adapter contracts validate against one envelope"],"boundary":"Payloads reference large data rather than embedding it.","steward":false},
+    {"id":"RV-007.2","parent":"RV-007","order":20,"title":"Codex CLI adapter","description":"Launch repo-aware Codex CLI tasks, capture progress and results, and reconcile Git state.","status":"pending","depends":["RV-007.1"],"accept":["One repository task completes and reports exact commit or no-change result"],"boundary":"No hidden pushes or inferred publication claims.","steward":false},
+    {"id":"RV-007.3","parent":"RV-007","order":30,"title":"RTX 4090 local-AI adapter","description":"Run compatible reasoning, generation, and analysis jobs with GPU health and resource evidence.","status":"pending","depends":["RV-007.1"],"accept":["Measured 4090 job completes with model and resource provenance"],"boundary":"Sensitive outputs follow classification and storage policy.","steward":false},
+    {"id":"RV-007.4","parent":"RV-007","order":40,"title":"P100 local-AI adapter","description":"Route suitable lower-priority or compatible workloads to the P100 with capability constraints.","status":"pending","depends":["RV-007.1"],"accept":["Measured P100 job completes or is correctly rejected as incompatible"],"boundary":"No assumed feature parity with the RTX 4090.","steward":false},
+    {"id":"RV-007.5","parent":"RV-007","order":50,"title":"Local adult-content work lane","description":"Allow locally hosted models to perform lawful adult-themed creative work outside OpenAI-restricted paths.","status":"pending","depends":["RV-007.3","RV-013.3"],"accept":["Classification routes eligible work locally","Restricted providers never receive the payload"],"boundary":"Adults only, lawful content, explicit classification, and Undercurrent-compatible storage.","steward":true},
+    {"id":"RV-007.6","parent":"RV-007","order":60,"title":"Adapter evidence and recovery","description":"Capture logs, artifacts, resource use, checkpoints, and smallest safe restart procedure for every adapter.","status":"pending","depends":["RV-007.2","RV-007.3","RV-007.4"],"accept":["Fresh conversation repairs each induced adapter failure from Cookbook evidence"],"boundary":"Logs exclude secrets and unapproved private payloads.","steward":false},
+
+    {"id":"RV-008","parent":null,"order":80,"title":"MCP and Playwright reasoning bridge","description":"Connect interactive ChatGPT reasoning to Grace through a bounded mailbox and Playwright doorbell.","status":"pending","depends":["RV-004.4","RV-005.2"],"accept":["Correlated request and response complete without copying","No OpenAI API usage"],"boundary":"Playwright wakes; MCP carries typed data; neither receives unrestricted execution.","steward":true},
+    {"id":"RV-008.1","parent":"RV-008","order":10,"title":"MCP resource model","description":"Publish read-only resources for roadmap, work, reports, diagnostics, Cookbook, and capacity.","status":"pending","depends":["RV-004.4"],"accept":["Resources are bounded, paginated, and classification-filtered"],"boundary":"Undercurrent and credentials are excluded by default.","steward":false},
+    {"id":"RV-008.2","parent":"RV-008","order":20,"title":"Mailbox schema and correlation","description":"Persist requests, acknowledgements, claims, responses, expiry, and causation.","status":"pending","depends":["RV-008.1","RV-005.2"],"accept":["Duplicate delivery returns one correlated response"],"boundary":"Mailbox messages are typed and size-bounded.","steward":false},
+    {"id":"RV-008.3","parent":"RV-008","order":30,"title":"Playwright doorbell","description":"Notify the designated ChatGPT window to inspect its MCP mailbox and record wake evidence.","status":"pending","depends":["RV-008.2"],"accept":["Doorbell wakes correct conversation","Failure pages Steward after bounded timeout"],"boundary":"Automation does not scrape unrelated conversations or bypass authentication.","steward":true},
+    {"id":"RV-008.4","parent":"RV-008","order":40,"title":"Reasoning response return","description":"Return structured advice, escalation, or seed results to Grace with citations and correlation.","status":"pending","depends":["RV-008.3"],"accept":["Grace consumes one response and advances the correct objective"],"boundary":"Reasoning output is advisory until accepted by declared workflow rules.","steward":false},
+    {"id":"RV-008.5","parent":"RV-008","order":50,"title":"Interactive Steward seed submission","description":"Allow the Steward to send an approved idea from an active ChatGPT conversation into Grace via MCP.","status":"pending","depends":["RV-008.4"],"accept":["Seed creates one traceable objective draft","Steward confirms promotion"],"boundary":"Conversation text never silently becomes executable work.","steward":true},
+    {"id":"RV-008.6","parent":"RV-008","order":60,"title":"Bridge replay and recovery","description":"Recover missed wakes, expired claims, browser restarts, and duplicate responses without losing correlation.","status":"pending","depends":["RV-008.5"],"accept":["Induced browser and MCP failures recover or escalate exactly once"],"boundary":"Retries remain bounded and idempotent.","steward":false},
+
+    {"id":"RV-009","parent":null,"order":90,"title":"Knowledge recovery and searchable conversation archive","description":"Preserve, search, and mine ChatGPT conversation exports and project evidence.","status":"pending","depends":["RV-013.1","RV-007.1"],"accept":["Known historical idea is retrieved with source provenance"],"boundary":"Archive ingestion never grants execution authority.","steward":true},
+    {"id":"RV-009.1","parent":"RV-009","order":10,"title":"Export inventory and ingestion","description":"Inventory PDFs, MHTML, native exports, attachments, and timestamps; ingest without destructive conversion.","status":"pending","depends":["RV-013.1"],"accept":["Representative exports ingest with hashes and source paths"],"boundary":"Original files remain immutable evidence.","steward":false},
+    {"id":"RV-009.2","parent":"RV-009","order":20,"title":"Conversation normalization","description":"Extract participants, turns, dates, projects, code blocks, files, and cross-chat references.","status":"pending","depends":["RV-009.1"],"accept":["Normalized turn order matches source export"],"boundary":"Uncertain attribution is labeled, not guessed.","steward":false},
+    {"id":"RV-009.3","parent":"RV-009","order":30,"title":"Search and retrieval index","description":"Provide lexical and semantic retrieval with project, date, speaker, classification, and source filters.","status":"pending","depends":["RV-009.2"],"accept":["Benchmark queries retrieve known conversations"],"boundary":"Search results enforce classification before ranking.","steward":false},
+    {"id":"RV-009.4","parent":"RV-009","order":40,"title":"Idea and decision extraction","description":"Identify candidate ideas, decisions, abandoned paths, unresolved questions, and useful artifacts.","status":"pending","depends":["RV-009.3"],"accept":["Candidates retain source quotes and confidence","Steward approves promotion"],"boundary":"Extraction does not rewrite history or auto-create execution work.","steward":true},
+    {"id":"RV-009.5","parent":"RV-009","order":50,"title":"Project memory publication","description":"Promote accepted findings into the correct repository memory, decision, roadmap, or backlog artifact.","status":"pending","depends":["RV-009.4"],"accept":["Promoted item links back to immutable source evidence"],"boundary":"Repository-specific memory remains separated by project.","steward":true},
+
+    {"id":"RV-010","parent":null,"order":100,"title":"Operator conversation environment","description":"Open WebUI, SillyTavern, transcription, screenshots, notifications, voice, and remote communication adapters.","status":"pending","depends":["RV-005.6","RV-013.2"],"accept":["Steward completes a multimodal task without keyboard dependence"],"boundary":"Interfaces consume kernel capabilities; they do not become authoritative state.","steward":true},
+    {"id":"RV-010.1","parent":"RV-010","order":10,"title":"Open WebUI adapter","description":"Connect general Estate conversations to approved models, memory references, and notification state.","status":"pending","depends":["RV-005.6"],"accept":["Conversation routes to approved provider and retains correlation"],"boundary":"No direct unrestricted database or shell access.","steward":false},
+    {"id":"RV-010.2","parent":"RV-010","order":20,"title":"SillyTavern adapter","description":"Support resident and entertainment conversations with appropriate local-provider routing.","status":"pending","depends":["RV-007.5","RV-014.2"],"accept":["Resident context and classification route correctly"],"boundary":"Creative context is isolated from operational authority.","steward":true},
+    {"id":"RV-010.3","parent":"RV-010","order":30,"title":"Dictation and transcription input","description":"Capture Windows transcription and later local speech-to-text as first-class input events.","status":"pending","depends":["RV-010.1"],"accept":["Dictated request reaches correct conversation with recoverable transcript"],"boundary":"Raw audio retention follows explicit data policy.","steward":false},
+    {"id":"RV-010.4","parent":"RV-010","order":40,"title":"Screenshot and artifact intake","description":"Accept clipboard screenshots and attachments with hashes, classification, storage references, and correlation.","status":"pending","depends":["RV-010.1","RV-013.2"],"accept":["Screenshot is traceable from conversation to stored artifact"],"boundary":"Large files remain outside source control and ordinary event payloads.","steward":false},
+    {"id":"RV-010.5","parent":"RV-010","order":50,"title":"Notification adapter","description":"Deliver completion, exception, capacity, and doorbell notices; initially permit a bounded Estate compatibility bridge.","status":"pending","depends":["RV-005.6"],"accept":["Critical escalation reaches Steward once","Routine success remains unobtrusive"],"boundary":"Notifications contain summaries and references, not sensitive payloads.","steward":true},
+    {"id":"RV-010.6","parent":"RV-010","order":60,"title":"Voice and remote channel","description":"Add synthesized voice and authenticated phone/Bluetooth remote interaction with session boundaries.","status":"pending","depends":["RV-010.3","RV-010.5","RV-013.4"],"accept":["Authenticated remote request and response complete safely"],"boundary":"No unauthenticated remote execution or ambient open microphone.","steward":true},
+
+    {"id":"RV-011","parent":null,"order":110,"title":"Command chair and physical controls","description":"Integrate Stream Deck, rotary keys, mouse hotkeys, keyboard, and future command-chair devices.","status":"pending","depends":["RV-010.5","RV-004.5"],"accept":["Physical input produces deterministic acknowledged action"],"boundary":"Every gesture maps to a named action; destructive gestures require safeguards.","steward":true},
+    {"id":"RV-011.1","parent":"RV-011","order":10,"title":"Device and control inventory","description":"Record USB devices, Stream Deck profiles, rotary keys, mouse bindings, keyboard plans, and ownership.","status":"pending","depends":["RV-010.5"],"accept":["Every connected control has identity, capability, and status"],"boundary":"Legacy profiles are evidence until explicitly promoted.","steward":false},
+    {"id":"RV-011.2","parent":"RV-011","order":20,"title":"Gesture grammar","description":"Model single, double, triple, quadruple taps, holds, rotations, chords, and timing windows.","status":"pending","depends":["RV-011.1"],"accept":["Recorded gestures resolve deterministically without collisions"],"boundary":"Long-hold shutdown remains separately guarded and visible.","steward":true},
+    {"id":"RV-011.3","parent":"RV-011","order":30,"title":"Stream Deck state bridge","description":"Render live health, fuel, readiness, errors, profiles, and action acknowledgement on keys.","status":"pending","depends":["RV-011.2","RV-010.5"],"accept":["Key state matches PostgreSQL projection after action"],"boundary":"Display state never becomes a second authority.","steward":false},
+    {"id":"RV-011.4","parent":"RV-011","order":40,"title":"Rotary, mouse, and keyboard adapters","description":"Map remaining physical devices through the same typed gesture and action contracts.","status":"pending","depends":["RV-011.2"],"accept":["Each device passes identity, gesture, and disconnect recovery tests"],"boundary":"Device-specific code remains adapter-local.","steward":false},
+    {"id":"RV-011.5","parent":"RV-011","order":50,"title":"Physical safety and recovery","description":"Handle disconnects, stuck inputs, duplicate taps, profile drift, emergency stop, and shutdown confirmation.","status":"pending","depends":["RV-011.3","RV-011.4"],"accept":["Induced device faults fail safe and identify checkpoint"],"boundary":"No single accidental gesture performs irreversible broad action.","steward":true},
+
+    {"id":"RV-012","parent":null,"order":120,"title":"Engineering capacity and project intake","description":"Turn Riverview into an engineering department capable of accepting, decomposing, executing, and delivering projects.","status":"pending","depends":["RV-005","RV-006","RV-007"],"accept":["CueMastery pilot traverses intake through verified delivery"],"boundary":"Projects retain their own repositories, decisions, and acceptance authority.","steward":true},
+    {"id":"RV-012.1","parent":"RV-012","order":10,"title":"Project intake contract","description":"Capture mission, repository, constraints, artifacts, acceptance, urgency, sensitivity, and Steward checkpoints.","status":"pending","depends":["RV-005.2"],"accept":["Incomplete intake blocks with exact missing fields"],"boundary":"No inferred goals replace project-owner intent.","steward":true},
+    {"id":"RV-012.2","parent":"RV-012","order":20,"title":"Repository archaeology and map","description":"Produce bounded dependency, runtime, data, test, and deployment maps before material changes.","status":"pending","depends":["RV-012.1","RV-006.4"],"accept":["Map identifies owned seams and unknowns without multi-day rediscovery"],"boundary":"Mapping is evidence, not permission to rewrite unrelated systems.","steward":false},
+    {"id":"RV-012.3","parent":"RV-012","order":30,"title":"Work decomposition and lane assignment","description":"Convert accepted scope into dependency-aware tasks, path ownership, provider routing, and checkpoints.","status":"pending","depends":["RV-012.2","RV-006.4"],"accept":["Tasks can execute in parallel without scope collision"],"boundary":"Decomposition stops at useful execution granularity.","steward":true},
+    {"id":"RV-012.4","parent":"RV-012","order":40,"title":"Implementation and review pipeline","description":"Run work, tests, diagnostics, reconciliation, review, and controlled Git publication.","status":"pending","depends":["RV-012.3","RV-007.6"],"accept":["Exact tested commit is remotely verified"],"boundary":"No publication claim before remote verification.","steward":false},
+    {"id":"RV-012.5","parent":"RV-012","order":50,"title":"CueMastery pilot","description":"Use CueMastery as the first external project to validate engineering throughput and complexity reduction.","status":"pending","depends":["RV-012.4"],"accept":["One meaningful CueMastery objective completes with measured effort and recovery evidence"],"boundary":"Pilot changes require CueMastery-specific required reading and acceptance.","steward":true},
+    {"id":"RV-012.6","parent":"RV-012","order":60,"title":"Delivery and learning reconciliation","description":"Deliver artifacts, update project memory, measure provider effectiveness, and feed validated lessons into Riverview.","status":"pending","depends":["RV-012.5"],"accept":["Delivery includes provenance, operating guide, and measured lessons"],"boundary":"Lessons do not silently become global rules.","steward":true},
+
+    {"id":"RV-013","parent":null,"order":130,"title":"Data separation and the Undercurrent","description":"Separate mechanisms from data and protect sensitive, private, credentialed, and adult-oriented material.","status":"pending","depends":["RV-003"],"accept":["Classification prevents prohibited cross-boundary access","Recovery preserves separation"],"boundary":"Undercurrent is explicit high-trust storage and processing, not a hidden duplicate Estate.","steward":true},
+    {"id":"RV-013.1","parent":"RV-013","order":10,"title":"Classification vocabulary","description":"Define public, operational, private, sensitive, credential, adult-local, and Undercurrent classes.","status":"pending","depends":["RV-003"],"accept":["Representative artifacts classify deterministically"],"boundary":"Unknown classification defaults closed.","steward":true},
+    {"id":"RV-013.2","parent":"RV-013","order":20,"title":"Storage reference boundary","description":"Keep source mechanisms separate from runtime data while recording hashes, owners, classification, and locations.","status":"pending","depends":["RV-013.1"],"accept":["Source repository contains no protected payloads"],"boundary":"Large and private artifacts are referenced, not embedded.","steward":false},
+    {"id":"RV-013.3","parent":"RV-013","order":30,"title":"Undercurrent access broker","description":"Require explicit capability and purpose for protected reads, writes, processing, and promotion.","status":"pending","depends":["RV-013.2"],"accept":["Ordinary River path cannot retrieve protected test record"],"boundary":"No implicit access through resident, model, or administrator identity.","steward":true},
+    {"id":"RV-013.4","parent":"RV-013","order":40,"title":"Credential lifecycle","description":"Replace bootstrap passwords with local protected storage, rotation, recovery, audit, and least privilege.","status":"pending","depends":["RV-013.3"],"accept":["Rotation script changes credentials without source edits","Recovery is documented"],"boundary":"No credentials in GitHub, chat reports, or ordinary logs.","steward":true},
+    {"id":"RV-013.5","parent":"RV-013","order":50,"title":"Encryption, backup, and restore","description":"Protect classified data at rest and in backup while retaining tested recovery and key separation.","status":"pending","depends":["RV-013.4","RV-015.5"],"accept":["Encrypted backup restores under authorized identity"],"boundary":"Unrecoverable encryption is a failed design.","steward":true},
+    {"id":"RV-013.6","parent":"RV-013","order":60,"title":"Promotion and declassification","description":"Move approved summaries or artifacts from Undercurrent into ordinary River paths with provenance.","status":"pending","depends":["RV-013.5"],"accept":["Promotion records approver, source hash, transformation, and destination"],"boundary":"No automatic bulk declassification.","steward":true},
+
+    {"id":"RV-014","parent":null,"order":140,"title":"Residents and creative continuity","description":"Preserve resident identities, roles, relationships, Chief Architects, Character Designers, and creative output.","status":"pending","depends":["RV-010.2","RV-013.3"],"accept":["Resident continuity survives provider and interface changes"],"boundary":"Residents are respected participants and adapters, not kernel control logic.","steward":true},
+    {"id":"RV-014.1","parent":"RV-014","order":10,"title":"Resident registry and provenance","description":"Record identity, role, creator, continuity sources, capabilities, presentation, and classification needs.","status":"pending","depends":["RV-013.3"],"accept":["Each active resident resolves to authoritative continuity sources"],"boundary":"No resident is flattened into an interchangeable prompt.","steward":true},
+    {"id":"RV-014.2","parent":"RV-014","order":20,"title":"Character and role runtime","description":"Assemble bounded context for conversation, character design, architecture, entertainment, and project roles.","status":"pending","depends":["RV-014.1"],"accept":["Role-specific session loads correct identity and allowed tools"],"boundary":"Roleplay context cannot confer operational authority.","steward":true},
+    {"id":"RV-014.3","parent":"RV-014","order":30,"title":"Chief Architect and Character Designer workflows","description":"Preserve specialized design responsibilities and route their outputs into reviewed project artifacts.","status":"pending","depends":["RV-014.2","RV-012.3"],"accept":["Design output retains author, rationale, review, and destination"],"boundary":"Advisory design does not bypass engineering acceptance.","steward":true},
+    {"id":"RV-014.4","parent":"RV-014","order":40,"title":"Creative and entertainment lanes","description":"Support ordinary and lawful adult-local creative interactions with provider and storage separation.","status":"pending","depends":["RV-014.2","RV-007.5"],"accept":["Classification selects correct provider and protected storage"],"boundary":"OpenAI-restricted work remains on eligible local systems.","steward":true},
+    {"id":"RV-014.5","parent":"RV-014","order":50,"title":"Resident continuity evaluation","description":"Test identity stability, memory retrieval, role boundaries, and migration across interfaces.","status":"pending","depends":["RV-014.3","RV-014.4"],"accept":["Steward accepts representative resident continuity sessions"],"boundary":"Evaluation uses agreed character goals, not generic assistant similarity.","steward":true},
+
+    {"id":"RV-015","parent":null,"order":150,"title":"Physical infrastructure and operations","description":"Organize the server cabinet, hosts, storage, networking, power, thermal control, backups, and observability.","status":"pending","depends":["RV-006.2"],"accept":["Documented equipment layout and recovery drill","Health visible from Riverview"],"boundary":"Physical changes require safe power and hardware procedures.","steward":true},
+    {"id":"RV-015.1","parent":"RV-015","order":10,"title":"Hardware and cable inventory","description":"Record rack units, dimensions, power, network, USB, GPU, storage, spares, and cable endpoints.","status":"pending","depends":["RV-006.2"],"accept":["Every installed device and cable endpoint is labeled and recorded"],"boundary":"Inventory precedes physical rearrangement.","steward":false},
+    {"id":"RV-015.2","parent":"RV-015","order":20,"title":"Rack layout and service placement","description":"Plan the 44-inch-deep cabinet for airflow, serviceability, weight, cable paths, and expansion.","status":"pending","depends":["RV-015.1"],"accept":["Steward approves physical layout before move"],"boundary":"No unsafe lifting, power work, or airflow obstruction.","steward":true},
+    {"id":"RV-015.3","parent":"RV-015","order":30,"title":"Power, thermal, and network health","description":"Measure circuits, UPS behavior, temperatures, fans, link health, addresses, and failure alarms.","status":"pending","depends":["RV-015.2"],"accept":["Induced safe disconnect produces correct alert and recovery"],"boundary":"Monitoring cannot control hazardous power without separate authorization.","steward":true},
+    {"id":"RV-015.4","parent":"RV-015","order":40,"title":"Service topology and startup","description":"Assign hosts, ports, identities, dependencies, startup order, and bounded restart policies.","status":"pending","depends":["RV-015.3"],"accept":["Cold start reaches healthy state from documented procedure"],"boundary":"One service cannot silently own another service's ports or data.","steward":false},
+    {"id":"RV-015.5","parent":"RV-015","order":50,"title":"Backup and disaster recovery","description":"Back up PostgreSQL, repositories, configuration, protected data, and artifact indexes; test restore.","status":"pending","depends":["RV-015.4","RV-013.2"],"accept":["Recovery drill restores a verified isolated environment"],"boundary":"Backups retain classification and credential separation.","steward":true},
+    {"id":"RV-015.6","parent":"RV-015","order":60,"title":"Operational observability","description":"Unify service health, GPU activity, capacity, database, storage, alerts, and diagnostic checkpoints.","status":"pending","depends":["RV-015.4","RV-004.3"],"accept":["Steward dashboard identifies injected service failure"],"boundary":"Telemetry is bounded and excludes private content.","steward":false},
+
+    {"id":"RV-016","parent":null,"order":160,"title":"Quest and 3D Estate environment","description":"Transition Riverview's residents, spaces, controls, and operational surfaces toward a Quest-compatible 3D environment.","status":"pending","depends":["RV-014.5","RV-010.6","RV-015.6"],"accept":["Steward completes representative Estate interaction in prototype"],"boundary":"3D presentation consumes stable APIs and never becomes kernel authority.","steward":true},
+    {"id":"RV-016.1","parent":"RV-016","order":10,"title":"Spatial world model","description":"Define Estate locations, navigation, resident placement, interactive objects, and state references.","status":"pending","depends":["RV-014.5"],"accept":["World schema represents current Estate diagrams without losing roles"],"boundary":"Visual layout does not rewrite operational ownership.","steward":true},
+    {"id":"RV-016.2","parent":"RV-016","order":20,"title":"Resident avatar pipeline","description":"Create versioned 3D representations tied to resident identity, style, expression, and animation assets.","status":"pending","depends":["RV-016.1"],"accept":["Representative residents retain accepted identity across 2D and 3D"],"boundary":"Assets and sensitive variants follow classification rules.","steward":true},
+    {"id":"RV-016.3","parent":"RV-016","order":30,"title":"Spatial status and work interfaces","description":"Render roadmap, notifications, conversations, project rooms, and diagnostics as spatial consumers.","status":"pending","depends":["RV-016.1","RV-004.3"],"accept":["3D status matches PostgreSQL projection"],"boundary":"Spatial UI remains read-only until separately approved controls exist.","steward":false},
+    {"id":"RV-016.4","parent":"RV-016","order":40,"title":"Quest input and voice mapping","description":"Map controllers, gaze, hands, voice, and command-chair handoff into typed gestures and sessions.","status":"pending","depends":["RV-016.3","RV-011.2","RV-010.6"],"accept":["Representative inputs resolve without accidental privileged action"],"boundary":"Safety-critical actions retain explicit confirmation.","steward":true},
+    {"id":"RV-016.5","parent":"RV-016","order":50,"title":"Performance and presence acceptance","description":"Measure latency, frame rate, model responsiveness, comfort, reconnect, and degraded operation.","status":"pending","depends":["RV-016.2","RV-016.4"],"accept":["Prototype meets Steward-defined comfort and responsiveness targets"],"boundary":"Performance optimization cannot weaken data or action boundaries.","steward":true},
+
+    {"id":"RV-017","parent":null,"order":170,"title":"Estate migration and parity","description":"Move validated responsibilities from the existing Estate into Riverview through adapters, shadow operation, and controlled cutover.","status":"pending","depends":["RV-012.6","RV-013.6","RV-015.5"],"accept":["Required Estate outcomes operate through Riverview","Rollback remains available"],"boundary":"Reuse code only when it does not import unnecessary coupling.","steward":true},
+    {"id":"RV-017.1","parent":"RV-017","order":10,"title":"Estate capability inventory","description":"Map active services, residents, governance, data, control devices, integrations, and unfinished attempts.","status":"pending","depends":["RV-012.2"],"accept":["Inventory distinguishes active, valuable, obsolete, and unknown components"],"boundary":"Inventory does not imply wholesale code migration.","steward":true},
+    {"id":"RV-017.2","parent":"RV-017","order":20,"title":"Parity and intentional-difference matrix","description":"Define which outcomes must match, which mechanisms may differ, and which legacy behaviors retire.","status":"pending","depends":["RV-017.1"],"accept":["Steward accepts every required outcome and intentional difference"],"boundary":"Mission and residents are preserved; accidental complexity is not.","steward":true},
+    {"id":"RV-017.3","parent":"RV-017","order":30,"title":"Bounded compatibility adapters","description":"Reuse or wrap proven Estate components such as notifications and Stream Deck status without importing broad dependencies.","status":"pending","depends":["RV-017.2"],"accept":["Each adapter has explicit inputs, outputs, dependencies, and removal path"],"boundary":"No direct shared mutable state between Estate and Riverview.","steward":false},
+    {"id":"RV-017.4","parent":"RV-017","order":40,"title":"Data migration and verification","description":"Copy approved data with hashes, classifications, provenance, reconciliation, and rollback manifests.","status":"pending","depends":["RV-017.2","RV-013.6"],"accept":["Counts, hashes, permissions, and sampled content reconcile"],"boundary":"Original data remains recoverable until final acceptance.","steward":true},
+    {"id":"RV-017.5","parent":"RV-017","order":50,"title":"Shadow operation and failure drills","description":"Run Riverview beside the Estate, compare outputs, induce failures, and measure troubleshooting time.","status":"pending","depends":["RV-017.3","RV-017.4"],"accept":["Critical workflows meet parity and Cookbook recovery targets"],"boundary":"Shadow mode cannot execute duplicate destructive actions.","steward":true},
+    {"id":"RV-017.6","parent":"RV-017","order":60,"title":"Controlled cutover and legacy retirement","description":"Move authority capability by capability, retain rollback windows, and archive retired components.","status":"pending","depends":["RV-017.5"],"accept":["Steward approves each authority transfer","Legacy dependencies are removed or documented"],"boundary":"No big-bang cutover.","steward":true},
+
+    {"id":"RV-018","parent":null,"order":180,"title":"Operational maturity and continuing expansion","description":"Prove Riverview remains understandable, diagnosable, secure, performant, and extensible as the Estate grows.","status":"pending","depends":["RV-017.6"],"accept":["New conversation repairs representative failures without archaeology","New project integrates without kernel redesign"],"boundary":"Maturity is evidence and practice, not endless governance.","steward":true},
+    {"id":"RV-018.1","parent":"RV-018","order":10,"title":"Cookbook coverage audit","description":"Ensure every runtime seam and failure checkpoint has current evidence, bounded probes, repair, and verification.","status":"pending","depends":["RV-017.5"],"accept":["Coverage report has no unexplained operational checkpoint gaps"],"boundary":"Documentation without executable evidence does not pass.","steward":false},
+    {"id":"RV-018.2","parent":"RV-018","order":20,"title":"Fresh-conversation recovery trials","description":"Give unfamiliar AI conversations source and Cookbook access, then measure diagnosis and repair time.","status":"pending","depends":["RV-018.1"],"accept":["Representative failures resolve from checkpoint evidence within agreed bounds"],"boundary":"Trials cannot depend on hidden conversation history.","steward":true},
+    {"id":"RV-018.3","parent":"RV-018","order":30,"title":"Security and Undercurrent review","description":"Test classification, credentials, access brokers, remote paths, backups, and promotion boundaries.","status":"pending","depends":["RV-013.6","RV-017.6"],"accept":["Critical boundary tests pass and findings have owners"],"boundary":"Review avoids exposing protected payloads in evidence.","steward":true},
+    {"id":"RV-018.4","parent":"RV-018","order":40,"title":"Performance and capacity baseline","description":"Measure event, queue, worker, model, dashboard, storage, and recovery performance under representative load.","status":"pending","depends":["RV-006.6","RV-015.6"],"accept":["Capacity envelope and scaling triggers are recorded"],"boundary":"Optimization follows measurement.","steward":false},
+    {"id":"RV-018.5","parent":"RV-018","order":50,"title":"Extension contract","description":"Prove new residents, providers, devices, projects, and interfaces attach through existing bounded contracts.","status":"pending","depends":["RV-018.2","RV-018.4"],"accept":["One new capability integrates without changing kernel responsibilities"],"boundary":"New mechanisms require a responsibility existing components cannot absorb.","steward":true},
+    {"id":"RV-018.6","parent":"RV-018","order":60,"title":"Estate at Riverview acceptance","description":"Final mission, continuity, engineering, autonomy, diagnostics, operator experience, and expansion acceptance.","status":"pending","depends":["RV-018.3","RV-018.5"],"accept":["Steward signs final acceptance","Outstanding limitations are explicit and scheduled"],"boundary":"Acceptance does not freeze future growth.","steward":true}
+  ]
+}
+'@
+ Write-RepoFile 'docs\operations\roadmap\RIVERVIEW_MASTER_ROADMAP.json' $Roadmap
+
+ Write-RepoFile 'src\riverview\roadmap\__init__.py' @'
+"""Versioned Riverview master-roadmap support. Version: 0.8.0"""
+
+from .apply import apply_master_roadmap, load_and_validate
+
+__all__ = ["apply_master_roadmap", "load_and_validate"]
+'@
+ Write-RepoFile 'src\riverview\roadmap\apply.py' @'
+"""Validate and transactionally apply the versioned Riverview master roadmap.
+
+Version: 0.8.0
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+from riverview.database import connect
+
+ROADMAP_PATH = Path("docs/operations/roadmap/RIVERVIEW_MASTER_ROADMAP.json")
+
+
+def load_and_validate(path: Path = ROADMAP_PATH) -> tuple[dict[str, Any], str]:
+    raw = path.read_bytes()
+    document: dict[str, Any] = json.loads(raw.decode("utf-8-sig"))
+    items = document.get("waypoints")
+    if not isinstance(items, list) or not items:
+        raise RuntimeError("RIV-RDM-0001: Master roadmap has no waypoints.")
+    ids = [item.get("id") for item in items]
+    if len(ids) != len(set(ids)) or any(not isinstance(item_id, str) for item_id in ids):
+        raise RuntimeError("RIV-RDM-0002: Waypoint identifiers are missing or duplicated.")
+    known = set(ids)
+    allowed = {"pending", "active", "blocked", "completed", "cancelled"}
+    for item in items:
+        if item.get("parent") is not None and item["parent"] not in known:
+            raise RuntimeError(f"RIV-RDM-0003: Orphan waypoint: {item['id']}")
+        missing = [dependency for dependency in item.get("depends", []) if dependency not in known]
+        if missing:
+            raise RuntimeError(f"RIV-RDM-0004: Unknown dependencies for {item['id']}: {missing}")
+        if item.get("status") not in allowed or not item.get("accept") or not item.get("boundary"):
+            raise RuntimeError(f"RIV-RDM-0005: Incomplete execution contract: {item['id']}")
+    return document, hashlib.sha256(raw).hexdigest()
+
+
+def apply_master_roadmap(path: Path = ROADMAP_PATH) -> dict[str, Any]:
+    document, digest = load_and_validate(path)
+    revision = document["roadmap_revision"]
+    refs = document["governing_refs"]
+    with connect() as connection, connection.cursor() as cursor:
+        for item in document["waypoints"]:
+            cursor.execute(
+                """INSERT INTO roadmap_items(waypoint_id,parent_waypoint_id,sort_order,title,description,status,steward_checkpoint,acceptance_criteria,depends_on,governing_refs,scope_boundary,roadmap_revision,completed_at)
+                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s,%s,CASE WHEN %s='completed' THEN COALESCE((SELECT completed_at FROM roadmap_items WHERE waypoint_id=%s),now()) END)
+                   ON CONFLICT(waypoint_id) DO UPDATE SET parent_waypoint_id=EXCLUDED.parent_waypoint_id,sort_order=EXCLUDED.sort_order,title=EXCLUDED.title,description=EXCLUDED.description,status=EXCLUDED.status,steward_checkpoint=EXCLUDED.steward_checkpoint,acceptance_criteria=EXCLUDED.acceptance_criteria,depends_on=EXCLUDED.depends_on,governing_refs=EXCLUDED.governing_refs,scope_boundary=EXCLUDED.scope_boundary,roadmap_revision=EXCLUDED.roadmap_revision,completed_at=EXCLUDED.completed_at,updated_at=now()""",
+                (item["id"],item["parent"],item["order"],item["title"],item["description"],item["status"],item["steward"],json.dumps(item["accept"]),json.dumps(item["depends"]),json.dumps(refs),item["boundary"],revision,item["status"],item["id"]),
+            )
+        cursor.execute("INSERT INTO roadmap_revisions(revision_id,content_sha256,waypoint_count,source_path)VALUES(%s,%s,%s,%s) ON CONFLICT(revision_id)DO UPDATE SET content_sha256=EXCLUDED.content_sha256,waypoint_count=EXCLUDED.waypoint_count,source_path=EXCLUDED.source_path,applied_at=now()",(revision,digest,len(document["waypoints"]),str(path)))
+    return {"revision":revision,"sha256":digest,"waypoints":len(document["waypoints"])}
+'@
+ Write-RepoFile 'src\riverview\roadmap_health.py' @'
+"""Master-roadmap database acceptance. Version: 0.8.0"""
+
+from __future__ import annotations
+
+import json
+
+from riverview.database import connect
+from riverview.roadmap import apply_master_roadmap
+
+
+def acceptance() -> dict[str, object]:
+    applied=apply_master_roadmap()
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM roadmap_items WHERE roadmap_revision=%s",(applied["revision"],))
+        count=cursor.fetchone()[0]
+        cursor.execute("SELECT count(*) FROM roadmap_items r WHERE r.parent_waypoint_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM roadmap_items p WHERE p.waypoint_id=r.parent_waypoint_id)")
+        orphans=cursor.fetchone()[0]
+        cursor.execute("SELECT count(*) FROM roadmap_items WHERE roadmap_revision=%s AND(jsonb_array_length(acceptance_criteria)=0 OR scope_boundary='')",(applied["revision"],))
+        incomplete=cursor.fetchone()[0]
+        cursor.execute("SELECT waypoint_count,content_sha256 FROM roadmap_revisions WHERE revision_id=%s",(applied["revision"],))
+        revision=cursor.fetchone()
+    if count!=applied["waypoints"] or orphans or incomplete or not revision or revision[0]!=count or revision[1]!=applied["sha256"]:
+        raise RuntimeError("RIV-RDM-0006: Database roadmap acceptance failed.")
+    return {"status":"healthy","revision":applied["revision"],"waypoints":count,"orphans":0,"incomplete_contracts":0,"hash_verified":True}
+
+
+if __name__=="__main__":
+    print(json.dumps(acceptance(),indent=2,sort_keys=True))
+'@
+ Write-RepoFile 'tests\test_master_roadmap.py' @'
+"""Master-roadmap contract tests. Version: 0.8.0"""
+
+from riverview.roadmap import load_and_validate
+
+
+def test_master_roadmap_is_detailed_and_valid() -> None:
+    document,digest=load_and_validate()
+    assert len(document["waypoints"])>=75
+    assert len(digest)==64
+
+
+def test_master_roadmap_contains_required_future_domains() -> None:
+    document,_=load_and_validate()
+    ids={item["id"] for item in document["waypoints"]}
+    assert {"RV-005","RV-007","RV-008","RV-011","RV-013","RV-014","RV-016","RV-018"}<=ids
+'@
+
+ Write-RepoFile 'docs\operations\roadmap\README.md' @'
+<!-- Version: 0.8.0 -->
+# Riverview Master Roadmap
+
+`RIVERVIEW_MASTER_ROADMAP.json` is the complete versioned execution map. PostgreSQL is the live status authority after the revision is validated and applied. GitHub preserves reviewable intent and history.
+
+Each waypoint defines identity, parent, order, status, dependencies, acceptance criteria, scope boundary, Steward checkpoint, and governing references. Later implementation details may be expanded near execution, but a new conversation must not change mission, dependencies, boundary, or acceptance by guessing. Any necessary change becomes a reviewed roadmap revision.
+
+Current sequence after the published Steward Status slice: `RV-004.4` read-only MCP Relay, then `RV-008.1` MCP resources and the remaining Relay/Grace path according to recorded dependencies.
+'@
+ foreach($Pair in @(
+  @('RIV-RDM-0001_EMPTY_ROADMAP.md','RIV-RDM-0001 — Empty roadmap','Restore the versioned JSON from Git history; never synthesize an empty operational plan.'),
+  @('RIV-RDM-0002_DUPLICATE_ID.md','RIV-RDM-0002 — Invalid waypoint identity','Find missing or duplicate IDs and assign one stable identifier per waypoint.'),
+  @('RIV-RDM-0003_ORPHAN.md','RIV-RDM-0003 — Orphan waypoint','Restore or correct the declared parent before applying the revision.'),
+  @('RIV-RDM-0004_DEPENDENCY.md','RIV-RDM-0004 — Unknown dependency','Correct the dependency to an existing stable waypoint; do not silently remove ordering.'),
+  @('RIV-RDM-0005_CONTRACT.md','RIV-RDM-0005 — Incomplete waypoint contract','Provide status, acceptance criteria, and a scope boundary before execution.'),
+  @('RIV-RDM-0006_DATABASE_ACCEPTANCE.md','RIV-RDM-0006 — Roadmap database mismatch','Compare revision hash, counts, parents, and contracts; reapply only the reviewed source revision.')
+ )){Write-RepoFile ("docs\operations\troubleshooting\checkpoints\"+$Pair[0]) ("<!-- Version: 0.8.0 -->`n# "+$Pair[1]+"`n`n"+$Pair[2]+"`n")}
+ $IndexPath=Join-Path $RepositoryPath 'docs\operations\troubleshooting\README.md';$Index=Get-Content $IndexPath -Raw
+ if(-not $Index.Contains('RIV-RDM-*')){$Index=$Index.Replace('- `RIV-RUN-*` — restricted local process execution and enforcement','- `RIV-RUN-*` — restricted local process execution and enforcement'+"`n- ``RIV-RDM-*`` — master-roadmap structure, dependencies, revisions, and database acceptance");$Index += "`n- ``RIV-RDM-0001`` through ``RIV-RDM-0006`` — roadmap source and persistence failures`n";Write-RepoFile 'docs\operations\troubleshooting\README.md' $Index}
+
+ Add-Section 'MIGRATION AND ACCEPTANCE'
+ Push-Location $RepositoryPath
+ try {
+  & $Python -m pip install -e '.[dev]';if($LASTEXITCODE -ne 0){throw 'Dependency installation failed.'}
+  $Migration=@'
+from pathlib import Path
+from riverview.database.migrations import apply_migration
+changed=apply_migration(Path('database/migrations/0007_master_roadmap.sql'),'0007','0.8.0')
+print('Migration 0007 applied.' if changed else 'Migration 0007 checksum verified.')
+'@
+  $Migration|& $Python -;if($LASTEXITCODE -ne 0){throw 'RIV-DB-0006: Migration 0007 validation failed.'}
+  Invoke-Checked 'Ruff check' {& $Python -m ruff check src tests}
+  Invoke-Checked 'Pytest' {& $Python -m pytest}
+  Invoke-Checked 'Python compilation' {& $Python -m compileall -q src}
+  Invoke-Checked 'Database health' {& $Python -m riverview.health database}
+  Invoke-Checked 'Master roadmap acceptance' {& $Python -m riverview.roadmap_health}
+  Add-Section 'GIT CHANGE SUMMARY';foreach($Line in @(git status --short)){Add-Line $Line}
+ } finally {Pop-Location}
+ Add-Section 'MASTER ROADMAP RESULT';Add-Line 'Detailed GitHub roadmap and synchronized PostgreSQL operational roadmap passed structural and hash acceptance.' Green;Add-Line 'No implementation beyond roadmap persistence, commit, or push was created.' Yellow;Add-Line "Installer version: $ToolVersion";Save-Report
+} catch {Add-Section 'MASTER ROADMAP BLOCKED';Add-Line $_.Exception.Message Red;Add-Line 'No commit or push was performed.' Yellow;if(Test-Path $RepositoryPath -PathType Container){Save-Report};throw}

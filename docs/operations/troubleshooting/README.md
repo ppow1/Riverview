@@ -29,6 +29,7 @@ Every checkpoint records:
 - `RIV-EVT-*` — event acceptance and delivery
 - `RIV-WRK-*` — worker assignment, attempts, ownership, and leases
 - `RIV-RUN-*` — restricted local process execution and enforcement
+- `RIV-RDM-*` — master-roadmap structure, dependencies, revisions, and database acceptance
 - `RIV-CME-*` — momentum detection and recovery
 - `RIV-MCP-*` — mailbox, correlation, claims, and responses
 - `RIV-PLY-*` — Playwright doorbell and conversation state
@@ -47,3 +48,5 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-WRK-0009` — notification-loop invariant failure
 
 - `RIV-UI-0001` through `RIV-UI-0006` — status routing, projection, bind, acceptance, environment, and exit failures
+
+- `RIV-RDM-0001` through `RIV-RDM-0006` — roadmap source and persistence failures
