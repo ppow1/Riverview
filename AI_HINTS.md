@@ -1,4 +1,4 @@
-<!-- Version: 0.3.0 -->
+<!-- Version: 0.4.0 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -19,7 +19,9 @@ Before creating, modifying, testing, deploying, or promoting Riverview software,
 
 Rules:
 
+- Treat the Charter as the active anti-drift anchor, not one-time onboarding.
 - Read the Charter completely before the first action and after every conversation handoff, context compaction, truncation, or reset.
+- Refresh its compact anchor at every new waypoint or delivery stage, after every substantial execution report, before the next executable artifact or path change, and whenever the mission/current waypoint/next action/prohibited scope cannot be stated immediately.
 - Re-anchor to the Charter, verified GitHub state, authoritative PostgreSQL state when accessible, and the current dependency-ready roadmap waypoint before continuing.
 - If the Charter is missing, unreadable, inconsistent, or ambiguously superseded, stop instead of reconstructing the mission from conversation fragments.
 - Inspect before adding.
