@@ -53,6 +53,13 @@ During this tranche, `riverview-comms.ionoge.com` resolved but HTTPS probes
 timed out, and no local Caddy or authorized remote deployment control existed.
 This was classified as an external ingress boundary failure, not as MCP health.
 
+Later VPS deployment evidence established that the approved Caddy route on
+`64.227.21.54` is active and HTTP requests redirect correctly to HTTPS, but
+public DNS still resolves the hostname to `185.146.167.203`. A direct TLS probe
+to the approved VPS therefore returned a TLS internal error because the
+hostname certificate could not be completed for that destination. This is
+`RIV-COMMS-0010`/`RIV-COMMS-0011`, not a backend or MCP failure.
+
 ## REPAIR
 
 Provision only an approved Riverview-owned HTTPS host. Install the Caddy route
@@ -61,6 +68,10 @@ service environment, validate configuration, and perform a controlled reload.
 Rotate credentials by replacing the service-held secret and the approved
 registration binding together; preserve neither value in GitHub, PostgreSQL,
 logs, diagnostics, or chat.
+
+When DNS is managed outside the authorized VPS, update only the
+`riverview-comms.ionoge.com` A/AAAA destination to the approved Caddy host,
+then allow Caddy ACME issuance to complete. Do not change unrelated records.
 
 For ChatGPT, register the exact name `Riverview Comms` and exact approved
 `/mcp` endpoint. Do not reuse an Estate or IONOGE application or endpoint.
