@@ -54,3 +54,11 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-BLD-0010` - Windows PowerShell 5.1 UTF-8 no-BOM encoding incompatibility
 
 - `RIV-MCP-0001` through `RIV-MCP-0006` - read-only MCP projection, authority boundary, database read, Cookbook, bounded limits, and fresh-conversation acceptance failures
+
+- `RIV-COMMS-0001` - Riverview Comms connection boundary
+- `RIV-COMMS-0002` - Riverview Comms service runtime
+- `RIV-COMMS-0003` - HTTPS ingress, bearer authentication, and ChatGPT registration
+- `RIV-PLY-0001` - bounded doorbell contract
+- `RIV-PLY-0002` - browser and doorbell end-to-end boundary
+- `RIV-MCP-0007`/`RIV-MCP-0008` - mailbox payload and correlation lifecycle
+- `RIV-RDM-0007` - RV-008.3 promotion evidence and authoritative-state reconciliation

@@ -1,0 +1,86 @@
+<!-- Version: 0.10.0 -->
+# RIV-COMMS-0003 - HTTPS ingress, authentication, and ChatGPT registration
+
+Owner: Riverview ingress and application-registration owner.
+
+## SYMPTOM
+
+DNS does not resolve, TLS fails, Caddy rejects its configuration, `/healthz`
+times out, `/mcp` returns 404/502/401 unexpectedly, or ChatGPT cannot discover
+`Riverview Comms`.
+
+## LIKELY BOUNDARY
+
+DNS/TLS/Caddy, bearer authentication, or ChatGPT workspace registration. A
+local MCP success does not prove this boundary.
+
+## SAFE DIAGNOSTIC
+
+```powershell
+Resolve-DnsName riverview-comms.ionoge.com
+Invoke-WebRequest https://riverview-comms.ionoge.com/healthz -TimeoutSec 10
+```
+
+For an approved host, validate Caddy before reload and probe `/healthz`, then
+probe `/mcp` with a secret supplied by the service environment. The probe must
+report status only; never print the Authorization header or response body.
+
+Expected classifications:
+
+- missing bearer: `401`;
+- wrong bearer: `401`;
+- correct bearer with unavailable backend: `502` or equivalent backend failure;
+- correct bearer with healthy backend: MCP initialize and tools/list succeed.
+
+## EXPECTED HEALTHY RESULT
+
+DNS and certificate resolve for the approved Riverview hostname; `/healthz`
+responds without revealing credentials; unauthenticated MCP is rejected;
+authenticated MCP returns `Riverview Comms`, 15 tools, six templates, and
+PostgreSQL-backed reads.
+
+## KNOWN FAILURE RESULT
+
+- `RIV-COMMS-0010`: DNS or hostname unavailable.
+- `RIV-COMMS-0011`: certificate/TLS failure.
+- `RIV-COMMS-0012`: Caddy validation/reload failure.
+- `RIV-COMMS-0013`: route or loopback backend unavailable.
+- `RIV-COMMS-0014`: missing or incorrect bearer.
+- `RIV-COMMS-0015`: request exceeds the 256 KiB ingress bound.
+- `RIV-COMMS-0016`: ChatGPT registration/discovery failure.
+
+During this tranche, `riverview-comms.ionoge.com` resolved but HTTPS probes
+timed out, and no local Caddy or authorized remote deployment control existed.
+This was classified as an external ingress boundary failure, not as MCP health.
+
+## REPAIR
+
+Provision only an approved Riverview-owned HTTPS host. Install the Caddy route
+from `config/riverview-comms-ingress.Caddyfile.example`, keep the bearer in the
+service environment, validate configuration, and perform a controlled reload.
+Rotate credentials by replacing the service-held secret and the approved
+registration binding together; preserve neither value in GitHub, PostgreSQL,
+logs, diagnostics, or chat.
+
+For ChatGPT, register the exact name `Riverview Comms` and exact approved
+`/mcp` endpoint. Do not reuse an Estate or IONOGE application or endpoint.
+
+## VERIFY
+
+Repeat DNS/TLS, unauthenticated, incorrect-bearer, correct-bearer, MCP
+initialize, tools/list, resource-template, PostgreSQL read, and authority
+checks. Then verify the designated conversation visibly has the exact
+`Riverview Comms` application and can retrieve current position and mailbox
+projections.
+
+## DO NOT
+
+Do not paste secrets into chat, print them in diagnostics, expose the Python
+listener directly, reload shared Caddy without backup/validation, or call a
+successful health response proof of ChatGPT registration.
+
+## EVIDENCE
+
+Record hostname, service/application version, status codes, tool/template
+counts, and correlation metadata only. Keep ingress logs under the approved
+Riverview runtime owner and omit bodies, cookies, and tokens.
