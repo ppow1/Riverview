@@ -31,3 +31,8 @@ def test_mailbox_rejects_protected_classification_before_database_access() -> No
             payload={"bounded": True},
             classification="undercurrent",
         )
+
+
+def test_mailbox_retry_contract_methods_are_available() -> None:
+    assert callable(MailboxStore.acknowledge)
+    assert callable(MailboxStore.claim)

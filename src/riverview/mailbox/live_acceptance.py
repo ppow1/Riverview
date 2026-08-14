@@ -36,8 +36,14 @@ def accept() -> dict[str, object]:
     )
     if duplicate.request_id != first.request_id or duplicate.correlation_id != first.correlation_id:
         raise RuntimeError("RIV-MCP-0008: duplicate delivery created a second lineage.")
-    store.acknowledge(first.request_id, "acceptance")
-    store.claim(first.request_id, "acceptance")
+    acknowledged = store.acknowledge(first.request_id, "acceptance")
+    acknowledgement_retry = store.acknowledge(first.request_id, "acceptance-retry")
+    if acknowledgement_retry.request_id != acknowledged.request_id:
+        raise RuntimeError("RIV-MCP-0008: acknowledgement retry changed the request lineage.")
+    claimed = store.claim(first.request_id, "acceptance")
+    claim_retry = store.claim(first.request_id, "acceptance")
+    if claim_retry.claim_owner != claimed.claim_owner:
+        raise RuntimeError("RIV-MCP-0008: active claim retry changed lease ownership.")
     response = store.respond(
         first.request_id,
         responder_id="acceptance",
@@ -78,6 +84,8 @@ def accept() -> dict[str, object]:
         "response_id": str(response.response_id),
         "duplicate_delivery_reused_request": True,
         "duplicate_response_reused_response": True,
+        "acknowledgement_retry_reused_request": True,
+        "active_claim_retry_reused_lease": True,
         "expiry_transition_verified": True,
         "event_types": [row[0] for row in events],
     }

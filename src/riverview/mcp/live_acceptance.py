@@ -40,6 +40,14 @@ PROHIBITED = {
     "undercurrent",
     "write",
 }
+EXPECTED_RESOURCE_TEMPLATES = {
+    "riverview://roadmap/{cursor}",
+    "riverview://work/{cursor}",
+    "riverview://reports/{cursor}",
+    "riverview://diagnostics/{cursor}",
+    "riverview://cookbook/{cursor}",
+    "riverview://capacity/{cursor}",
+}
 
 
 async def _accept() -> dict[str, Any]:
@@ -80,8 +88,9 @@ async def _accept() -> dict[str, Any]:
             raise RuntimeError("RIV-MCP-0006: resource_roadmap tool call failed.")
         resources = await session.list_resources()
         templates = await session.list_resource_templates()
-        resource_count = len(resources.resources) + len(templates.resourceTemplates)
-        if resource_count < 6:
+        template_names = {item.uriTemplate for item in templates.resourceTemplates}
+        resource_count = len(resources.resources) + len(template_names)
+        if template_names != EXPECTED_RESOURCE_TEMPLATES:
             raise RuntimeError("RIV-MCP-0001: bounded MCP resource templates are incomplete.")
 
         return {

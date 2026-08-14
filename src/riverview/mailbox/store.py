@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -203,14 +203,27 @@ class MailboxStore:
             return self._message(row) if row else None
 
     def acknowledge(self, request_id: UUID, actor_id: str) -> MailboxMessage:
+        if not actor_id.strip():
+            raise ValueError("RIV-MCP-0008: acknowledgement actor is required.")
         with connect(self._config) as connection, connection.cursor() as cursor:
             cursor.execute(
-                """UPDATE mailbox_messages SET acknowledgement_state='acknowledged',acknowledged_at=COALESCE(acknowledged_at,now())
-                   WHERE request_id=%s AND completion_state='pending' RETURNING request_id""",
+                self._select_sql() + " WHERE request_id=%s FOR UPDATE",
                 (request_id,),
             )
-            if cursor.rowcount != 1:
-                raise RuntimeError("RIV-MCP-0008: acknowledgement target is missing or complete.")
+            row = cursor.fetchone()
+            if row is None:
+                raise RuntimeError("RIV-MCP-0008: acknowledgement target is missing.")
+            message = self._message(row)
+            if (
+                message.acknowledgement_state == "acknowledged"
+                or message.completion_state != "pending"
+            ):
+                return message
+            cursor.execute(
+                """UPDATE mailbox_messages SET acknowledgement_state='acknowledged',acknowledged_at=COALESCE(acknowledged_at,now())
+                   WHERE request_id=%s""",
+                (request_id,),
+            )
             message = self._locked(cursor, request_id)
             _event(
                 cursor,
@@ -230,8 +243,24 @@ class MailboxStore:
         if not owner_id.strip() or not 1 <= lease_seconds <= 3_600:
             raise ValueError("RIV-MCP-0008: claim owner and lease are invalid.")
         with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute(self._select_sql() + " WHERE request_id=%s FOR UPDATE", (request_id,))
+            row = cursor.fetchone()
+            if row is None:
+                raise RuntimeError("RIV-MCP-0008: claim target is missing.")
+            current = self._message(row)
+            if current.completion_state != "pending":
+                raise RuntimeError("RIV-MCP-0008: request is complete, expired, or missing.")
+            if (
+                current.claim_state == "claimed"
+                and current.claim_owner == owner_id
+                and current.claim_expires_at is not None
+                and current.claim_expires_at > datetime.now(UTC)
+            ):
+                return current
+            if current.claim_state == "claimed":
+                raise RuntimeError("RIV-MCP-0008: request is already claimed by another owner.")
             cursor.execute(
-                """UPDATE mailbox_messages SET claim_state='claimed',claim_owner=%s,claim_expires_at=now()+make_interval(secs=>%s),claimed_at=COALESCE(claimed_at,now())
+                """UPDATE mailbox_messages SET claim_state='claimed',claim_owner=%s,claim_expires_at=now()+make_interval(secs=>%s),claimed_at=now()
                    WHERE request_id=%s AND completion_state='pending' AND (claim_state IN ('unclaimed','released','expired') OR claim_expires_at<now())""",
                 (owner_id, lease_seconds, request_id),
             )
@@ -264,8 +293,6 @@ class MailboxStore:
         payload_ref: str | None = None,
         classification: str = Classification.RIVER.value,
     ) -> MailboxResponse:
-        payload, payload_ref = _bounded(payload, payload_ref, "response")
-        classification = _classification(classification)
         with connect(self._config) as connection, connection.cursor() as cursor:
             cursor.execute(self._select_sql() + " WHERE request_id=%s FOR UPDATE", (request_id,))
             row = cursor.fetchone()
@@ -280,6 +307,10 @@ class MailboxStore:
                 return MailboxResponse(*cursor.fetchone())
             if request.claim_state != "claimed":
                 raise RuntimeError("RIV-MCP-0008: only a claimed request may be completed.")
+            if not responder_id.strip() or not response_type.strip():
+                raise ValueError("RIV-MCP-0008: responder and response type are required.")
+            payload, payload_ref = _bounded(payload, payload_ref, "response")
+            classification = _classification(classification)
             response_id = uuid4()
             cursor.execute(
                 """INSERT INTO mailbox_responses(response_id,request_id,correlation_id,causation_id,responder_id,response_type,payload,payload_ref,classification)
@@ -300,7 +331,12 @@ class MailboxStore:
                 """UPDATE mailbox_messages SET response_id=%s,response_payload=%s::jsonb,response_payload_ref=%s,
                    completion_state='completed',claim_state='released',completed_at=now(),claim_expires_at=NULL
                    WHERE request_id=%s""",
-                (response_id, json.dumps(payload) if payload is not None else None, payload_ref, request_id),
+                (
+                    response_id,
+                    json.dumps(payload) if payload is not None else None,
+                    payload_ref,
+                    request_id,
+                ),
             )
             _event(
                 cursor,
