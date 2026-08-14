@@ -38,3 +38,9 @@ Every checkpoint records:
 ## Acceptance rule
 
 No capability is operationally complete until a new AI conversation can identify the checkpoint, distinguish modeled failures, perform the smallest safe repair, and verify recovery from repository guidance and captured evidence.
+
+- `RIV-WRK-0005` — invalid polling recovery configuration
+- `RIV-WRK-0006` — persistent worker runtime failure
+- `RIV-WRK-0007` — PostgreSQL listener startup failure
+- `RIV-WRK-0008` — bounded worker stop failure
+- `RIV-WRK-0009` — notification-loop invariant failure
