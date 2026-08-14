@@ -68,11 +68,24 @@ attempts failed at the external DNS boundary. HTTP-01 was answered by
 remains healthy but cannot complete certificate issuance until the A/AAAA
 records converge. This is verified `RIV-COMMS-0010`/`RIV-COMMS-0011` evidence.
 
+After the explicit A record converged to `64.227.21.54`, the hostname returned
+no AAAA answer despite the domain wildcard IPv6 record. Caddy obtained the
+certificate successfully and public `/healthz` returned `200`; missing and
+incorrect bearer probes returned `401`. The first authenticated MCP initialize
+returned `421` because the reverse proxy preserved the public `Host` header for
+the loopback service. Adding `header_up Host 127.0.0.1:11825` to the Riverview
+upstream fixed the seam. Authenticated external initialize then returned `200`,
+and bounded protocol acceptance passed with 15 tools, six resource templates,
+and PostgreSQL-backed reads. This is verified `RIV-COMMS-0013` evidence.
+
 ## REPAIR
 
 Provision only an approved Riverview-owned HTTPS host. Install the Caddy route
 from `config/riverview-comms-ingress.Caddyfile.example`, keep the bearer in the
 service environment, validate configuration, and perform a controlled reload.
+When the loopback service rejects the public host with `421`, preserve the
+public TLS hostname and normalize only the upstream header with
+`header_up Host 127.0.0.1:11825`; do not widen the backend bind.
 Rotate credentials by replacing the service-held secret and the approved
 registration binding together; preserve neither value in GitHub, PostgreSQL,
 logs, diagnostics, or chat.

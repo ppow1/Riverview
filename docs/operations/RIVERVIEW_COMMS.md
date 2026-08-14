@@ -1,8 +1,8 @@
 # Riverview Comms
 
-Version: 0.10.0
+Version: 0.11.0
 Checkpoint date: 2026-08-14
-Status: deployment checkpoint; external ChatGPT acceptance remains pending.
+Status: external MCP accepted; ChatGPT application/conversation acceptance remains pending.
 
 ## Purpose and authority
 
@@ -114,32 +114,36 @@ in GitHub or ordinary diagnostics. PostgreSQL authority remains the local
 Riverview PostgreSQL instance. No server-side replica or file fallback authority
 was created.
 
+The reverse proxy normalizes the upstream `Host` header to
+`127.0.0.1:11825`. This is required by the loopback MCP service and does not
+change the public Riverview hostname or external TLS identity.
+
 Deployment recovery backup:
 
 `/etc/caddy/Caddyfile.backup-riverview-comms-20260814T225407Z`
 
 ## Current DNS and TLS checkpoint
 
-At the dated deployment checkpoint represented by this document,
-`riverview-comms.ionoge.com` resolves publicly to:
+At the 2026-08-14 deployment checkpoint represented by this document,
+`riverview-comms.ionoge.com` resolves authoritatively and through the checked
+public resolvers to:
 
-- A: `185.146.167.203`
-- AAAA: `2a07:7800:1::203`
+- A: `64.227.21.54`
+- AAAA: no answer
 
-The approved Riverview Caddy destination is `64.227.21.54`; DNS therefore does
-not yet point to the approved deployment host. HTTP currently redirects toward
-HTTPS, but TLS certificate completion on `64.227.21.54` is blocked until DNS is
-corrected. This is a DNS/TLS boundary issue, not an MCP or backend authority
-failure.
+The domain-wide wildcard IPv6 record is not inherited by this explicit hostname,
+so clients do not receive the unrelated IPv6 destination for Riverview Comms.
+Caddy obtained a valid certificate for the hostname after DNS convergence.
+Public `/healthz` returns `200`; missing and incorrect bearer credentials are
+rejected with `401`; authenticated external MCP initialization, tool/resource
+discovery, and bounded PostgreSQL-backed reads pass.
 
 Detailed symptom, diagnostic, repair, and verification procedures remain in
 [`RIV-COMMS-0003_HTTPS_AUTH_REGISTRATION.md`](troubleshooting/checkpoints/RIV-COMMS-0003_HTTPS_AUTH_REGISTRATION.md).
 
-The next external action is to update only the DNS records for
-`riverview-comms.ionoge.com` so the approved public destination is
-`64.227.21.54`. Handle AAAA deliberately: verify whether an approved IPv6
-address exists for `ionoge-control-01`, or remove the stale/incorrect AAAA
-record. Do not invent an IPv6 value.
+The next bounded action is ChatGPT application registration and designated
+conversation acceptance. DNS records and the domain-wide wildcard/root records
+must not be changed as part of that continuation.
 
 ## Recovery and troubleshooting
 
@@ -154,20 +158,16 @@ it does not replace the operational troubleshooting checkpoints.
 
 ## Next bounded continuation
 
-After DNS convergence:
+After external MCP acceptance:
 
-1. Allow and verify Caddy ACME certificate issuance.
-2. Run external HTTPS `/healthz` acceptance.
-3. Run unauthenticated and incorrect-bearer rejection tests.
-4. Run authenticated external `/mcp` acceptance.
-5. Register Riverview Comms in ChatGPT using the accepted Comms8 Blue application pattern.
-6. Verify Riverview Comms is visible and usable in the designated `Riverview_001` conversation.
-7. Reconfirm browser and doorbell preflight.
-8. Create one real correlated RV-008.3 mailbox request.
-9. Ring the already-authorized fixed doorbell once.
-10. Verify typed mailbox/MCP/River evidence.
-11. Promote RV-008.3 only after genuine end-to-end success.
-12. Evaluate RV-004.5 dependency readiness without starting RV-004.5.
+1. Register Riverview Comms in ChatGPT using the accepted Comms8 Blue application pattern.
+2. Verify Riverview Comms is visible and usable in the designated `Riverview_001` conversation.
+3. Reconfirm browser and doorbell preflight.
+4. Create one real correlated RV-008.3 mailbox request.
+5. Ring the already-authorized fixed doorbell once.
+6. Verify typed mailbox/MCP/River evidence.
+7. Promote RV-008.3 only after genuine end-to-end success.
+8. Evaluate RV-004.5 dependency readiness without starting RV-004.5.
 
 ## Roadmap checkpoint snapshot
 

@@ -26,6 +26,7 @@ riverview-comms.example.invalid {
             reverse_proxy 127.0.0.1:11825 {
                 header_up Authorization {env.RIVERVIEW_COMMS_UPSTREAM_AUTH}
                 header_up X-Riverview-Comms 1
+                header_up Host 127.0.0.1:11825
                 transport http {
                     read_timeout 20s
                     write_timeout 20s
