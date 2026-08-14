@@ -60,6 +60,14 @@ to the approved VPS therefore returned a TLS internal error because the
 hostname certificate could not be completed for that destination. This is
 `RIV-COMMS-0010`/`RIV-COMMS-0011`, not a backend or MCP failure.
 
+On 2026-08-14, authorized inspection of `ionoge-control-01` confirmed Caddy
+configuration validation and the loopback listener, while Caddy's live ACME
+attempts failed at the external DNS boundary. HTTP-01 was answered by
+`185.146.167.203` with `404`, and TLS-ALPN-01 could not negotiate
+`acme-tls/1` through the same stale destination. The approved host therefore
+remains healthy but cannot complete certificate issuance until the A/AAAA
+records converge. This is verified `RIV-COMMS-0010`/`RIV-COMMS-0011` evidence.
+
 ## REPAIR
 
 Provision only an approved Riverview-owned HTTPS host. Install the Caddy route
