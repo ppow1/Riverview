@@ -10,8 +10,9 @@ const VERSION = '1.0.0';
 const OPERATION = 'ring_riverview_doorbell';
 const WAKE_TEXT = 'Riverview doorbell v1: inspect the Riverview MCP mailbox.';
 const ROOT = path.resolve(__dirname, '..');
-const CONFIG = process.env.RIVERVIEW_DOORBELL_CONFIG || path.join(ROOT, 'runtime', 'doorbell', 'config', 'doorbell.json');
-const JOURNAL = path.join(ROOT, 'runtime', 'doorbell', 'diagnostics', 'evidence.json');
+const RUNTIME_ROOT = path.resolve(ROOT, '..', 'runtime');
+const CONFIG = process.env.RIVERVIEW_DOORBELL_CONFIG || path.join(RUNTIME_ROOT, 'doorbell', 'config', 'doorbell.json');
+const JOURNAL = path.join(RUNTIME_ROOT, 'doorbell', 'diagnostics', 'evidence.json');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function now() { return new Date().toISOString(); }

@@ -14,8 +14,8 @@ Riverview owns:
 
 - `tools/riverview_doorbell_bridge.cjs`;
 - `tools/riverview_browser_runtime.cjs`;
-- `runtime/doorbell/` configuration and diagnostics;
-- `runtime/browser/profile/` persistent browser profile;
+- `A:\Riverview\runtime\doorbell\` configuration and diagnostics;
+- `A:\Riverview\runtime\browser\profile\` persistent browser profile;
 - `src/riverview/doorbell/browser_bridge.py`.
 
 The local configuration is created with:

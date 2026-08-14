@@ -8,8 +8,9 @@ const path = require('node:path');
 const bridge = require('./riverview_doorbell_bridge.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
-const PROFILE = path.join(ROOT, 'runtime', 'browser', 'profile');
-const PID_FILE = path.join(ROOT, 'runtime', 'browser', 'runtime.json');
+const RUNTIME_ROOT = path.resolve(ROOT, '..', 'runtime');
+const PROFILE = path.join(RUNTIME_ROOT, 'browser', 'profile');
+const PID_FILE = path.join(RUNTIME_ROOT, 'browser', 'runtime.json');
 
 async function main() {
   let config;

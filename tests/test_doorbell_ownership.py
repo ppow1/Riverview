@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from riverview.doorbell.config import bootstrap_config, load_config
+from riverview.doorbell.config import RUNTIME_ROOT, bootstrap_config, load_config
 
 ROOT = Path(__file__).parents[1]
 RUNTIME_MODULES = [
@@ -17,6 +17,11 @@ def test_runtime_has_no_external_estate_path_dependency():
             source = file.read_text(encoding="utf-8")
             assert "A:\\theestate" not in source
             assert "A:\\theestate-data" not in source
+
+
+def test_mutable_runtime_root_is_outside_repository():
+    assert RUNTIME_ROOT == ROOT.parent / "runtime"
+    assert not str(RUNTIME_ROOT).startswith(str(ROOT / "runtime"))
 
 
 def test_bootstrap_writes_riverview_owned_safe_config(tmp_path):

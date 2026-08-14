@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-RUNTIME_ROOT = REPOSITORY_ROOT / "runtime"
+RUNTIME_ROOT = REPOSITORY_ROOT.parent / "runtime"
 DOORBELL_ROOT = RUNTIME_ROOT / "doorbell"
 CONFIG_PATH = DOORBELL_ROOT / "config" / "doorbell.json"
 PROFILE_PATH = RUNTIME_ROOT / "browser" / "profile"
