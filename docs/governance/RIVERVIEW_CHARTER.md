@@ -1,6 +1,6 @@
 <!--
 File: docs/governance/RIVERVIEW_CHARTER.md
-Version: 1.0.0
+Version: 1.1.0
 Date: 2026-08-14
 Purpose: Mission, North Star, authority, and anti-drift charter for Project Riverview.
 -->
@@ -106,7 +106,9 @@ These remain bounded adapters and surfaces. They must not become hidden alternat
 
 ## 10. Anti-drift and context-reset protocol
 
-This Charter is the first mission-control document after `AI_HINTS.md`.
+This Charter is the first mission-control document after `AI_HINTS.md`. It is a working anti-drift anchor, not a document that is read once and forgotten.
+
+The agent must keep a compact Charter anchor in active working context: the mission, North Star, current dependency-ready waypoint, prohibited drift, Steward checkpoints, data/Undercurrent boundary, and exact next bounded action. Refresh that anchor often enough that it does not fall outside the usable context window.
 
 Every ChatGPT, Codex, Codex CLI, Grace, local-AI, or engineering session must read this Charter completely:
 
@@ -116,6 +118,12 @@ Every ChatGPT, Codex, Codex CLI, Grace, local-AI, or engineering session must re
 - When the active objective becomes unclear.
 - Before accepting a material scope or architecture change.
 - Before resuming work after a long interruption.
+- At the beginning of every new roadmap waypoint or installer/repair/publisher stage.
+- After receiving and interpreting each substantial execution report.
+- Before generating the next executable artifact or changing the active path.
+- Whenever the agent cannot immediately state the mission, current waypoint, exact next action, and prohibited scope without reconstructing them from old conversation turns.
+
+Reading the Charter once at conversation start is insufficient when the session is long. Re-anchor proactively before context loss is suspected, and again whenever any trigger above occurs.
 
 After reading it, the agent must re-anchor against:
 
