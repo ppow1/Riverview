@@ -1,6 +1,6 @@
 <!--
 File: docs/operations/RIVERVIEW_ENGINEERING_INTERACTION_CONTRACT.md
-Version: 1.1.0
+Version: 1.2.0
 Date: 2026-08-14
 Purpose: Canonical operating contract for Steward-to-AI engineering work on Project Riverview.
 -->
@@ -45,6 +45,8 @@ Before creating, modifying, repairing, testing, publishing, or promoting Rivervi
 The canonical Charter is `docs/governance/RIVERVIEW_CHARTER.md`.
 
 Every ChatGPT, Codex, Codex CLI, Grace, local-AI, or engineering session must read it completely before its first Riverview action and again after any conversation handoff, context compaction, truncation, reset, long interruption, loss of the active objective, or proposed material change.
+
+The Charter is a continuously refreshed working-context anchor. Keep its mission, North Star, current dependency-ready waypoint, prohibited scope, Steward checkpoints, data/Undercurrent boundary, and exact next bounded action in active context. Refresh this anchor at every new waypoint or installer/repair/publisher stage, after every substantial execution report, before creating the next executable artifact or changing direction, and whenever these facts cannot be stated immediately without reconstructing old conversation turns. Do not wait for a context failure to become obvious.
 
 After every such reset, explicitly re-anchor to the Charter's mission, North Star, Steward relationship, Continuous Momentum Engine mandate, simplicity boundary, data/Undercurrent boundary, prohibited drift, verified GitHub state, authoritative PostgreSQL state when accessible, and the current dependency-ready roadmap waypoint.
 
