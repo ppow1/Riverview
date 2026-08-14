@@ -17,3 +17,4 @@ Smallest repair: Add the single verified project file to the explicit manifest, 
 Verification: Rerun the publisher. Every observed path must match one exact manifest entry; staged whitespace, acceptance, push, remote commit equality, and final clean-tree checks must pass.
 
 Observed resolution: `tools/powershell/database/Install-RiverviewPostgreSQL.ps1` was created during the approved native PostgreSQL installation and was added as one exact path in publisher v0.2.1.
+Observed status-view manifestation: default porcelain output condensed an untracked package to an untracked directory summary. Publication scope must use `--untracked-files=all` so every file is independently allowlisted.

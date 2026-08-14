@@ -34,6 +34,7 @@ Every checkpoint records:
 - `RIV-PLY-*` — Playwright doorbell and conversation state
 - `RIV-LOC-*` — local execution adapters
 - `RIV-SEC-*` — classification and Undercurrent boundaries
+- `RIV-UI-*` — read-only Steward status and operator surfaces
 
 ## Acceptance rule
 
@@ -44,3 +45,5 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-WRK-0007` — PostgreSQL listener startup failure
 - `RIV-WRK-0008` — bounded worker stop failure
 - `RIV-WRK-0009` — notification-loop invariant failure
+
+- `RIV-UI-0001` through `RIV-UI-0006` — status routing, projection, bind, acceptance, environment, and exit failures

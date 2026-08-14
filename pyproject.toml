@@ -1,12 +1,12 @@
 # Riverview Python Project Configuration
-# Version: 0.6.1
+# Version: 0.7.0
 [build-system]
 requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
 name = "riverview-kernel"
-version = "0.6.1"
+version = "0.7.0"
 description = "Diagnostics-first kernel for The Estate at Riverview"
 requires-python = ">=3.12"
 dependencies = [
