@@ -13,7 +13,7 @@ const ROOT = path.resolve(__dirname, '..');
 const RUNTIME_ROOT = path.resolve(ROOT, '..', 'runtime');
 const CONFIG = process.env.RIVERVIEW_DOORBELL_CONFIG || path.join(RUNTIME_ROOT, 'doorbell', 'config', 'doorbell.json');
 const JOURNAL = path.join(RUNTIME_ROOT, 'doorbell', 'diagnostics', 'evidence.json');
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CHATGPT_CONVERSATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function now() { return new Date().toISOString(); }
 function targetRef(id) { return `target-sha256:${crypto.createHash('sha256').update(id).digest('hex')}`; }
@@ -21,7 +21,7 @@ function loadConfig() {
   const raw = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
   const allowed = ['adapter_version', 'browser_executable', 'cdp_port', 'conversation_id'];
   if (Object.keys(raw).sort().join(',') !== allowed.join(',')) throw Error('RIV-PLY-0011');
-  if (!UUID.test(raw.conversation_id) || !Number.isInteger(raw.cdp_port) || raw.cdp_port < 9225 || raw.cdp_port > 9325) throw Error('RIV-PLY-0011');
+  if (!CHATGPT_CONVERSATION_ID.test(raw.conversation_id) || !Number.isInteger(raw.cdp_port) || raw.cdp_port < 9225 || raw.cdp_port > 9325) throw Error('RIV-PLY-0011');
   if (typeof raw.browser_executable !== 'string' || !path.isAbsolute(raw.browser_executable)) throw Error('RIV-PLY-0011');
   return raw;
 }
