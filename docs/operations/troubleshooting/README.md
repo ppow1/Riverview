@@ -1,4 +1,4 @@
-<!-- Version: 0.1.2 -->
+<!-- Version: 0.3.0 -->
 # Riverview Troubleshooting Cookbook
 
 Status: Designed; initial kernel entries pending implementation evidence.
@@ -24,6 +24,7 @@ Every checkpoint records:
 ## Initial checkpoint namespace
 
 - `RIV-DB-*` — database, migration, transaction, and projection
+- `RIV-DIA-*` — diagnostic persistence and emergency evidence spooling
 - `RIV-BLD-*` — build, packaging, and dependency-environment failures
 - `RIV-EVT-*` — event acceptance and delivery
 - `RIV-WRK-*` — worker assignment, attempts, ownership, and leases
