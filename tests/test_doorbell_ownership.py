@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from riverview.doorbell.config import RUNTIME_ROOT, bootstrap_config, load_config
 
 ROOT = Path(__file__).parents[1]
@@ -30,6 +32,34 @@ def test_bootstrap_writes_riverview_owned_safe_config(tmp_path):
     config = load_config(result)
     assert config.cdp_port == 9225
     assert "theestate" not in str(result).lower()
+
+
+def test_chatgpt_identifier_accepts_non_rfc_uuidv4_shape(tmp_path):
+    config_path = tmp_path / "doorbell.json"
+    bootstrap_config("6a7f910b-1308-83ea-91a3-654e4a7aa4e7", r"C:\\Riverview\\chromium.exe", config_path)
+    assert load_config(config_path).conversation_id == "6a7f910b-1308-83ea-91a3-654e4a7aa4e7"
+
+
+def test_chatgpt_identifier_accepts_case_without_uuid_semantics(tmp_path):
+    config_path = tmp_path / "doorbell.json"
+    bootstrap_config("ABCDEFAB-CDEF-0123-FEDC-ABCDEFABCDEF", r"C:\\Riverview\\chromium.exe", config_path)
+    assert load_config(config_path).conversation_id == "abcdefab-cdef-0123-fedc-abcdefabcdef"
+
+
+def test_chatgpt_identifier_rejects_url_whitespace_and_malformed_values(tmp_path):
+    invalid = [
+        "",
+        " 6a7f910b-1308-83ea-91a3-654e4a7aa4e7",
+        "6a7f910b-1308-83ea-91a3-654e4a7aa4e7 ",
+        "https://chatgpt.com/c/6a7f910b-1308-83ea-91a3-654e4a7aa4e7",
+        "6a7f910b-1308-83ea-91a3-654e4a7aa4",
+        "6a7f910b-1308-83ea-91a3-654e4a7aa4e77",
+        "6a7f910b-1308-83ea-91a3-654e4a7aa4eg",
+        "6a7f910b-1308-83ea-91a3-654e4a7aa4e7-extra",
+    ]
+    for index, value in enumerate(invalid):
+        with pytest.raises(ValueError, match="ChatGPT conversation identifier"):
+            bootstrap_config(value, r"C:\\Riverview\\chromium.exe", tmp_path / f"invalid-{index}.json")
 
 
 def test_config_rejects_secret_fields(tmp_path):
