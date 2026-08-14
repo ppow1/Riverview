@@ -1,6 +1,6 @@
 <!--
 File: docs/operations/RIVERVIEW_ENGINEERING_INTERACTION_CONTRACT.md
-Version: 1.0.0
+Version: 1.1.0
 Date: 2026-08-14
 Purpose: Canonical operating contract for Steward-to-AI engineering work on Project Riverview.
 -->
@@ -20,10 +20,11 @@ When sources appear to disagree, use this order:
 1. The Steward's current explicit instruction.
 2. Authoritative PostgreSQL operational state.
 3. Verified GitHub `main` source and development history.
-4. `AI_HINTS.md` and its complete required-reading chain.
-5. The versioned Riverview master roadmap and accepted architecture decisions.
-6. Durable local diagnostic, acceptance, and publication reports.
-7. Conversation memory.
+4. `AI_HINTS.md` and the complete canonical Riverview Charter.
+5. The remaining `AI_HINTS.md` required-reading chain.
+6. The versioned Riverview master roadmap and accepted architecture decisions.
+7. Durable local diagnostic, acceptance, and publication reports.
+8. Conversation memory.
 
 Conversation context is helpful but is never authoritative state.
 
@@ -38,6 +39,16 @@ Before creating, modifying, repairing, testing, publishing, or promoting Rivervi
 5. Inspect existing implementation, tests, migrations, tools, diagnostics, and Cookbook checkpoints before adding anything.
 6. Confirm whether the requested capability is designed, implemented, installed, running, committed, pushed, and remotely verified. These are different states.
 7. Preserve unrelated work and stop if safe scope isolation is impossible.
+
+## 2A. Charter and context-reset protocol
+
+The canonical Charter is `docs/governance/RIVERVIEW_CHARTER.md`.
+
+Every ChatGPT, Codex, Codex CLI, Grace, local-AI, or engineering session must read it completely before its first Riverview action and again after any conversation handoff, context compaction, truncation, reset, long interruption, loss of the active objective, or proposed material change.
+
+After every such reset, explicitly re-anchor to the Charter's mission, North Star, Steward relationship, Continuous Momentum Engine mandate, simplicity boundary, data/Undercurrent boundary, prohibited drift, verified GitHub state, authoritative PostgreSQL state when accessible, and the current dependency-ready roadmap waypoint.
+
+If the Charter is missing, unreadable, contradictory, or ambiguously superseded, stop implementation and request resolution. Never reconstruct Riverview's mission from partial conversation context.
 
 ## 3. Scope and roadmap discipline
 
