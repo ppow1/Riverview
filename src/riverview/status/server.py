@@ -1,6 +1,6 @@
 """Local HTTP surface for Riverview Steward status.
 
-Version: 0.7.0
+Version: 0.7.1
 """
 
 from __future__ import annotations
@@ -21,14 +21,14 @@ HTML = """<!doctype html>
 <body><h1>The Estate at Riverview</h1><div class="sub">Steward Status · read-only River projection · <span id="stamp">loading</span></div><main class="grid" id="view"></main>
 <script>
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const table=(rows,cols)=>`<table><thead><tr>${cols.map(c=>`<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c[1]])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-async function refresh(){try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);const d=await r.json();document.getElementById('stamp').textContent=`updated ${new Date(d.generated_at).toLocaleTimeString()}`;const counts=Object.fromEntries(d.work_counts.map(x=>[x.status,x.count]));document.getElementById('view').innerHTML=`<section class="card"><h2>River</h2><div class="ok">${esc(d.status)}</div><p>Migrations: ${d.migrations.length}</p><p>Queued: ${counts.queued||0} · Running: ${counts.running||0}</p></section><section class="card"><h2>Workers</h2>${table(d.workers,[['Worker','worker_id'],['State','state'],['Seen','last_seen_at']])}</section><section class="card wide"><h2>Roadmap</h2>${table(d.roadmap,[['Waypoint','waypoint_id'],['Title','title'],['Status','status'],['Updated','updated_at']])}</section><section class="card wide"><h2>Open Steward Escalations</h2>${table(d.escalations,[['Checkpoint','checkpoint_id'],['Reason','reason'],['State','state'],['Created','created_at']])}</section><section class="card wide"><h2>Recent Work</h2>${table(d.recent_work,[['Action','action_type'],['Status','status'],['Checkpoint','error_checkpoint'],['Created','created_at']])}</section><section class="card wide"><h2>Recent Diagnostics</h2>${table(d.diagnostics,[['Checkpoint','checkpoint_id'],['Severity','severity'],['Summary','summary'],['Recovery','recovery_state']])}</section>`}catch(e){document.getElementById('stamp').innerHTML='<span class="bad">RIV-UI-0002 status unavailable</span>'}}
+const table=(rows,cols)=>`<table><thead><tr>${cols.map(c=>`<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c[1]] ?? '--')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+async function refresh(){try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);const d=await r.json();document.getElementById('stamp').textContent=`updated ${new Date(d.generated_at).toLocaleTimeString()}`;const counts=Object.fromEntries(d.work_counts.map(x=>[x.status,x.count]));document.getElementById('view').innerHTML=`<section class="card"><h2>River</h2><div class="ok">${esc(d.status)}</div><p>Migrations: ${d.migrations.length}</p><p>Queued: ${counts.queued||0} · Running: ${counts.running||0}</p></section><section class="card"><h2>Workers</h2>${table(d.workers,[['Worker','worker_id'],['State','state'],['Seen','last_seen_at']])}</section><section class="card wide"><h2>Roadmap</h2>${table(d.roadmap,[['Waypoint','waypoint_id'],['Title','title'],['Status','status'],['Updated','status_changed_at']])}</section><section class="card wide"><h2>Open Steward Escalations</h2>${table(d.escalations,[['Checkpoint','checkpoint_id'],['Reason','reason'],['State','state'],['Created','created_at']])}</section><section class="card wide"><h2>Recent Work</h2>${table(d.recent_work,[['Action','action_type'],['Status','status'],['Checkpoint','error_checkpoint'],['Created','created_at']])}</section><section class="card wide"><h2>Recent Diagnostics</h2>${table(d.diagnostics,[['Checkpoint','checkpoint_id'],['Severity','severity'],['Summary','summary'],['Recovery','recovery_state']])}</section>`}catch(e){document.getElementById('stamp').innerHTML='<span class="bad">RIV-UI-0002 status unavailable</span>'}}
 refresh();setInterval(refresh,3000);
 </script></body></html>"""
 
 
 class StatusHandler(BaseHTTPRequestHandler):
-    server_version = "RiverviewStatus/0.7.0"
+    server_version = "RiverviewStatus/0.7.1"
 
     def log_message(self, format: str, *args: Any) -> None:
         return
