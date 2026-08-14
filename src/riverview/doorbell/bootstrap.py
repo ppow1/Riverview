@@ -10,7 +10,7 @@ from .config import bootstrap_config
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bootstrap the Riverview doorbell runtime.")
     parser.add_argument("--conversation-id", required=True)
-    parser.add_argument("--browser-executable", required=True)
+    parser.add_argument("--browser-executable")
     args = parser.parse_args()
     print(bootstrap_config(args.conversation_id, args.browser_executable))
 

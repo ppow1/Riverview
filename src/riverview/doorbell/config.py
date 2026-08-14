@@ -24,6 +24,20 @@ class DoorbellRuntimeConfig:
     adapter_version: str = "1.0.0"
 
 
+def discover_browser_executable() -> Path:
+    candidates = [
+        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+        Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Chrome/Application/chrome.exe",
+    ]
+    playwright_root = Path(os.environ.get("LOCALAPPDATA", "")) / "ms-playwright"
+    candidates.extend(sorted(playwright_root.glob("chromium-*/chrome-win64/chrome.exe"), reverse=True))
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise ValueError("RIV-PLY-0013: no supported local Chromium executable was found.")
+
+
 def load_config(path: Path = CONFIG_PATH) -> DoorbellRuntimeConfig:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -44,10 +58,11 @@ def load_config(path: Path = CONFIG_PATH) -> DoorbellRuntimeConfig:
     return DoorbellRuntimeConfig(conversation_id, executable, port, raw["adapter_version"])
 
 
-def bootstrap_config(conversation_id: str, browser_executable: str, path: Path = CONFIG_PATH) -> Path:
+def bootstrap_config(conversation_id: str, browser_executable: str | None = None, path: Path = CONFIG_PATH) -> Path:
     if not CONVERSATION_ID.fullmatch(conversation_id):
         raise ValueError("RIV-PLY-0011: conversation ID must be a UUID.")
-    executable = Path(browser_executable).expanduser().resolve()
+    executable = (Path(browser_executable).expanduser().resolve()
+                  if browser_executable else discover_browser_executable())
     if not executable.is_absolute():
         raise ValueError("RIV-PLY-0011: browser executable must be an absolute local path.")
     path.parent.mkdir(parents=True, exist_ok=True)

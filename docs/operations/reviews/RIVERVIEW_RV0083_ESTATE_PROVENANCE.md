@@ -21,9 +21,10 @@ Riverview owns:
 The local configuration is created with:
 
 ```powershell
-python -m riverview.doorbell.bootstrap --conversation-id <uuid> --browser-executable <absolute-local-path>
+python -m riverview.doorbell.bootstrap --conversation-id <uuid>
 ```
 
-The command stores only target identity, browser executable path, localhost
-CDP port, and adapter version. Authentication remains a normal interactive
+The command discovers a supported installed Chromium executable unless an
+explicit local override is supplied. It stores only target identity, browser
+executable path, localhost CDP port, and adapter version. Authentication remains a normal interactive
 browser-profile action and is never captured by Riverview.
