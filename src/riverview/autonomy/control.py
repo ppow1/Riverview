@@ -97,7 +97,7 @@ class CapabilityRegistry:
         health_status: str = "unknown",
         capability_id: UUID | None = None,
     ) -> UUID:
-        if not capability_name or not provider_id or health_status not in {"unknown", "healthy", "unhealthy", "disabled"}:
+        if not capability_name or not provider_id or "openai" in provider_id.lower() or health_status not in {"unknown", "healthy", "unhealthy", "disabled"}:
             raise ValueError("RIV-CAP-0001: capability registration is invalid.")
         capability_id = capability_id or uuid4()
         with connect() as connection, connection.cursor() as cursor:
@@ -146,6 +146,15 @@ class CapabilityRegistry:
             if row is None:
                 return None
             return dict(zip(("capability_name", "provider_id", "version", "concurrency_limit", "current_load", "observed_at"), row, strict=True))
+
+    def dispatch(self, task: str, *, classification: str = "river", max_age_seconds: int = 300) -> dict[str, Any]:
+        """Return deterministic provider selection and the reason for it."""
+        if classification not in {"river", "internal"}:
+            raise ValueError("RIV-CAP-0001: protected classification cannot enter this dispatch path.")
+        selected = self.select(task, max_age_seconds=max_age_seconds)
+        if selected is None:
+            return {"selected": None, "reason": "no enabled healthy capability has fresh compatible capacity", "classification": classification}
+        return {"selected": selected, "reason": "lowest current load among enabled healthy measured capabilities with fresh compatible capacity", "classification": classification}
 
 
 class GraceMomentum:

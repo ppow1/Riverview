@@ -47,3 +47,10 @@ def test_capacity_freshness_bound_is_validated() -> None:
 
     with pytest.raises(ValueError, match="freshness"):
         CapabilityRegistry().select("bounded-engineering", max_age_seconds=0)
+
+
+def test_dispatch_rejects_protected_classification() -> None:
+    from riverview.autonomy import CapabilityRegistry
+
+    with pytest.raises(ValueError, match="protected"):
+        CapabilityRegistry().dispatch("bounded-engineering", classification="undercurrent")

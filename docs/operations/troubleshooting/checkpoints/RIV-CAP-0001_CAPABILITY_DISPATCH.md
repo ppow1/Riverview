@@ -23,6 +23,10 @@ descriptive provider label for a health probe.
 VERIFY: Repeat selection and retain the capability/version, observed capacity, and
 correlation in the execution envelope.
 
+The freshness failure/recovery probe was verified on 2026-08-15 by aging the local
+Codex telemetry beyond the five-minute bound (selection returned no provider), then
+refreshing the measured telemetry (selection returned `codex.engineering.v1`).
+
 DO NOT: route to an OpenAI API model, bypass capacity/backoff, or expose provider
 credentials in an envelope or Cookbook entry.
 
