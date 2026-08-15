@@ -40,3 +40,10 @@ def test_envelope_rejects_bad_base_sha() -> None:
 def test_retry_policy_is_one_bounded_retry() -> None:
     assert RetryPolicy().decide("relay.noop", 1, failure_class="timeout")["retry"] is True
     assert RetryPolicy().decide("relay.noop", 2, failure_class="timeout")["retry"] is False
+
+
+def test_capacity_freshness_bound_is_validated() -> None:
+    from riverview.autonomy import CapabilityRegistry
+
+    with pytest.raises(ValueError, match="freshness"):
+        CapabilityRegistry().select("bounded-engineering", max_age_seconds=0)

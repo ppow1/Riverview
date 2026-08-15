@@ -128,16 +128,19 @@ class CapabilityRegistry:
                 (row[0], available, concurrency_limit, current_load, _json(fuel or {}), backoff_until),
             )
 
-    def select(self, task: str) -> dict[str, Any] | None:
+    def select(self, task: str, *, max_age_seconds: int = 300) -> dict[str, Any] | None:
+        if not 1 <= max_age_seconds <= 86_400:
+            raise ValueError("RIV-CAP-0002: freshness bound is invalid.")
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """SELECT c.capability_name,c.provider_id,c.version,cc.concurrency_limit,cc.current_load,cc.observed_at
                    FROM capabilities c JOIN capability_capacity cc ON cc.capability_id=c.capability_id
                    WHERE c.enabled=true AND c.health_status='healthy' AND cc.available=true
                    AND cc.current_load < cc.concurrency_limit AND %s = ANY(SELECT jsonb_array_elements_text(c.supported_tasks))
+                   AND cc.observed_at >= now()-make_interval(secs=>%s)
                    AND (cc.backoff_until IS NULL OR cc.backoff_until <= now())
                    ORDER BY cc.current_load ASC,c.capability_name ASC LIMIT 1""",
-                (task,),
+                (task, max_age_seconds),
             )
             row = cursor.fetchone()
             if row is None:
