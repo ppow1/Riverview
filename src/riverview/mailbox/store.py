@@ -60,6 +60,21 @@ class MailboxResponse:
     classification: str
 
 
+def _claim_action(message: MailboxMessage, owner_id: str, current_time: datetime) -> str:
+    """Return the bounded claim action for one locked mailbox row."""
+    if message.completion_state != "pending" or message.expires_at <= current_time:
+        raise RuntimeError("RIV-MCP-0008: request is complete, expired, or missing.")
+    if message.claim_state != "claimed":
+        return "acquire"
+    if message.claim_owner == owner_id and message.claim_expires_at is not None:
+        if message.claim_expires_at > current_time:
+            return "retry"
+        return "reclaim_expired"
+    if message.claim_expires_at is not None and message.claim_expires_at <= current_time:
+        return "reclaim_expired"
+    raise RuntimeError("RIV-MCP-0008: request is already claimed by another owner.")
+
+
 def _bounded(value: Any | None, reference: str | None, label: str) -> tuple[Any | None, str | None]:
     if (value is None) == (reference is None):
         raise ValueError(f"RIV-MCP-0007: exactly one {label} or {label}_ref is required.")
@@ -254,17 +269,9 @@ class MailboxStore:
             if row is None:
                 raise RuntimeError("RIV-MCP-0008: claim target is missing.")
             current = self._message(row)
-            if current.completion_state != "pending":
-                raise RuntimeError("RIV-MCP-0008: request is complete, expired, or missing.")
-            if (
-                current.claim_state == "claimed"
-                and current.claim_owner == owner_id
-                and current.claim_expires_at is not None
-                and current.claim_expires_at > datetime.now(UTC)
-            ):
+            action = _claim_action(current, owner_id, datetime.now(UTC))
+            if action == "retry":
                 return current
-            if current.claim_state == "claimed":
-                raise RuntimeError("RIV-MCP-0008: request is already claimed by another owner.")
             cursor.execute(
                 """UPDATE mailbox_messages SET claim_state='claimed',claim_owner=%s,claim_expires_at=now()+make_interval(secs=>%s),claimed_at=now()
                    WHERE request_id=%s AND completion_state='pending' AND (claim_state IN ('unclaimed','released','expired') OR claim_expires_at<now())""",

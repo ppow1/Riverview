@@ -49,6 +49,14 @@ timeout escalation; replay reports zero additional escalations.
   but the prior generic response-write schema was blocked twice before Riverview
   accepted the call. This is a ChatGPT tool-contract boundary, not evidence of
   PostgreSQL or mailbox failure.
+- `EXPIRED CLAIM REMAINS WEDGED AS ANOTHER OWNER`: a pending, acknowledged
+  request with an expired lease rejected a reclaim because the implementation
+  treated every `claimed` row as active. This is a mailbox lifecycle defect.
+- `CHATGPT APP ADMIN SHOWS NEW TOOL SCHEMA BUT EXISTING CONVERSATION RECEIVES
+  OLD TOOL SCHEMA`: Apps administration showed the repaired advisory tool while
+  existing conversations still received `mailbox_submit_response`. This is a
+  conversation-level schema binding/cache boundary unless registration evidence
+  proves otherwise.
 - A response accepted but the request remains incomplete indicates a transaction
   or schema mismatch; it is not a reason to replay the response blindly.
 - A real doorbell may succeed while the designated ChatGPT conversation leaves
@@ -81,6 +89,12 @@ but finite TTL.
 If a fresh request remains untouched after one known successful wake, require one
 new reasoning turn in the designated conversation; do not issue another wake.
 
+For stale claims, an unexpired active claim remains exclusive. After the claim
+lease expires, the bounded claim operation may reacquire it while preserving
+request and correlation identity. An expired request itself is terminal and
+must not be revived. The exposed reasoning claim path still fixes the consumer
+to `chatgpt:riverview_001`.
+
 ## VERIFY
 
 Rerun the local acceptance, external authenticated MCP acceptance, and schema
@@ -109,6 +123,12 @@ call, and do not scrape the conversation to manufacture that evidence.
 Repeated retries of a platform-blocked response tool are not a repair. Narrow
 the contract, deploy it, refresh the application schema, and resume only the
 same request if it remains valid; never revive an expired request.
+
+If Apps administration shows a new schema but an existing conversation exposes
+the old schema, compare the public tool list and application metadata first.
+Riverview cannot invalidate a conversation-level snapshot unless the platform
+provides such a control. Do not create requests or applications to mask that
+binding discrepancy.
 
 ## EVIDENCE
 

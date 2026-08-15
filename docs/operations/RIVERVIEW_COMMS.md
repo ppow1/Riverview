@@ -113,6 +113,12 @@ accepted the call. The repair is the narrower
 `mailbox_submit_advisory_response` contract; the request remains historical and
 must not be revived after expiry.
 
+The current schema-binding diagnostic is separate: ChatGPT Apps administration
+shows the repaired advisory tool, while existing conversations may continue to
+receive the prior tool snapshot. Riverview's public endpoint advertises only
+the repaired tool; conversation-level invalidation is a ChatGPT platform
+boundary unless an explicit refresh control is provided.
+
 Riverview Comms explicitly does not expose arbitrary SQL, filesystem access,
 shell or process authority, secrets, arbitrary writes, roadmap mutation,
 work-order creation, Undercurrent, or general browser control. The three
