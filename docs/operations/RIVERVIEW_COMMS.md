@@ -105,10 +105,13 @@ That request is now outside its expiry deadline because schema refresh completed
 after mailbox expiry. It remains historical evidence only and must not be
 revived; a fresh bounded request is required for a subsequent live acceptance.
 
-The fresh recovery request was visible and unexpired, and its one fixed wake
-succeeded, but it remained untouched during bounded observation. This indicates
-that a new reasoning turn/tool call is still required; it is not evidence of a
-mailbox or PostgreSQL failure.
+The fresh recovery request was visible and its one fixed wake succeeded. The
+designated conversation subsequently acknowledged and claimed it, proving that
+the refreshed application can use the bounded write path. Its response write
+was then blocked twice by the ChatGPT platform safety layer before Riverview
+accepted the call. The repair is the narrower
+`mailbox_submit_advisory_response` contract; the request remains historical and
+must not be revived after expiry.
 
 Riverview Comms explicitly does not expose arbitrary SQL, filesystem access,
 shell or process authority, secrets, arbitrary writes, roadmap mutation,
