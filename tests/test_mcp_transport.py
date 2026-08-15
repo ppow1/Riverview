@@ -25,15 +25,22 @@ def test_no_action_adapter_is_exposed_by_server_module() -> None:
     assert not (public & prohibited)
 
 
+def test_only_named_mailbox_write_operations_are_exposed() -> None:
+    assert {"mailbox_acknowledge", "mailbox_claim", "mailbox_submit_response"} <= {
+        name for name in dir(server) if name.startswith("mailbox_")
+    }
+    assert not any(name in {"mailbox_update", "execute_sql", "enqueue_anything"} for name in dir(server))
+
+
 def test_comms_manifest_is_named_and_read_only() -> None:
     from tools.riverview_comms_manifest import APPLICATION, PROHIBITED, TOOLS, VERSION
 
     assert APPLICATION == "Riverview Comms"
-    assert VERSION == "0.11.0"
+    assert VERSION == "0.12.0"
     assert "current_position" in TOOLS
     assert "resource_work" in TOOLS
     assert "mailbox_requests" in TOOLS
-    assert "write" in PROHIBITED
+    assert "arbitrary_write" in PROHIBITED
 
 
 def test_http_entrypoint_rejects_non_loopback_binding(monkeypatch) -> None:

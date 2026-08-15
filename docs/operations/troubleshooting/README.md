@@ -60,5 +60,6 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-COMMS-0003` - HTTPS ingress, bearer authentication, and ChatGPT registration
 - `RIV-PLY-0001` - bounded doorbell contract
 - `RIV-PLY-0002` - browser and doorbell end-to-end boundary
+- `RIV-MCP-0009` - full-loop mailbox and bounded reasoning response
 - `RIV-MCP-0007`/`RIV-MCP-0008` - mailbox payload and correlation lifecycle
 - `RIV-RDM-0007` - RV-008.3 promotion evidence and authoritative-state reconciliation

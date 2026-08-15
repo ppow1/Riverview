@@ -24,6 +24,9 @@ REQUIRED = {
     "recent_diagnostic_events",
     "troubleshooting_cookbook",
     "mailbox_requests",
+    "mailbox_acknowledge",
+    "mailbox_claim",
+    "mailbox_submit_response",
     "resource_roadmap",
     "resource_work",
     "resource_reports",
@@ -103,7 +106,7 @@ async def _accept() -> dict[str, Any]:
         return {
             "status": "healthy",
             "transport": "stdio",
-            "authority": "read_only",
+            "authority": "read_only_plus_bounded_mailbox_writes",
             "tool_count": len(names),
             "required_tools_present": True,
             "prohibited_tools_present": False,

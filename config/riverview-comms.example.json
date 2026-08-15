@@ -1,11 +1,11 @@
 {
   "application": "Riverview Comms",
-  "version": "0.10.0",
+  "version": "0.12.0",
   "transport": "streamable-http",
   "endpoint": "https://replace-with-approved-riverview-ingress.example/mcp",
   "health_endpoint": "https://replace-with-approved-riverview-ingress.example/healthz",
   "authentication": "bearer",
-  "authority": "read_only",
+  "authority": "read_only_plus_bounded_mailbox_writes",
   "source_of_truth": "postgresql",
   "registration_required": true,
   "secrets_in_manifest": false

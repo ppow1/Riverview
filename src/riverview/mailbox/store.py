@@ -21,6 +21,7 @@ from riverview.river import Classification, RiverEvent
 MAX_PAYLOAD_BYTES = 16_384
 MAX_REFERENCE_LENGTH = 512
 ALLOWED_CLASSIFICATIONS = frozenset(item.value for item in Classification)
+REASONING_CONSUMER_ID = "chatgpt:riverview_001"
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,6 +240,11 @@ class MailboxStore:
             )
             return message
 
+    def acknowledge_reasoning(self, request_id: UUID, correlation_id: UUID) -> MailboxMessage:
+        message = self.get(request_id)
+        _require_reasoning_message(message, correlation_id)
+        return self.acknowledge(request_id, REASONING_CONSUMER_ID)
+
     def claim(self, request_id: UUID, owner_id: str, lease_seconds: int = 30) -> MailboxMessage:
         if not owner_id.strip() or not 1 <= lease_seconds <= 3_600:
             raise ValueError("RIV-MCP-0008: claim owner and lease are invalid.")
@@ -282,6 +288,13 @@ class MailboxStore:
                 ),
             )
             return message
+
+    def claim_reasoning(self, request_id: UUID, correlation_id: UUID, lease_seconds: int = 120) -> MailboxMessage:
+        message = self.get(request_id)
+        _require_reasoning_message(message, correlation_id)
+        if message.acknowledgement_state != "acknowledged":
+            raise RuntimeError("RIV-MCP-0008: reasoning claim requires acknowledgement.")
+        return self.claim(request_id, REASONING_CONSUMER_ID, lease_seconds)
 
     def respond(
         self,
@@ -363,6 +376,56 @@ class MailboxStore:
                 classification,
             )
 
+    def respond_reasoning(
+        self,
+        request_id: UUID,
+        correlation_id: UUID,
+        *,
+        response_type: str,
+        summary: str,
+        evidence_refs: list[str],
+        escalation_required: bool,
+    ) -> MailboxResponse:
+        message = self.get(request_id)
+        if message is None:
+            raise RuntimeError("RIV-MCP-0008: mailbox request is missing.")
+        if message.correlation_id != correlation_id:
+            raise ValueError("RIV-MCP-0008: mailbox correlation identity does not match the request.")
+        if response_type not in {"advice", "escalation", "seed_result"}:
+            raise ValueError("RIV-MCP-0007: response_type is outside the bounded reasoning envelope.")
+        if not summary.strip() or len(summary) > 2_048:
+            raise ValueError("RIV-MCP-0007: reasoning summary is empty or exceeds 2048 characters.")
+        if len(evidence_refs) > 8 or any(not ref.strip() or len(ref) > MAX_REFERENCE_LENGTH for ref in evidence_refs):
+            raise ValueError("RIV-MCP-0007: evidence_refs exceed the bounded reasoning envelope.")
+        if message.completion_state == "completed":
+            return self.respond(
+                request_id,
+                responder_id=REASONING_CONSUMER_ID,
+                response_type=response_type,
+                payload={
+                    "schema_version": "rv-008.4-response-v1",
+                    "summary": summary,
+                    "evidence_refs": evidence_refs,
+                    "escalation_required": escalation_required,
+                },
+                classification=Classification.RIVER.value,
+            )
+        _require_reasoning_message(message, correlation_id)
+        if message.claim_state != "claimed" or message.claim_owner != REASONING_CONSUMER_ID:
+            raise RuntimeError("RIV-MCP-0008: reasoning response requires the active reasoning claim.")
+        return self.respond(
+            request_id,
+            responder_id=REASONING_CONSUMER_ID,
+            response_type=response_type,
+            payload={
+                "schema_version": "rv-008.4-response-v1",
+                "summary": summary,
+                "evidence_refs": evidence_refs,
+                "escalation_required": escalation_required,
+            },
+            classification=Classification.RIVER.value,
+        )
+
     def expire(self) -> list[UUID]:
         with connect(self._config) as connection, connection.cursor() as cursor:
             cursor.execute(
@@ -384,9 +447,69 @@ class MailboxStore:
                 )
             return [row[0] for row in rows]
 
+    def expire_and_escalate(self) -> list[UUID]:
+        """Expire due requests and open one Steward escalation per request."""
+        with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT request_id,correlation_id,causation_id FROM mailbox_messages
+                   WHERE completion_state='pending' AND expires_at<=now() FOR UPDATE SKIP LOCKED"""
+            )
+            rows = cursor.fetchall()
+            for request_id, correlation_id, causation_id in rows:
+                cursor.execute(
+                    """UPDATE mailbox_messages SET completion_state='expired',claim_state='expired',completed_at=now()
+                       WHERE request_id=%s AND completion_state='pending'""",
+                    (request_id,),
+                )
+                _event(
+                    cursor,
+                    RiverEvent(
+                        event_type="mailbox.request.expired",
+                        aggregate_type="mailbox_request",
+                        aggregate_id=request_id,
+                        correlation_id=correlation_id,
+                        causation_id=causation_id or request_id,
+                        idempotency_key=f"mailbox.request.expired:{request_id}",
+                        payload={},
+                    ),
+                )
+                evidence = [f"mailbox:request:{request_id}", f"correlation:{correlation_id}"]
+                cursor.execute(
+                    """INSERT INTO steward_escalations(
+                           escalation_id,mailbox_request_id,checkpoint_id,reason,state,evidence_refs)
+                       VALUES(%s,%s,'RIV-MCP-0008','Mailbox request expired before bounded reasoning response.','open',%s::jsonb)
+                       ON CONFLICT DO NOTHING""",
+                    (uuid4(), request_id, json.dumps(evidence)),
+                )
+                _event(
+                    cursor,
+                    RiverEvent(
+                        event_type="mailbox.timeout.escalated",
+                        aggregate_type="mailbox_request",
+                        aggregate_id=request_id,
+                        correlation_id=correlation_id,
+                        causation_id=request_id,
+                        idempotency_key=f"mailbox.timeout.escalated:{request_id}",
+                        payload={"checkpoint_id": "RIV-MCP-0008"},
+                    ),
+                )
+            return [row[0] for row in rows]
+
     @staticmethod
     def _locked(cursor: Any, request_id: UUID) -> MailboxMessage:
         cursor.execute(
             MailboxStore._select_sql() + " WHERE request_id=%s FOR UPDATE", (request_id,)
         )
         return MailboxStore._message(cursor.fetchone())
+
+
+def _require_reasoning_message(message: MailboxMessage | None, correlation_id: UUID) -> MailboxMessage:
+    if message is None:
+        raise RuntimeError("RIV-MCP-0008: mailbox request is missing.")
+    if message.classification != Classification.RIVER.value:
+        raise ValueError("RIV-SEC-0001: protected mailbox classification is not available to reasoning.")
+    if message.correlation_id != correlation_id:
+        raise ValueError("RIV-MCP-0008: mailbox correlation identity does not match the request.")
+    if message.completion_state != "pending":
+        raise RuntimeError("RIV-MCP-0008: mailbox request is not pending.")
+    return message

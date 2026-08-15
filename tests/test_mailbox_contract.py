@@ -36,3 +36,13 @@ def test_mailbox_rejects_protected_classification_before_database_access() -> No
 def test_mailbox_retry_contract_methods_are_available() -> None:
     assert callable(MailboxStore.acknowledge)
     assert callable(MailboxStore.claim)
+    assert callable(MailboxStore.acknowledge_reasoning)
+    assert callable(MailboxStore.claim_reasoning)
+    assert callable(MailboxStore.respond_reasoning)
+    assert callable(MailboxStore.expire_and_escalate)
+
+
+def test_reasoning_consumer_identity_is_fixed() -> None:
+    from riverview.mailbox import REASONING_CONSUMER_ID
+
+    assert REASONING_CONSUMER_ID == "chatgpt:riverview_001"

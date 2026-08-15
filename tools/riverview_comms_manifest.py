@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 APPLICATION = "Riverview Comms"
-VERSION = "0.11.0"
+VERSION = "0.12.0"
 TOOLS = (
     "roadmap_revision",
     "waypoints",
@@ -27,6 +27,9 @@ TOOLS = (
     "recent_diagnostic_events",
     "troubleshooting_cookbook",
     "mailbox_requests",
+    "mailbox_acknowledge",
+    "mailbox_claim",
+    "mailbox_submit_response",
     "resource_roadmap",
     "resource_work",
     "resource_reports",
@@ -42,7 +45,7 @@ PROHIBITED = (
     "credentials",
     "secrets",
     "undercurrent",
-    "write",
+    "arbitrary_write",
 )
 
 
@@ -60,7 +63,7 @@ def manifest(endpoint: str) -> dict[str, Any]:
         "endpoint": endpoint.rstrip("/") + "/mcp",
         "health_endpoint": endpoint.rstrip("/") + "/healthz",
         "authentication": "bearer",
-        "authority": "read_only",
+        "authority": "read_only_plus_bounded_mailbox_writes",
         "source_of_truth": "postgresql",
         "tools": list(TOOLS),
         "prohibited_capabilities": list(PROHIBITED),

@@ -1,6 +1,6 @@
 # Riverview Comms
 
-Version: 0.12.0
+Version: 0.13.0
 Checkpoint date: 2026-08-14
 Status: external MCP accepted; Riverview Comms is connected to the designated
 ChatGPT conversation; RV-008.3 bounded wake acceptance is complete.
@@ -70,18 +70,36 @@ Application identity: `Riverview Comms`.
 
 The accepted surface contains:
 
-- 16 bounded tools, including the classification-filtered `mailbox_requests` read;
+- 19 bounded tools, including the classification-filtered `mailbox_requests` read
+  and fixed reasoning-consumer writes: `mailbox_acknowledge`, `mailbox_claim`,
+  and `mailbox_submit_response`;
 - 6 resource templates;
 - PostgreSQL-backed reads;
-- read-only authority;
+- read-only projections plus bounded typed mailbox-write authority;
 - local stdio MCP transport;
 - Streamable HTTP MCP transport.
 
 The accepted ingress paths are `/healthz` and `/mcp`.
 
+The bounded reasoning write contract is:
+
+- `mailbox_acknowledge(request_id, correlation_id)`;
+- `mailbox_claim(request_id, correlation_id, lease_seconds)`;
+- `mailbox_submit_response(request_id, correlation_id, response_type, summary,
+  evidence_refs, escalation_required)`.
+
+These operations are fixed to the designated `chatgpt:riverview_001` consumer,
+accept only River-classified requests, preserve correlation, enforce leases and
+payload bounds, and never provide a generic state setter. A response completes
+the request transactionally. Timeout expiry and exactly-once Steward escalation
+are performed by the bounded mailbox service, not by arbitrary ChatGPT input.
+
 Riverview Comms explicitly does not expose arbitrary SQL, filesystem access,
-shell or process authority, secrets, unrestricted write authority, Undercurrent,
-or general browser control.
+shell or process authority, secrets, arbitrary writes, roadmap mutation,
+work-order creation, Undercurrent, or general browser control. The three
+mailbox writes are fixed typed operations for the designated
+`chatgpt:riverview_001` reasoning consumer and preserve request/correlation,
+classification, payload, lease, and lifecycle bounds.
 
 ## Runtime and deployment topology
 
@@ -174,6 +192,7 @@ it does not replace the operational troubleshooting checkpoints.
 - [HTTPS, authentication, and registration](troubleshooting/checkpoints/RIV-COMMS-0003_HTTPS_AUTH_REGISTRATION.md)
 - [Browser doorbell and end-to-end acceptance](troubleshooting/checkpoints/RIV-PLY-0002_BROWSER_DOORBELL_END_TO_END.md)
 - [Promotion evidence](troubleshooting/checkpoints/RIV-RDM-0007_PROMOTION_EVIDENCE.md)
+- [Full-loop mailbox](troubleshooting/checkpoints/RIV-MCP-0009_FULL_LOOP_MAILBOX.md)
 
 ## Next bounded continuation
 

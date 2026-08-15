@@ -55,7 +55,8 @@ boundary; do not add file fallback state.
 ## VERIFY
 
 Rerun both MCP acceptances and confirm the exact application identity, 15-tool
-allowlist, six resource templates, bounded reads, and read-only authority.
+allowlist, six resource templates, bounded reads, and the fixed typed mailbox
+write capability for the designated reasoning consumer.
 
 ## DO NOT
 

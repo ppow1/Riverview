@@ -7,14 +7,17 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import UUID
 
 from mcp.server.fastmcp import FastMCP
 
+from riverview.mailbox import MailboxStore
 from riverview.mcp.read_model import ReadOnlyRelay
 
 SERVER_NAME = "Riverview Comms"
 mcp = FastMCP(SERVER_NAME)
 relay = ReadOnlyRelay()
+mailbox = MailboxStore()
 
 
 def _safe(value: Any) -> Any:
@@ -79,6 +82,35 @@ def troubleshooting_cookbook(limit: int = 100) -> Any:
 def mailbox_requests(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
     """Return bounded, classification-filtered mailbox requests for reasoning."""
     return _safe(relay.mailbox_requests(limit, cursor, classification))
+
+
+@mcp.tool()
+def mailbox_acknowledge(request_id: str, correlation_id: str) -> Any:
+    """Acknowledge one matching River mailbox request as the designated reasoning consumer."""
+    return _safe(mailbox.acknowledge_reasoning(UUID(request_id), UUID(correlation_id)))
+
+
+@mcp.tool()
+def mailbox_claim(request_id: str, correlation_id: str, lease_seconds: int = 120) -> Any:
+    """Claim one acknowledged River mailbox request with a bounded lease."""
+    return _safe(mailbox.claim_reasoning(UUID(request_id), UUID(correlation_id), lease_seconds))
+
+
+@mcp.tool()
+def mailbox_submit_response(
+    request_id: str,
+    correlation_id: str,
+    response_type: str,
+    summary: str,
+    evidence_refs: list[str],
+    escalation_required: bool = False,
+) -> Any:
+    """Submit one bounded structured reasoning response and complete its request."""
+    return _safe(mailbox.respond_reasoning(
+        UUID(request_id), UUID(correlation_id), response_type=response_type,
+        summary=summary, evidence_refs=evidence_refs,
+        escalation_required=escalation_required,
+    ))
 
 
 @mcp.tool()
