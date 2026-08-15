@@ -4,7 +4,12 @@ from uuid import uuid4
 import pytest
 
 from riverview.classification import Classification, StorageReference, classify_label
-from riverview.reasoning import ReasoningProvider, ReasoningRequest, ReasoningResponse
+from riverview.reasoning import (
+    OllamaReasoningAdapter,
+    ReasoningProvider,
+    ReasoningRequest,
+    ReasoningResponse,
+)
 
 
 def test_provider_neutral_envelopes_validate() -> None:
@@ -28,3 +33,8 @@ def test_classification_and_reference_fail_closed() -> None:
     assert not StorageReference("r", "ref://x", "a" * 64, "owner", Classification.SENSITIVE, 1, "text/plain", "test").ordinary_river_safe()
     with pytest.raises(ValueError, match="unknown classification"):
         classify_label("mystery")
+
+
+def test_ollama_adapter_is_loopback_only() -> None:
+    with pytest.raises(ValueError, match="loopback"):
+        OllamaReasoningAdapter(endpoint="https://example.invalid")

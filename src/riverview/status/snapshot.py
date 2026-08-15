@@ -70,6 +70,18 @@ def status_snapshot() -> dict[str, Any]:
         bindings = _rows(cursor)
         cursor.execute("SELECT recovery_id,request_id,correlation_id,operation,state,failure_class,attempt_count,max_attempts,escalation_id,updated_at FROM bridge_recovery_attempts ORDER BY updated_at DESC LIMIT 16")
         recoveries = _rows(cursor)
+        cursor.execute("""SELECT participant_id,provider_id,provider_type,role,health,capacity,
+                                contract_version,observed_at
+                         FROM reasoning_providers ORDER BY participant_id LIMIT 32""")
+        reasoning_providers = _rows(cursor)
+        cursor.execute("""SELECT count(*) AS cookbook_entries,
+                                count(*) FILTER (WHERE checkpoint_id LIKE 'RIV-%') AS checkpoint_entries
+                         FROM cookbook_entries""")
+        cookbook_health = _rows(cursor)
+        cursor.execute("""SELECT checkpoint_id,recovery_state,count(*) AS count
+                         FROM diagnostic_events GROUP BY checkpoint_id,recovery_state
+                         ORDER BY checkpoint_id,recovery_state LIMIT 64""")
+        diagnostic_health = _rows(cursor)
         cursor.execute("SELECT migration_id,version,applied_at FROM schema_migrations ORDER BY migration_id")
         migrations = _rows(cursor)
     return {
@@ -87,5 +99,8 @@ def status_snapshot() -> dict[str, Any]:
         "lanes": lanes,
         "comms_bindings": bindings,
         "bridge_recoveries": recoveries,
+        "reasoning_providers": reasoning_providers,
+        "cookbook_health": cookbook_health,
+        "diagnostic_health": diagnostic_health,
         "migrations": migrations,
     }

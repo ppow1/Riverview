@@ -214,6 +214,26 @@ ENTRIES = [
         "Run intake contract tests and confirm no work order or roadmap transition was created.",
         "docs/operations/troubleshooting/checkpoints/RIV-INT-0001_PROJECT_INTAKE.md",
     ),
+    (
+        "RIV-INT-0002",
+        "Repository map or decomposition boundary",
+        "A bounded repository map is incomplete or decomposed tasks overlap mutable paths.",
+        ["map-incomplete", "unknown-ownership", "lane-conflict", "missing-acceptance"],
+        ["Validate RepositoryMap ownership/source fields, then run reject_path_overlap before dispatch."],
+        "Complete bounded archaeology or reschedule the overlapping lane; do not rewrite unrelated paths.",
+        "Run map/decomposition tests and verify separate envelopes or a durable conflict checkpoint.",
+        "docs/operations/troubleshooting/checkpoints/RIV-INT-0002_REPOSITORY_DECOMPOSITION.md",
+    ),
+    (
+        "RIV-REASON-0002",
+        "Local reasoning provider boundary",
+        "A local reasoning provider is unavailable, times out, returns an invalid response, or is addressed outside loopback.",
+        ["provider-unavailable", "provider-timeout", "invalid-response", "adapter-boundary"],
+        ["Check loopback provider health, model identity, bounded request size, and the provider-neutral response validator."],
+        "Repair only the local adapter/model/runtime seam; do not add an external model route or treat prose as authority.",
+        "Repeat a bounded local reasoning request and verify correlation, classification, and typed response evidence.",
+        "docs/operations/troubleshooting/checkpoints/RIV-REASON-0002_LOCAL_PROVIDER.md",
+    ),
 ]
 
 
