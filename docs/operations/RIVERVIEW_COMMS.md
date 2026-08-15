@@ -1,10 +1,15 @@
 # Riverview Comms
 
-Version: 0.18.0
+Version: 0.19.0
 Checkpoint date: 2026-08-15
 Status: external MCP accepted; RV-004.5 and RV-008.4 are complete; the bounded
 autonomous control-plane foundation is implemented locally; RV-008.5 and RV-008.6
 are complete with durable acceptance evidence.
+
+The long-lived interaction grammar and complete roadmap schema-freeze audit are
+defined in [RIVERVIEW_COMMS_INTERACTION_MATRIX.md](RIVERVIEW_COMMS_INTERACTION_MATRIX.md).
+Future ordinary ChatGPT interactions use these semantic families rather than adding
+one waypoint-specific MCP operation.
 
 ## Purpose and authority
 
@@ -213,6 +218,12 @@ failure and recovery events, and creates at most one Steward escalation when a
 bounded retry budget is exhausted. It does not add browser authority or create
 mailbox requests.
 
+Migration `0019` adds the PostgreSQL `comms_bindings` registry. It records verified
+application/conversation candidates, active role bindings, rollover replacement
+lineage, contract version, and nonsecret evidence. The active
+`designated_reasoning` binding is the authoritative doorbell target; local browser
+configuration must match it and cannot silently override it.
+
 ## Runtime and deployment topology
 
 The local HTTP implementation can be started with the repository's accepted
@@ -312,6 +323,7 @@ it does not replace the operational troubleshooting checkpoints.
 - [Lane ownership and result reconciliation](troubleshooting/checkpoints/RIV-CAP-0002_LANE_RECONCILIATION.md)
 - [Steward seed and schema boundary](troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md)
 - [Bridge replay and recovery](troubleshooting/checkpoints/RIV-MCP-0011_BRIDGE_REPLAY_RECOVERY.md)
+- [Comms binding and rollover](troubleshooting/checkpoints/RIV-COMMS-0004_BINDING_ROLLOVER.md)
 
 ## Next bounded continuation
 

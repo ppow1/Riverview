@@ -175,6 +175,37 @@ Do not scrape responses, inspect unrelated conversations, use arbitrary
 selectors/navigation/JavaScript, or treat browser submission/exit code as
 end-to-end success.
 
+## Active binding with no exact browser target
+
+SYMPTOM: The authoritative `comms_bindings` row is verified and active, but the
+doorbell preflight reports `exact_target_resolvable=false` because the owned
+browser currently has no page for that exact conversation (for example, it is on
+an administration page).
+
+LIKELY BOUNDARY: Browser UI target availability, not PostgreSQL binding state or
+MCP service health.
+
+SAFE DIAGNOSTIC: Run the two preflights and inspect only target metadata. Compare
+the active binding's conversation ID with the exact page target count. Do not read
+conversation content.
+
+EXPECTED HEALTHY RESULT: One exact page target, authenticated session, and
+`ready=true`.
+
+KNOWN FAILURE: Zero exact targets is fail-closed. The binding remains authoritative
+and no wake is attempted.
+
+REPAIR: Restore the already-authenticated designated conversation in the owned
+browser runtime using the accepted lifecycle procedure, then rerun preflight.
+
+VERIFY: Require exact target resolution and `ready=true`; only then can the named
+doorbell operation be considered available.
+
+DO NOT: select an administration page, fuzzy-match another conversation, scrape
+history, or alter the binding to match an incidental browser tab.
+
+EVIDENCE: preflight metadata, active `comms_bindings` row, checkpoint `RIV-PLY-0002`.
+
 ## EVIDENCE
 
 Store metadata-only reports under `A:\Riverview\runtime\diagnostics\`. Trace

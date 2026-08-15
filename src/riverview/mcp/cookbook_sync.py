@@ -174,6 +174,16 @@ ENTRIES = [
         "Run the induced failure/recovery acceptance and verify one recovery identity, preserved lineage, and at most one escalation.",
         "docs/operations/troubleshooting/checkpoints/RIV-MCP-0011_BRIDGE_REPLAY_RECOVERY.md",
     ),
+    (
+        "RIV-COMMS-0004",
+        "Comms binding and conversation rollover",
+        "The active verified ChatGPT binding and the local doorbell target disagree or rollover evidence is incomplete.",
+        ["binding-drift", "schema-stale", "unverified-candidate", "target-mismatch"],
+        ["Resolve the verified active comms_bindings row and compare its exact conversation ID and application contract."],
+        "Verify the candidate evidence and activate only through the explicit Steward binding path; fail closed on target drift.",
+        "Resolve the active binding again and require one verified active role binding with replacement lineage where applicable.",
+        "docs/operations/troubleshooting/checkpoints/RIV-COMMS-0004_BINDING_ROLLOVER.md",
+    ),
 ]
 
 
@@ -189,7 +199,7 @@ def sync() -> dict[str, object]:
         for checkpoint_id, title, summary, classes, probes, repair, verify, source in ENTRIES:
             cookbook_entry = f"CB-{checkpoint_id}"
             entry_applicability = dict(applicability)
-            if checkpoint_id in {"RIV-GRC-0004", "RIV-CAP-0001", "RIV-CAP-0002", "RIV-EXE-0001", "RIV-MCP-0010", "RIV-MCP-0011"}:
+            if checkpoint_id in {"RIV-GRC-0004", "RIV-CAP-0001", "RIV-CAP-0002", "RIV-EXE-0001", "RIV-MCP-0010", "RIV-MCP-0011", "RIV-COMMS-0004"}:
                 entry_applicability.update({"kernel": ">=0.14.0", "waypoint": "RV-005.3/RV-006.1/RV-006.4/RV-006.5/RV-008.5/RV-008.6", "authority": "bounded_control_plane"})
             entry_applicability["source_path"] = source
             entry_applicability["title"] = title

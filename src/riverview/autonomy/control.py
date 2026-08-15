@@ -244,6 +244,37 @@ class GraceMomentum:
             return cursor.fetchone()[0]
 
 
+class ContinuousMomentumEngine:
+    """Run one bounded, event-driven Grace cycle across independent objectives."""
+
+    def frontier(self, *, limit: int = 16) -> list[dict[str, Any]]:
+        if not 1 <= limit <= 64:
+            raise ValueError("RIV-GRC-0004: frontier limit is outside the bounded range.")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT o.objective_id,o.objective_key,o.correlation_id,s.stage_id,s.stage_key,
+                          s.readiness,s.status,s.declared_action,s.steward_checkpoint
+                   FROM objectives o JOIN objective_stages s ON s.objective_id=o.objective_id
+                   WHERE o.status IN ('ready','active') AND s.status<>'completed'
+                     AND s.readiness='ready' AND s.steward_checkpoint=false
+                   ORDER BY o.created_at,s.sort_order LIMIT %s""",
+                (limit,),
+            )
+            names = [item.name for item in cursor.description]
+            return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+
+    def cycle(self, *, limit: int = 16, correlation_id: UUID | None = None) -> dict[str, Any]:
+        """Evaluate all currently eligible stages once; callers trigger the next cycle from an event."""
+        correlation_id = correlation_id or uuid4()
+        frontier = self.frontier(limit=limit)
+        evaluated: list[dict[str, Any]] = []
+        for item in frontier:
+            decisions = GraceMomentum().evaluate(item["objective_key"], correlation_id=correlation_id)
+            stage = next(entry for entry in decisions if entry["stage_key"] == item["stage_key"])
+            evaluated.append({"objective_key": item["objective_key"], "stage_key": item["stage_key"], "decision": stage["decision"], "declared_action": item["declared_action"]})
+        return {"correlation_id": str(correlation_id), "frontier_count": len(frontier), "evaluated": evaluated, "bounded": True}
+
+
 class CookbookAdvisor:
     """Read only the validated bounded repair guidance for a stable checkpoint."""
 

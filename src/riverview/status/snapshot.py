@@ -53,6 +53,23 @@ def status_snapshot() -> dict[str, Any]:
         escalations = _rows(cursor)
         cursor.execute("SELECT event_id,checkpoint_id,component,severity,failure_class,summary,recovery_state,occurred_at FROM diagnostic_events ORDER BY occurred_at DESC LIMIT 20")
         diagnostics = _rows(cursor)
+        cursor.execute("""SELECT o.objective_id,o.objective_key,o.status,s.stage_key,s.readiness,
+                                 s.steward_checkpoint,o.correlation_id
+                          FROM objectives o JOIN objective_stages s ON s.objective_id=o.objective_id
+                          WHERE o.status IN ('ready','active') AND s.status<>'completed'
+                          ORDER BY o.updated_at DESC LIMIT 32""")
+        active_objectives = _rows(cursor)
+        cursor.execute("""SELECT c.capability_name,c.provider_id,c.health_status,cc.available,
+                                 cc.concurrency_limit,cc.current_load,cc.backoff_until,cc.observed_at
+                          FROM capabilities c LEFT JOIN capability_capacity cc ON cc.capability_id=c.capability_id
+                          ORDER BY c.capability_name LIMIT 32""")
+        capacity = _rows(cursor)
+        cursor.execute("SELECT lane_id,lane_key,owner_id,allowed_paths,state,correlation_id FROM execution_lanes WHERE state='active' ORDER BY created_at LIMIT 32")
+        lanes = _rows(cursor)
+        cursor.execute("SELECT binding_id,role,application_ref,contract_version,conversation_id,status,verification_state,consumer_id FROM comms_bindings ORDER BY updated_at DESC LIMIT 16")
+        bindings = _rows(cursor)
+        cursor.execute("SELECT recovery_id,request_id,correlation_id,operation,state,failure_class,attempt_count,max_attempts,escalation_id,updated_at FROM bridge_recovery_attempts ORDER BY updated_at DESC LIMIT 16")
+        recoveries = _rows(cursor)
         cursor.execute("SELECT migration_id,version,applied_at FROM schema_migrations ORDER BY migration_id")
         migrations = _rows(cursor)
     return {
@@ -65,5 +82,10 @@ def status_snapshot() -> dict[str, Any]:
         "recent_work": recent_work,
         "escalations": escalations,
         "diagnostics": diagnostics,
+        "active_objectives": active_objectives,
+        "capacity": capacity,
+        "lanes": lanes,
+        "comms_bindings": bindings,
+        "bridge_recoveries": recoveries,
         "migrations": migrations,
     }

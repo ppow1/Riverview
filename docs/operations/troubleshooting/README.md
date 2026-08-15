@@ -62,4 +62,6 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-PLY-0002` - browser and doorbell end-to-end boundary
 - `RIV-MCP-0009` - full-loop mailbox and bounded reasoning response
 - `RIV-MCP-0007`/`RIV-MCP-0008` - mailbox payload and correlation lifecycle
+- `RIV-MCP-0011` - bounded bridge replay and recovery
+- `RIV-COMMS-0004` - authoritative Comms binding and rollover
 - `RIV-RDM-0007` - RV-008.3 promotion evidence and authoritative-state reconciliation

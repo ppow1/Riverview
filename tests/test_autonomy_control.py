@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from riverview.autonomy.control import ExecutionEnvelope, RetryPolicy
+from riverview.autonomy.control import ContinuousMomentumEngine, ExecutionEnvelope, RetryPolicy
 
 
 def envelope(**overrides: object) -> ExecutionEnvelope:
@@ -54,3 +54,8 @@ def test_dispatch_rejects_protected_classification() -> None:
 
     with pytest.raises(ValueError, match="protected"):
         CapabilityRegistry().dispatch("bounded-engineering", classification="undercurrent")
+
+
+def test_continuous_frontier_is_bounded() -> None:
+    with pytest.raises(ValueError, match="frontier limit"):
+        ContinuousMomentumEngine().frontier(limit=65)
