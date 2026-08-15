@@ -274,6 +274,16 @@ ENTRIES = [
         "Repeat the measured job or deliberate rejection and verify typed response/evidence lineage.",
         "docs/operations/troubleshooting/checkpoints/RIV-REASON-0003_GPU_PROVIDER.md",
     ),
+    (
+        "RIV-NOT-0001",
+        "Exactly-once notification boundary",
+        "A genuine checkpoint/critical event is missing, duplicated, or carries unbounded/sensitive notification content.",
+        ["notification-missing", "duplicate-notification", "payload-overflow", "sensitive-payload"],
+        ["Inspect steward_notifications by idempotency key, checkpoint, state, and evidence references."],
+        "Use the same typed idempotency key and bounded summary/reference payload; do not duplicate delivery or expose content.",
+        "Emit twice, deliver once, and verify one durable notification identity/state transition.",
+        "docs/operations/troubleshooting/checkpoints/RIV-NOT-0001_EXACTLY_ONCE.md",
+    ),
 ]
 
 
