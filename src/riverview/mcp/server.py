@@ -11,6 +11,7 @@ from uuid import UUID
 
 from mcp.server.fastmcp import FastMCP
 
+from riverview.grace.seeds import StewardSeedStore
 from riverview.mailbox import MailboxStore
 from riverview.mcp.read_model import ReadOnlyRelay
 
@@ -18,6 +19,7 @@ SERVER_NAME = "Riverview Comms"
 mcp = FastMCP(SERVER_NAME)
 relay = ReadOnlyRelay()
 mailbox = MailboxStore()
+seeds = StewardSeedStore()
 
 
 def _safe(value: Any) -> Any:
@@ -108,6 +110,12 @@ def mailbox_submit_advisory_response(
         UUID(request_id), UUID(correlation_id), response_type="advice",
         summary=summary, evidence_refs=evidence_refs, escalation_required=False,
     ))
+
+
+@mcp.tool()
+def submit_steward_seed(seed_text: str, correlation_id: str, idempotency_key: str) -> Any:
+    """Create one bounded Steward seed draft; this does not create work or promote an objective."""
+    return _safe({"seed_id": str(seeds.submit(seed_text, correlation_id=UUID(correlation_id), idempotency_key=idempotency_key))})
 
 
 @mcp.tool()

@@ -27,6 +27,7 @@ REQUIRED = {
     "mailbox_acknowledge",
     "mailbox_claim",
     "mailbox_submit_advisory_response",
+    "submit_steward_seed",
     "resource_roadmap",
     "resource_work",
     "resource_reports",

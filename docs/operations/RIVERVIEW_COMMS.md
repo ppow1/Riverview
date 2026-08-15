@@ -1,9 +1,10 @@
 # Riverview Comms
 
-Version: 0.15.0
+Version: 0.16.0
 Checkpoint date: 2026-08-15
-Status: external MCP accepted; RV-004.5 and RV-008.4 are complete; RV-008.5
-remains at its Steward checkpoint.
+Status: external MCP accepted; RV-004.5 and RV-008.4 are complete; the bounded
+autonomous control-plane foundation is implemented locally; RV-008.5 remains at
+its Steward checkpoint.
 
 ## Purpose and authority
 
@@ -115,7 +116,10 @@ run momentum evaluation, mutate the roadmap, or grant conversation text
 execution authority. A Steward seed remains a later RV-008.5 input, not a work
 order.
 
-The new schema is externally deployed and lists 19 tools. A real RV-004.5
+The currently deployed external schema lists 19 tools. The local source now adds
+the bounded `submit_steward_seed` draft operation (20 local tools); deployment and
+conversation schema refresh are required before that operation is externally
+available. A real RV-004.5
 request was created and its fixed doorbell wake succeeded, but the designated
 conversation did not acknowledge or claim it during the bounded observation
 window. No second wake was sent and no response was fabricated.
@@ -144,6 +148,39 @@ work-order creation, Undercurrent, or general browser control. The three
 mailbox writes are fixed typed operations for the designated
 `chatgpt:riverview_001` reasoning consumer and preserve request/correlation,
 classification, payload, lease, and lifecycle bounds.
+
+## Grace and local Codex control plane
+
+The autonomous engineering path is Riverview-owned and PostgreSQL-backed:
+
+`Grace evaluation -> measured capability -> bounded execution envelope -> named
+adapter -> typed result -> independent reconciliation -> Grace evidence`.
+
+Migration `0014` stores measured capabilities and capacity, replay-safe execution
+envelopes, typed execution results, Grace transition evaluations, and explicit
+checkpoints. The registered local capability is `codex.engineering.v1`, provided by
+`codex-cli-local`; its current measured slot is one, with no OpenAI API route.
+The adapter launches the installed local Codex CLI through the fixed `codex.cmd`
+entry point, binds execution to the Riverview Git repository, enforces the expected
+base SHA, relative allowed paths, bounded instruction, and hard timeout, and never
+claims publication without independent verification.
+
+The first real local acceptance envelope used the same persisted correlation after
+an initial Windows executable-resolution failure, created only
+`tests/fixtures/autonomy/README.md`, completed the bounded tests, and was
+independently reconciled to the allowed path. Its durable evidence is in
+`execution_envelopes`/`execution_results`; it did not commit or push.
+
+Grace momentum records readiness, stale lease checkpoints, bounded retry decisions,
+and Steward routing without silently changing objective intent. A retry-safe failure
+is limited to one retry; otherwise a durable checkpoint is required. The named
+Codex adapter is not exposed through MCP as a generic execution operation.
+
+Migration `0015` adds the bounded Steward seed draft boundary. The MCP
+`submit_steward_seed` operation creates exactly one idempotent draft for the fixed
+consumer `chatgpt:riverview_001`; only an explicit `steward` confirmer can promote
+that draft through Grace into an objective. A seed is never a work order and no
+seed was promoted by this deployment checkpoint.
 
 ## Runtime and deployment topology
 
@@ -238,13 +275,18 @@ it does not replace the operational troubleshooting checkpoints.
 - [Promotion evidence](troubleshooting/checkpoints/RIV-RDM-0007_PROMOTION_EVIDENCE.md)
 - [Full-loop mailbox](troubleshooting/checkpoints/RIV-MCP-0009_FULL_LOOP_MAILBOX.md)
 - [Grace reasoning-response consumption](troubleshooting/checkpoints/RIV-GRC-0003_REASONING_RESPONSE_CONSUMPTION.md)
+- [Autonomous control-plane and Codex adapter](troubleshooting/checkpoints/RIV-EXE-0001_AUTONOMOUS_CONTROL_PLANE.md)
+- [Grace momentum and checkpoint routing](troubleshooting/checkpoints/RIV-GRC-0004_MOMENTUM_CONTROL.md)
+- [Capability registry and dispatch](troubleshooting/checkpoints/RIV-CAP-0001_CAPABILITY_DISPATCH.md)
+- [Steward seed and schema boundary](troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md)
 
 ## Next bounded continuation
 
-After external MCP acceptance:
-
-1. Evaluate RV-008.5 readiness at its Steward checkpoint; do not implement it in this tranche.
-2. Evaluate RV-005.3 readiness separately; do not start its momentum loop here.
+After the local control-plane acceptance, the next bounded continuations are the
+remaining momentum/stale/retry/checkpoint acceptance and external schema refresh for
+the new `submit_steward_seed` tool. Do not promote a waypoint from implementation
+alone: each requires its own objective, evidence, and authoritative PostgreSQL
+transition. RV-008.5 still requires an actual Steward seed and explicit confirmation.
 
 ## Roadmap checkpoint snapshot
 

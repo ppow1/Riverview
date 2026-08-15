@@ -114,6 +114,46 @@ ENTRIES = [
         "Deterministic harness passes; Steward separately performs the RV-008.3 live checkpoint when authorized.",
         "docs/operations/troubleshooting/checkpoints/RIV-PLY-0001_DOORBELL_BOUNDARY.md",
     ),
+    (
+        "RIV-GRC-0004",
+        "Momentum evaluation or checkpoint routing failure",
+        "Grace cannot distinguish a ready declared stage from a blocked, stale, or Steward-gated stage.",
+        ["dependency-failure", "stale-state", "authority-failure", "checkpoint-routing"],
+        ["Run GraceMomentum.evaluate against PostgreSQL objective/stage state; inspect grace_transition_evaluations and grace_checkpoints."],
+        "Repair only the declared dependency, lease, or authority seam; route unresolved intent to the durable checkpoint.",
+        "Repeat evaluation and verify one idempotent decision with a stable checkpoint when required.",
+        "docs/operations/troubleshooting/checkpoints/RIV-GRC-0004_MOMENTUM_CONTROL.md",
+    ),
+    (
+        "RIV-CAP-0001",
+        "Capability or dispatch evidence unavailable",
+        "No measured healthy capability with current capacity can be selected for a bounded task.",
+        ["provider-failure", "stale-capacity", "backoff", "dispatch-no-match"],
+        ["Inspect capabilities and capability_capacity; compare supported task, health_status, observed_at, load, and backoff_until."],
+        "Register or refresh only measured capability evidence; do not route to a descriptive or stale provider label.",
+        "Deterministic selection returns the named capability and an auditable capacity reason, or a checkpoint is durable.",
+        "docs/operations/troubleshooting/checkpoints/RIV-CAP-0001_CAPABILITY_DISPATCH.md",
+    ),
+    (
+        "RIV-EXE-0001",
+        "Autonomous envelope or Codex adapter failure",
+        "A bounded execution envelope cannot start, times out, exits unsuccessfully, or fails independent reconciliation.",
+        ["configuration", "base-sha", "path-scope", "transport", "provider-failure", "timeout", "reconciliation"],
+        ["Inspect execution_envelopes and execution_results; verify the fixed local codex.cmd entry point, base SHA, allowed paths, and deadline."],
+        "Use the smallest bounded executable, repository, or evidence repair; retry only registered retry-safe failures once.",
+        "Re-run the bounded acceptance and verify typed result, changed paths, validation evidence, and reconciled status.",
+        "docs/operations/troubleshooting/checkpoints/RIV-EXE-0001_AUTONOMOUS_CONTROL_PLANE.md",
+    ),
+    (
+        "RIV-MCP-0010",
+        "Steward seed draft or schema-boundary failure",
+        "A seed is rejected, duplicated, promoted without explicit confirmation, or the new tool is absent from a bound ChatGPT schema.",
+        ["payload-bound", "duplicate-seed", "authority-failure", "schema-stale", "external-platform"],
+        ["Inspect steward_seed_drafts, the local MCP tool list, the manifest version, and the application/conversation schema separately."],
+        "Keep the seed as a draft, refresh only the supported application binding, and require the fixed Steward confirmer for promotion.",
+        "Verify one draft by idempotency key, no work order creation, explicit confirmation, and the expected schema at the actual boundary.",
+        "docs/operations/troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md",
+    ),
 ]
 
 
@@ -129,6 +169,8 @@ def sync() -> dict[str, object]:
         for checkpoint_id, title, summary, classes, probes, repair, verify, source in ENTRIES:
             cookbook_entry = f"CB-{checkpoint_id}"
             entry_applicability = dict(applicability)
+            if checkpoint_id in {"RIV-GRC-0004", "RIV-CAP-0001", "RIV-EXE-0001", "RIV-MCP-0010"}:
+                entry_applicability.update({"kernel": ">=0.14.0", "waypoint": "RV-005.3/RV-006.1/RV-007.1/RV-008.5", "authority": "bounded_control_plane"})
             entry_applicability["source_path"] = source
             entry_applicability["title"] = title
             entry_applicability["summary"] = summary

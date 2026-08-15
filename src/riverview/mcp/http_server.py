@@ -2,8 +2,8 @@
 
 Version: 0.10.0
 
-This is a transport wrapper around the existing fixed read-only MCP server. It
-does not add tools, writes, SQL inputs, or browser authority. The default bind
+This is a transport wrapper around the existing fixed bounded MCP server. It
+does not add generic writes, SQL inputs, or browser authority. The default bind
 is loopback; a separately controlled deployment may place this service behind
 an authenticated HTTPS ingress without changing the read model.
 """
@@ -15,7 +15,7 @@ import os
 from riverview.mcp.server import mcp
 
 APPLICATION_NAME = "Riverview Comms"
-APPLICATION_VERSION = "0.13.0"
+APPLICATION_VERSION = "0.14.0"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 11825
 
