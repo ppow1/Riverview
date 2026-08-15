@@ -316,7 +316,18 @@ Authoritative operational state at this deployment checkpoint:
 - RV-004.5: completed
 - RV-008.4: completed
 - RV-008.5: pending Steward checkpoint
-- RV-005.3: pending and dependency-ready
+- RV-005.3: completed
+- RV-005.4: completed
+- RV-005.5: completed at its authorized checkpoint
+- RV-005.6: completed at its authorized checkpoint
+- RV-006.1: completed
+- RV-006.2: completed
+- RV-006.3: completed at its authorized checkpoint
+- RV-007.1: completed
+- RV-007.2: completed
+- RV-006.4/006.5/006.6: pending and dependency-ready as applicable
+- RV-007.3/007.4: pending; hardware/provider evidence not present
+- RV-007.6: pending until all declared adapter dependencies complete
 
 This is a dated recovery snapshot, not a replacement for PostgreSQL authority.
 PostgreSQL remains the authoritative operational state and must be queried for
