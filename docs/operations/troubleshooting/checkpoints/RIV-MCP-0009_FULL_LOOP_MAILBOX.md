@@ -54,6 +54,11 @@ timeout escalation; replay reports zero additional escalations.
   expiry deadline passed before the designated conversation had the refreshed
   write-capable schema. Treat that lineage as expired even if its pending row
   has not yet been swept by the expiry worker.
+- `SCHEMA VISIBLE BUT NO REASONING TURN`: a fresh request is visible and
+  unexpired, the fixed wake succeeds, and the application exposes the write
+  tools, but no acknowledgement or tool call occurs. This distinguishes
+  conversation-turn/tool-selection behavior from mailbox projection,
+  correlation, and PostgreSQL failures.
 
 ## REPAIR
 
@@ -67,6 +72,8 @@ designated conversation once if the platform has not refreshed its tool schema.
 Then verify tool discovery before considering a new live acceptance request.
 Only after that verification create a fresh bounded request with a sufficient
 but finite TTL.
+If a fresh request remains untouched after one known successful wake, require one
+new reasoning turn in the designated conversation; do not issue another wake.
 
 ## VERIFY
 
@@ -84,6 +91,8 @@ outside the typed response operation.
 Do not issue a second wake for a request whose first wake outcome is known, and
 do not mark a pending request completed to compensate for a stale ChatGPT schema.
 Do not revive or mutate a request whose expiry deadline has passed.
+Do not treat a successful browser wake as proof that ChatGPT performed a tool
+call, and do not scrape the conversation to manufacture that evidence.
 
 ## EVIDENCE
 
