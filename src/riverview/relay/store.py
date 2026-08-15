@@ -101,3 +101,27 @@ class RelayStore:
             for order_id in expired:
                 cursor.execute("INSERT INTO steward_escalations (escalation_id,work_order_id,checkpoint_id,reason,state) VALUES (%s,%s,'RIV-WRK-0004','Worker lease expired without completion.','open')", (uuid4(), order_id))
             return expired
+
+    def retry_if_safe(self, work_order_id: UUID, correlation_id: UUID) -> WorkOrder:
+        """Requeue one retry-safe terminal order once, preserving its identity."""
+        with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT action_type,status,correlation_id FROM work_orders WHERE work_order_id=%s FOR UPDATE", (work_order_id,))
+            row = cursor.fetchone()
+            if row is None or row[2] != correlation_id:
+                raise RuntimeError("RIV-GRC-0007: retry correlation does not match the work order.")
+            if row[1] == "queued":
+                pass
+            elif row[1] not in {"failed", "timed_out"}:
+                raise RuntimeError("RIV-GRC-0007: work order is not in a retryable terminal state.")
+            else:
+                cursor.execute("SELECT retry_safe FROM approved_actions WHERE action_type=%s AND enabled=true", (row[0],))
+                safe = cursor.fetchone()
+                cursor.execute("SELECT count(*) FROM work_order_attempts WHERE work_order_id=%s", (work_order_id,))
+                attempts = cursor.fetchone()[0]
+                if not safe or not safe[0] or attempts >= 2:
+                    raise RuntimeError("RIV-GRC-0007: retry requires a Steward checkpoint.")
+                cursor.execute("""UPDATE work_orders SET status='queued',lease_owner=NULL,lease_expires_at=NULL,
+                    last_heartbeat_at=NULL,finished_at=NULL,result_report=NULL,error_checkpoint=NULL,updated_at=now()
+                    WHERE work_order_id=%s""", (work_order_id,))
+            cursor.execute("SELECT action_type,parameters,requested_by,idempotency_key,correlation_id,work_order_id,action_version,expected_duration_seconds,hard_timeout_seconds,status FROM work_orders WHERE work_order_id=%s", (work_order_id,))
+            return WorkOrder(*cursor.fetchone())

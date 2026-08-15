@@ -35,6 +35,10 @@ A real recovery acceptance completed objective
 `grace-momentum.acceptance.0819f7b0-6c65-4d56-8cd0-5e1937487244`, enqueued work
 `f5250284-584d-4448-8890-5035af378d59`, and finalized without recursive creation.
 
+The retry acceptance used work `389c0428-0695-4a36-94ef-360df8b1878b`: the first
+bounded timeout was requeued once, the second bounded timeout remained terminal, and
+a third retry was rejected with `RIV-GRC-0007` for Steward checkpoint routing.
+
 DO NOT: Infer a transition from conversation prose, mark a stage complete without
 required evidence, or enqueue recursive work from a diagnostic.
 
