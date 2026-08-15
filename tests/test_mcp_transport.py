@@ -26,17 +26,41 @@ def test_no_action_adapter_is_exposed_by_server_module() -> None:
 
 
 def test_only_named_mailbox_write_operations_are_exposed() -> None:
-    assert {"mailbox_acknowledge", "mailbox_claim", "mailbox_submit_response"} <= {
+    assert {"mailbox_acknowledge", "mailbox_claim", "mailbox_submit_advisory_response"} <= {
         name for name in dir(server) if name.startswith("mailbox_")
     }
+    assert not hasattr(server, "mailbox_submit_response")
     assert not any(name in {"mailbox_update", "execute_sql", "enqueue_anything"} for name in dir(server))
+
+
+def test_advisory_response_has_fixed_safe_semantics(monkeypatch) -> None:
+    captured = {}
+
+    def fake_respond(*args, **kwargs):
+        captured["args"] = args
+        captured.update(kwargs)
+        return {"status": "accepted"}
+
+    monkeypatch.setattr(server.mailbox, "respond_reasoning", fake_respond)
+    result = server.mailbox_submit_advisory_response(
+        "00000000-0000-4000-8000-000000000000",
+        "00000000-0000-4000-8000-000000000001",
+        "bounded advisory",
+        ["riverview://evidence/1"],
+    )
+
+    assert result == {"status": "accepted"}
+    assert captured["response_type"] == "advice"
+    assert captured["escalation_required"] is False
+    assert captured["summary"] == "bounded advisory"
+    assert captured["evidence_refs"] == ["riverview://evidence/1"]
 
 
 def test_comms_manifest_is_named_and_read_only() -> None:
     from tools.riverview_comms_manifest import APPLICATION, PROHIBITED, TOOLS, VERSION
 
     assert APPLICATION == "Riverview Comms"
-    assert VERSION == "0.12.0"
+    assert VERSION == "0.13.0"
     assert "current_position" in TOOLS
     assert "resource_work" in TOOLS
     assert "mailbox_requests" in TOOLS

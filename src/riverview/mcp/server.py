@@ -97,19 +97,16 @@ def mailbox_claim(request_id: str, correlation_id: str, lease_seconds: int = 120
 
 
 @mcp.tool()
-def mailbox_submit_response(
+def mailbox_submit_advisory_response(
     request_id: str,
     correlation_id: str,
-    response_type: str,
     summary: str,
     evidence_refs: list[str],
-    escalation_required: bool = False,
 ) -> Any:
-    """Submit one bounded structured reasoning response and complete its request."""
+    """Return one bounded advisory result for the active reasoning claim."""
     return _safe(mailbox.respond_reasoning(
-        UUID(request_id), UUID(correlation_id), response_type=response_type,
-        summary=summary, evidence_refs=evidence_refs,
-        escalation_required=escalation_required,
+        UUID(request_id), UUID(correlation_id), response_type="advice",
+        summary=summary, evidence_refs=evidence_refs, escalation_required=False,
     ))
 
 

@@ -1,6 +1,6 @@
 {
   "application": "Riverview Comms",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "transport": "streamable-http",
   "endpoint": "https://replace-with-approved-riverview-ingress.example/mcp",
   "health_endpoint": "https://replace-with-approved-riverview-ingress.example/healthz",

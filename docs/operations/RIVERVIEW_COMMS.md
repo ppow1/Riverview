@@ -1,6 +1,6 @@
 # Riverview Comms
 
-Version: 0.13.0
+Version: 0.14.0
 Checkpoint date: 2026-08-14
 Status: external MCP accepted; bounded mailbox writes are deployed; the
 designated ChatGPT conversation has not yet completed the RV-004.5 response loop.
@@ -72,7 +72,7 @@ The accepted surface contains:
 
 - 19 bounded tools, including the classification-filtered `mailbox_requests` read
   and fixed reasoning-consumer writes: `mailbox_acknowledge`, `mailbox_claim`,
-  and `mailbox_submit_response`;
+  and `mailbox_submit_advisory_response`;
 - 6 resource templates;
 - PostgreSQL-backed reads;
 - read-only projections plus bounded typed mailbox-write authority;
@@ -85,13 +85,15 @@ The bounded reasoning write contract is:
 
 - `mailbox_acknowledge(request_id, correlation_id)`;
 - `mailbox_claim(request_id, correlation_id, lease_seconds)`;
-- `mailbox_submit_response(request_id, correlation_id, response_type, summary,
-  evidence_refs, escalation_required)`.
+- `mailbox_submit_advisory_response(request_id, correlation_id, summary,
+  evidence_refs)`.
 
 These operations are fixed to the designated `chatgpt:riverview_001` consumer,
 accept only River-classified requests, preserve correlation, enforce leases and
-payload bounds, and never provide a generic state setter. A response completes
-the request transactionally. Timeout expiry and exactly-once Steward escalation
+payload bounds, and never provide a generic state setter. The advisory response
+operation fixes its category to `advice` and escalation to `false`; it accepts
+only an existing active reasoning claim. A response completes the request
+transactionally. Timeout expiry and exactly-once Steward escalation
 are performed by the bounded mailbox service, not by arbitrary ChatGPT input.
 
 The new schema is externally deployed and lists 19 tools. A real RV-004.5

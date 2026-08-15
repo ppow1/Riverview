@@ -26,7 +26,7 @@ REQUIRED = {
     "mailbox_requests",
     "mailbox_acknowledge",
     "mailbox_claim",
-    "mailbox_submit_response",
+    "mailbox_submit_advisory_response",
     "resource_roadmap",
     "resource_work",
     "resource_reports",

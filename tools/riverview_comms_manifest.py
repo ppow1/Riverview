@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 APPLICATION = "Riverview Comms"
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 TOOLS = (
     "roadmap_revision",
     "waypoints",
@@ -29,7 +29,7 @@ TOOLS = (
     "mailbox_requests",
     "mailbox_acknowledge",
     "mailbox_claim",
-    "mailbox_submit_response",
+    "mailbox_submit_advisory_response",
     "resource_roadmap",
     "resource_work",
     "resource_reports",

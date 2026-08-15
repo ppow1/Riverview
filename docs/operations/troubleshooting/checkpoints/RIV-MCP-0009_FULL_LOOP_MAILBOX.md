@@ -1,4 +1,4 @@
-<!-- Version: 0.12.0 -->
+<!-- Version: 0.13.0 -->
 # RIV-MCP-0009 - Full-loop mailbox and bounded reasoning response
 
 Owner: Riverview mailbox store and bounded Riverview Comms reasoning capability.
@@ -42,7 +42,13 @@ timeout escalation; replay reports zero additional escalations.
 - `RIV-MCP-0008`: missing request, invalid lifecycle, claim, correlation, or
   timeout/escalation state.
 - A stale deployment exposes fewer than 19 tools or lacks one of
-  `mailbox_acknowledge`, `mailbox_claim`, and `mailbox_submit_response`.
+  `mailbox_acknowledge`, `mailbox_claim`, and
+  `mailbox_submit_advisory_response`.
+- `ACKNOWLEDGE AND CLAIM SUCCEED, RESPONSE WRITE BLOCKED BY CHATGPT SAFETY
+  LAYER`: the designated conversation completed the first two typed writes,
+  but the prior generic response-write schema was blocked twice before Riverview
+  accepted the call. This is a ChatGPT tool-contract boundary, not evidence of
+  PostgreSQL or mailbox failure.
 - A response accepted but the request remains incomplete indicates a transaction
   or schema mismatch; it is not a reason to replay the response blindly.
 - A real doorbell may succeed while the designated ChatGPT conversation leaves
@@ -83,6 +89,12 @@ authority audit. Confirm the exact request/correlation lineage and one
 
 ## DO NOT
 
+The exposed advisory response operation is
+`mailbox_submit_advisory_response(request_id, correlation_id, summary,
+evidence_refs)`. Its server-side semantics fix the response category to
+`advice` and escalation to `false`; future escalation behavior remains a
+separate explicitly authorized contract.
+
 Do not expose `mailbox_update`, arbitrary SQL, generic enqueue, roadmap mutation,
 filesystem, shell, browser control, credentials, or Undercurrent. Do not bypass
 correlation or lease ownership, fabricate a response, or mark a request complete
@@ -93,6 +105,10 @@ do not mark a pending request completed to compensate for a stale ChatGPT schema
 Do not revive or mutate a request whose expiry deadline has passed.
 Do not treat a successful browser wake as proof that ChatGPT performed a tool
 call, and do not scrape the conversation to manufacture that evidence.
+
+Repeated retries of a platform-blocked response tool are not a repair. Narrow
+the contract, deploy it, refresh the application schema, and resume only the
+same request if it remains valid; never revive an expired request.
 
 ## EVIDENCE
 

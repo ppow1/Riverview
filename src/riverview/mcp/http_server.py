@@ -15,7 +15,7 @@ import os
 from riverview.mcp.server import mcp
 
 APPLICATION_NAME = "Riverview Comms"
-APPLICATION_VERSION = "0.12.0"
+APPLICATION_VERSION = "0.13.0"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 11825
 
