@@ -130,6 +130,23 @@ class ReadOnlyRelay:
             )
             return self._rows(cursor)
 
+    def mailbox_requests(
+        self, limit: int = 50, cursor: int = 0, classification: str = "river"
+    ) -> dict[str, Any]:
+        """Return bounded mailbox metadata and payloads for reasoning reads."""
+        return self._page(
+            """SELECT request_id,sender_id,requester_id,correlation_id,causation_id,
+                message_type,payload,payload_ref,classification,acknowledgement_state,
+                claim_state,claim_owner,claim_expires_at,completion_state,idempotency_key,
+                created_at,expires_at,'river' AS classification FROM mailbox_messages
+                WHERE classification=%s AND 'river'=%s
+                ORDER BY created_at,request_id LIMIT %s OFFSET %s""",
+            (classification,),
+            limit,
+            cursor,
+            classification,
+        )
+
     @staticmethod
     def _resource_args(limit: int, cursor: int, classification: str) -> tuple[int, int, str]:
         bounded_limit = max(1, min(int(limit), MAX_PAGE_SIZE))

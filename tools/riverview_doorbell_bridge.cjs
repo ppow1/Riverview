@@ -26,7 +26,14 @@ function loadConfig() {
   return raw;
 }
 function selectExactTarget(targets, conversationId) {
-  const matches = targets.filter(item => { try { return item.type === 'page' && new URL(item.url).hostname === 'chatgpt.com' && new URL(item.url).pathname === `/c/${conversationId}` && item.webSocketDebuggerUrl; } catch { return false; } });
+  const matches = targets.filter(item => { try {
+    const url = new URL(item.url);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const conversationIndex = segments.length - 1;
+    return item.type === 'page' && url.hostname === 'chatgpt.com' &&
+      segments[conversationIndex] === conversationId &&
+      segments[conversationIndex - 1] === 'c' && item.webSocketDebuggerUrl;
+  } catch { return false; } });
   if (matches.length === 0) throw Error('RIV-PLY-0005');
   if (matches.length > 1) throw Error('RIV-PLY-0006');
   return matches[0];

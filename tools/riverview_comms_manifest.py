@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 APPLICATION = "Riverview Comms"
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 TOOLS = (
     "roadmap_revision",
     "waypoints",
@@ -26,6 +26,7 @@ TOOLS = (
     "open_steward_escalations",
     "recent_diagnostic_events",
     "troubleshooting_cookbook",
+    "mailbox_requests",
     "resource_roadmap",
     "resource_work",
     "resource_reports",

@@ -1,6 +1,6 @@
 # Riverview Comms
 
-Version: 0.11.0
+Version: 0.12.0
 Checkpoint date: 2026-08-14
 Status: external MCP accepted; ChatGPT application/conversation acceptance remains pending.
 
@@ -69,7 +69,7 @@ Application identity: `Riverview Comms`.
 
 The accepted surface contains:
 
-- 15 bounded tools;
+- 16 bounded tools, including the classification-filtered `mailbox_requests` read;
 - 6 resource templates;
 - PostgreSQL-backed reads;
 - read-only authority;
@@ -161,9 +161,9 @@ it does not replace the operational troubleshooting checkpoints.
 After external MCP acceptance:
 
 1. Register Riverview Comms in ChatGPT using the accepted Comms8 Blue application pattern.
-2. Verify Riverview Comms is visible and usable in the designated `Riverview_001` conversation.
+2. Verify Riverview Comms and its `mailbox_requests` read are visible and usable in the designated `Riverview_001` conversation.
 3. Reconfirm browser and doorbell preflight.
-4. Create one real correlated RV-008.3 mailbox request.
+4. Reuse the existing durable correlated RV-008.3 mailbox request.
 5. Ring the already-authorized fixed doorbell once.
 6. Verify typed mailbox/MCP/River evidence.
 7. Promote RV-008.3 only after genuine end-to-end success.

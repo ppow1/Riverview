@@ -23,6 +23,7 @@ REQUIRED = {
     "completed_work_reports",
     "recent_diagnostic_events",
     "troubleshooting_cookbook",
+    "mailbox_requests",
     "resource_roadmap",
     "resource_work",
     "resource_reports",
@@ -65,6 +66,7 @@ async def _accept(endpoint: str) -> dict[str, Any]:
                 ("work_order_status", {"limit": 5}),
                 ("recent_diagnostic_events", {"limit": 5}),
                 ("troubleshooting_cookbook", {"limit": 5}),
+                ("mailbox_requests", {"limit": 5, "cursor": 0, "classification": "river"}),
             ):
                 response = await session.call_tool(tool_name, arguments)
                 if getattr(response, "isError", False) or getattr(response, "is_error", False):

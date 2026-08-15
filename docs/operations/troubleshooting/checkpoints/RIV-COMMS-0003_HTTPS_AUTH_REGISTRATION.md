@@ -36,7 +36,7 @@ Expected classifications:
 
 DNS and certificate resolve for the approved Riverview hostname; `/healthz`
 responds without revealing credentials; unauthenticated MCP is rejected;
-authenticated MCP returns `Riverview Comms`, 15 tools, six templates, and
+authenticated MCP returns `Riverview Comms`, 16 tools, six templates, and
 PostgreSQL-backed reads.
 
 ## KNOWN FAILURE RESULT
@@ -76,7 +76,12 @@ returned `421` because the reverse proxy preserved the public `Host` header for
 the loopback service. Adding `header_up Host 127.0.0.1:11825` to the Riverview
 upstream fixed the seam. Authenticated external initialize then returned `200`,
 and bounded protocol acceptance passed with 15 tools, six resource templates,
-and PostgreSQL-backed reads. This is verified `RIV-COMMS-0013` evidence.
+and PostgreSQL-backed reads. A subsequent live RV-008.3 request was absent from
+the existing `resource_work` projection because that projection reads work
+orders, not mailbox messages. The bounded repair added `mailbox_requests` as a
+classification-filtered read; redeployment must verify 16 tools and mailbox
+identity/correlation visibility before the doorbell is rung. This is verified
+`RIV-COMMS-0013`/mailbox projection evidence.
 
 ## REPAIR
 

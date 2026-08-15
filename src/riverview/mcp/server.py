@@ -76,6 +76,12 @@ def troubleshooting_cookbook(limit: int = 100) -> Any:
 
 
 @mcp.tool()
+def mailbox_requests(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
+    """Return bounded, classification-filtered mailbox requests for reasoning."""
+    return _safe(relay.mailbox_requests(limit, cursor, classification))
+
+
+@mcp.tool()
 def resource_roadmap(limit: int = 50, cursor: int = 0, classification: str = "river") -> Any:
     """Return one bounded, classification-filtered roadmap resource page."""
     return _safe(relay.resource_roadmap(limit, cursor, classification))

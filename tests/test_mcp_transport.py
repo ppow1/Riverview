@@ -29,9 +29,10 @@ def test_comms_manifest_is_named_and_read_only() -> None:
     from tools.riverview_comms_manifest import APPLICATION, PROHIBITED, TOOLS, VERSION
 
     assert APPLICATION == "Riverview Comms"
-    assert VERSION == "0.10.0"
+    assert VERSION == "0.11.0"
     assert "current_position" in TOOLS
     assert "resource_work" in TOOLS
+    assert "mailbox_requests" in TOOLS
     assert "write" in PROHIBITED
 
 

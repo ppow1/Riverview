@@ -55,5 +55,6 @@ def test_resource_model_is_paginated_and_named() -> None:
             "resource_diagnostics",
             "resource_cookbook",
             "resource_capacity",
+            "mailbox_requests",
         )
     )

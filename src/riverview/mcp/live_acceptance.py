@@ -23,6 +23,7 @@ REQUIRED = {
     "open_steward_escalations",
     "recent_diagnostic_events",
     "troubleshooting_cookbook",
+    "mailbox_requests",
     "resource_roadmap",
     "resource_work",
     "resource_reports",
@@ -76,6 +77,12 @@ async def _accept() -> dict[str, Any]:
         position = await session.call_tool("current_position", {})
         if getattr(position, "isError", False) or getattr(position, "is_error", False):
             raise RuntimeError("RIV-MCP-0006: current_position tool call failed.")
+
+        mailbox = await session.call_tool(
+            "mailbox_requests", {"limit": 5, "cursor": 0, "classification": "river"}
+        )
+        if getattr(mailbox, "isError", False) or getattr(mailbox, "is_error", False):
+            raise RuntimeError("RIV-MCP-0006: mailbox_requests tool call failed.")
 
         cookbook = await session.call_tool("troubleshooting_cookbook", {"limit": 5})
         if getattr(cookbook, "isError", False) or getattr(cookbook, "is_error", False):
