@@ -42,6 +42,14 @@ Riverview-owned profile under `A:\Riverview\runtime\browser\profile`.
 - `RIV-PLY-0009`: bounded invocation timeout/failure.
 - `RIV-PLY-0010`/`0011`: missing or invalid local configuration.
 - `RIV-PLY-0012`/`0013`: browser lifecycle or executable failure.
+- A first ring attempt exposed a tranche-local `UUID is not defined` defect
+  before browser submission; the bounded bridge was repaired and published.
+  The exact configured ChatGPT project route was then accepted by the target
+  matcher without enabling fallback discovery.
+- The final authorized attempt returned durable `succeeded` evidence, but a
+  bounded 51-second PostgreSQL observation still showed the request as
+  unacknowledged, unclaimed, and pending with no response. Browser success is
+  not downstream reasoning success.
 
 ## REPAIR
 
@@ -56,6 +64,12 @@ fall back to fuzzy/latest selection.
 Rerun both preflights. For a live attempt, reconcile the returned attempt,
 request, and correlation identities with PostgreSQL mailbox/River evidence and
 then verify that the designated conversation used Riverview Comms.
+
+For the current live checkpoint, also verify the same request's acknowledgement,
+claim, response, completion, and River-event lineage through PostgreSQL. The
+absence of those states after a bounded observation is a downstream Comms /
+reasoning-boundary failure; it is not evidence that another browser wake is
+safe.
 
 ## DO NOT
 

@@ -2,7 +2,8 @@
 
 Version: 0.12.0
 Checkpoint date: 2026-08-14
-Status: external MCP accepted; ChatGPT application/conversation acceptance remains pending.
+Status: external MCP accepted; Riverview Comms is connected to the designated
+ChatGPT conversation; RV-008.3 live mailbox completion remains pending.
 
 ## Purpose and authority
 
@@ -122,6 +123,22 @@ Deployment recovery backup:
 
 `/etc/caddy/Caddyfile.backup-riverview-comms-20260814T225407Z`
 
+## ChatGPT Comms acceptance checkpoint
+
+The application `Riverview Comms` is connected at
+`https://riverview-comms.ionoge.com/mcp` for the designated `Riverview_001`
+conversation. Through the real ChatGPT/MCP boundary, `current_position` and
+`roadmap_revision` returned PostgreSQL-backed state; the observed revision was
+`RV-MASTER-2026-08-14`, and RV-008.3 was observed as pending with its Steward
+checkpoint. PostgreSQL, not GitHub conversation context, remains operational
+authority.
+
+The single authorized doorbell attempt subsequently succeeded at the browser
+boundary with attempt identity `ad57b894-5960-420d-be76-1ea33bd62212`. A
+bounded typed-state observation found no acknowledgement, claim, response, or
+completion event. This is not end-to-end success; RV-008.3 remains pending
+until mailbox-side reasoning evidence is present.
+
 ## Current DNS and TLS checkpoint
 
 At the 2026-08-14 deployment checkpoint represented by this document,
@@ -141,9 +158,10 @@ discovery, and bounded PostgreSQL-backed reads pass.
 Detailed symptom, diagnostic, repair, and verification procedures remain in
 [`RIV-COMMS-0003_HTTPS_AUTH_REGISTRATION.md`](troubleshooting/checkpoints/RIV-COMMS-0003_HTTPS_AUTH_REGISTRATION.md).
 
-The next bounded action is ChatGPT application registration and designated
-conversation acceptance. DNS records and the domain-wide wildcard/root records
-must not be changed as part of that continuation.
+The next bounded action is to diagnose why the designated connected conversation
+did not acknowledge or claim the mailbox request, using only the typed
+Comms/mailbox path. Do not ring a second time for this request. DNS records and
+the domain-wide wildcard/root records must not be changed.
 
 ## Recovery and troubleshooting
 
@@ -160,14 +178,10 @@ it does not replace the operational troubleshooting checkpoints.
 
 After external MCP acceptance:
 
-1. Register Riverview Comms in ChatGPT using the accepted Comms8 Blue application pattern.
-2. Verify Riverview Comms and its `mailbox_requests` read are visible and usable in the designated `Riverview_001` conversation.
-3. Reconfirm browser and doorbell preflight.
-4. Reuse the existing durable correlated RV-008.3 mailbox request.
-5. Ring the already-authorized fixed doorbell once.
-6. Verify typed mailbox/MCP/River evidence.
-7. Promote RV-008.3 only after genuine end-to-end success.
-8. Evaluate RV-004.5 dependency readiness without starting RV-004.5.
+1. Diagnose the missing typed mailbox acknowledgement/claim in the designated conversation.
+2. Reconfirm the `mailbox_requests` projection and correlation identity without broadening authority.
+3. Promote RV-008.3 only after genuine end-to-end success.
+4. Evaluate RV-004.5 dependency readiness without starting RV-004.5.
 
 ## Roadmap checkpoint snapshot
 
