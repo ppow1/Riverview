@@ -22,6 +22,7 @@ class StageSpec:
     required_evidence: tuple[str, ...] = ()
     depends_on: tuple[str, ...] = ()
     steward_checkpoint: bool = False
+    declared_action: dict[str, Any] | None = None
 
 
 class ObjectiveStore:
@@ -98,13 +99,13 @@ class ObjectiveStore:
                     """
                     INSERT INTO objective_stages(
                         stage_id,objective_id,stage_key,sort_order,title,description,status,
-                        readiness,required_evidence,steward_checkpoint
+                        readiness,required_evidence,steward_checkpoint,declared_action
                     )
-                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s::jsonb)
                     """,
                     (
                         stage_id,objective_id,spec.key,order,spec.title,spec.description,status,
-                        readiness,json.dumps(list(spec.required_evidence)),spec.steward_checkpoint,
+                        readiness,json.dumps(list(spec.required_evidence)),spec.steward_checkpoint,json.dumps(spec.declared_action) if spec.declared_action else None,
                     ),
                 )
 

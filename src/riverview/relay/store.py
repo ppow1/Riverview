@@ -41,7 +41,7 @@ class RelayStore:
     def __init__(self, config: DatabaseConfig | None = None) -> None:
         self._config = config
 
-    def enqueue(self, action_type: str, parameters: dict[str, Any], requested_by: str, idempotency_key: str, correlation_id: UUID | None = None) -> WorkOrder:
+    def enqueue(self, action_type: str, parameters: dict[str, Any], requested_by: str, idempotency_key: str, correlation_id: UUID | None = None, causation_id: UUID | None = None) -> WorkOrder:
         """Create one durable order or return the existing idempotent order."""
         with connect(self._config) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT action_version, expected_duration_seconds, hard_timeout_seconds, enabled FROM approved_actions WHERE action_type=%s", (action_type,))
@@ -50,11 +50,11 @@ class RelayStore:
                 raise RuntimeError(f"RIV-WRK-0001: Action is unknown or disabled: {action_type}")
             order_id = uuid4(); correlation = correlation_id or uuid4()
             cursor.execute(
-                """INSERT INTO work_orders (work_order_id, action_type, action_version, status, parameters, requested_by, idempotency_key, correlation_id, expected_duration_seconds, hard_timeout_seconds)
-                   VALUES (%s,%s,%s,'queued',%s::jsonb,%s,%s,%s,%s,%s)
+                """INSERT INTO work_orders (work_order_id, action_type, action_version, status, parameters, requested_by, idempotency_key, correlation_id, causation_id, expected_duration_seconds, hard_timeout_seconds)
+                   VALUES (%s,%s,%s,'queued',%s::jsonb,%s,%s,%s,%s,%s,%s)
                    ON CONFLICT (idempotency_key) DO NOTHING
                    RETURNING work_order_id""",
-                (order_id, action_type, action[0], json.dumps(parameters), requested_by, idempotency_key, correlation, action[1], action[2]),
+                (order_id, action_type, action[0], json.dumps(parameters), requested_by, idempotency_key, correlation, causation_id, action[1], action[2]),
             )
             inserted = cursor.fetchone()
             if not inserted:

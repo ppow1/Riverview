@@ -168,12 +168,12 @@ class GraceMomentum:
             if objective is None:
                 raise RuntimeError("RIV-GRC-0004: objective is not present in PostgreSQL.")
             cursor.execute(
-                """SELECT stage_id,stage_key,status,readiness,steward_checkpoint FROM objective_stages
+                """SELECT stage_id,stage_key,status,readiness,steward_checkpoint,declared_action FROM objective_stages
                    WHERE objective_id=%s ORDER BY sort_order""", (objective[0],)
             )
             rows = cursor.fetchall()
             decisions: list[dict[str, Any]] = []
-            for stage_id, stage_key, status, readiness, steward_checkpoint in rows:
+            for stage_id, stage_key, status, readiness, steward_checkpoint, declared_action in rows:
                 decision = "completed" if status == "completed" else ("ready" if readiness == "ready" else "blocked")
                 reason = "stage is completed" if decision == "completed" else ("declared dependencies are complete" if decision == "ready" else "declared dependencies or evidence are incomplete")
                 key = f"grace.evaluation:{objective_key}:{stage_key}:{decision}"
@@ -182,8 +182,28 @@ class GraceMomentum:
                        VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s) ON CONFLICT(idempotency_key) DO NOTHING""",
                     (uuid4(), objective[0], stage_id, correlation_id, "checkpoint" if steward_checkpoint and decision == "ready" else decision, reason, None if decision != "ready" else "declared-stage-action", _json([]), key),
                 )
-                decisions.append({"stage_key": stage_key, "decision": decision, "steward_checkpoint": steward_checkpoint})
+                decisions.append({"stage_key": stage_key, "decision": decision, "steward_checkpoint": steward_checkpoint, "declared_action": declared_action})
             return decisions
+
+    def enqueue_declared_action(self, objective_key: str, stage_key: str, *, requested_by: str = "grace") -> dict[str, Any]:
+        from riverview.relay import RelayStore
+
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT s.stage_id,s.status,s.readiness,s.steward_checkpoint,s.declared_action,o.correlation_id
+                   FROM objective_stages s JOIN objectives o ON o.objective_id=s.objective_id
+                   WHERE o.objective_key=%s AND s.stage_key=%s""", (objective_key, stage_key)
+            )
+            row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError("RIV-GRC-0004: declared objective stage is missing.")
+        stage_id, status, readiness, steward_checkpoint, action, correlation_id = row
+        if status == "completed" or readiness != "ready" or steward_checkpoint:
+            raise RuntimeError("RIV-GRC-0004: stage is not eligible for automatic action.")
+        if not isinstance(action, dict) or not isinstance(action.get("action_type"), str) or not isinstance(action.get("parameters"), dict):
+            raise TypeError("RIV-GRC-0004: no declared approved action is present.")
+        order = RelayStore().enqueue(action["action_type"], action["parameters"], requested_by, f"grace:{objective_key}:{stage_key}", correlation_id)
+        return {"stage_id": str(stage_id), "work_order_id": str(order.work_order_id), "correlation_id": str(correlation_id), "action_type": order.action_type}
 
     def detect_stale_work(self, correlation_id: UUID | None = None) -> list[dict[str, Any]]:
         """Record stale leases/checkpoints without changing user intent."""

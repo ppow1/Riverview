@@ -191,6 +191,14 @@ consumer `chatgpt:riverview_001`; only an explicit `steward` confirmer can promo
 that draft through Grace into an objective. A seed is never a work order and no
 seed was promoted by this deployment checkpoint.
 
+Migration `0016` adds the optional declared action binding to objective stages.
+Grace may enqueue only that stage's already-registered approved action, with a
+stable objective/stage idempotency key; no generic state setter or database command
+is accepted. A real momentum acceptance evaluated and enqueued `relay.noop`, the
+restricted runner completed it, and Grace finalized the objective. Its durable
+work-order evidence is `f5250284-584d-4448-8890-5035af378d59` with correlation
+`05080b5e-92cc-425d-8477-f49626d05700`.
+
 ## Runtime and deployment topology
 
 The local HTTP implementation can be started with the repository's accepted

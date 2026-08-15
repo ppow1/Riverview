@@ -17,11 +17,23 @@ KNOWN FAILURE: `RIV-GRC-0004` means the objective is absent; `RIV-GRC-0005` mean
 work lease is stale; `RIV-GRC-0006` means checkpoint fields are incomplete;
 `RIV-GRC-0007` means a retry request is outside the one-retry bound.
 
+During migration 0016 integration, ObjectiveStage creation initially failed with a
+PostgreSQL placeholder/parameter-count mismatch after adding `declared_action`. The
+failure was a schema-binding/configuration defect, not a dependency or authority
+decision.
+
 REPAIR: Restore the missing declared dependency or measured lease state, or route a
 true Steward decision. Retry only a registered retry-safe transport/provider failure.
+For the migration defect, align the additive column list, placeholder count, and
+parameter tuple, then rerun the existing objective-stage tests and migration ledger
+check; never rewrite an applied migration.
 
 VERIFY: Re-evaluate and confirm the same idempotency key yields one durable decision
 and, when needed, one open checkpoint.
+
+A real recovery acceptance completed objective
+`grace-momentum.acceptance.0819f7b0-6c65-4d56-8cd0-5e1937487244`, enqueued work
+`f5250284-584d-4448-8890-5035af378d59`, and finalized without recursive creation.
 
 DO NOT: Infer a transition from conversation prose, mark a stage complete without
 required evidence, or enqueue recursive work from a diagnostic.
