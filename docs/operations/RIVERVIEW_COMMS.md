@@ -2,8 +2,8 @@
 
 Version: 0.13.0
 Checkpoint date: 2026-08-14
-Status: external MCP accepted; Riverview Comms is connected to the designated
-ChatGPT conversation; RV-008.3 bounded wake acceptance is complete.
+Status: external MCP accepted; bounded mailbox writes are deployed; the
+designated ChatGPT conversation has not yet completed the RV-004.5 response loop.
 
 ## Purpose and authority
 
@@ -93,6 +93,11 @@ accept only River-classified requests, preserve correlation, enforce leases and
 payload bounds, and never provide a generic state setter. A response completes
 the request transactionally. Timeout expiry and exactly-once Steward escalation
 are performed by the bounded mailbox service, not by arbitrary ChatGPT input.
+
+The new schema is externally deployed and lists 19 tools. A real RV-004.5
+request was created and its fixed doorbell wake succeeded, but the designated
+conversation did not acknowledge or claim it during the bounded observation
+window. No second wake was sent and no response was fabricated.
 
 Riverview Comms explicitly does not expose arbitrary SQL, filesystem access,
 shell or process authority, secrets, arbitrary writes, roadmap mutation,

@@ -45,6 +45,11 @@ timeout escalation; replay reports zero additional escalations.
   `mailbox_acknowledge`, `mailbox_claim`, and `mailbox_submit_response`.
 - A response accepted but the request remains incomplete indicates a transaction
   or schema mismatch; it is not a reason to replay the response blindly.
+- A real doorbell may succeed while the designated ChatGPT conversation leaves
+  the request `unacknowledged/unclaimed/pending`. This indicates that the
+  connected application has not executed the new typed write path, often
+  because its application schema is stale or requires a UI refresh. This state
+  was observed for one authorized RV-004.5 attempt.
 
 ## REPAIR
 
@@ -52,6 +57,10 @@ Apply migration `0012_mailbox_timeout_escalation.sql` through the normal migrati
 runner, deploy the published Riverview Comms source, and restart only the
 Riverview-owned loopback service. Refresh the ChatGPT application schema through
 its supported registration path if discovery is stale.
+
+After deployment, refresh or reconnect the Riverview Comms application in the
+designated conversation once if the platform has not refreshed its tool schema.
+Then verify tool discovery before considering a new live acceptance request.
 
 ## VERIFY
 
@@ -65,6 +74,9 @@ Do not expose `mailbox_update`, arbitrary SQL, generic enqueue, roadmap mutation
 filesystem, shell, browser control, credentials, or Undercurrent. Do not bypass
 correlation or lease ownership, fabricate a response, or mark a request complete
 outside the typed response operation.
+
+Do not issue a second wake for a request whose first wake outcome is known, and
+do not mark a pending request completed to compensate for a stale ChatGPT schema.
 
 ## EVIDENCE
 
