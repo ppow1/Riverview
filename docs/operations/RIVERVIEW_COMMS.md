@@ -1,10 +1,10 @@
 # Riverview Comms
 
-Version: 0.16.0
+Version: 0.18.0
 Checkpoint date: 2026-08-15
 Status: external MCP accepted; RV-004.5 and RV-008.4 are complete; the bounded
-autonomous control-plane foundation is implemented locally; RV-008.5 remains at
-its Steward checkpoint.
+autonomous control-plane foundation is implemented locally; RV-008.5 and RV-008.6
+are complete with durable acceptance evidence.
 
 ## Purpose and authority
 
@@ -188,8 +188,10 @@ as a published source claim.
 Migration `0015` adds the bounded Steward seed draft boundary. The MCP
 `submit_steward_seed` operation creates exactly one idempotent draft for the fixed
 consumer `chatgpt:riverview_001`; only an explicit `steward` confirmer can promote
-that draft through Grace into an objective. A seed is never a work order and no
-seed was promoted by this deployment checkpoint.
+that draft through Grace into an objective. Seed
+`c68f4a7e-a442-40db-ae7f-229978911b2f` was explicitly confirmed and promoted into
+objective `24c5081b-b82c-4a88-b1cb-8c3f9ab952d4` under correlation
+`696dc369-a86e-4264-b5de-d94762d8483f`. A seed is never a work order.
 
 Migration `0016` adds the optional declared action binding to objective stages.
 Grace may enqueue only that stage's already-registered approved action, with a
@@ -204,6 +206,12 @@ records. An overlapping lane was rejected and safely reacquired after release; t
 same continuation correlation also produced one durable conflicting-result decision
 (`db4676fb-8fe4-47e6-a204-1489e5fb6619`) without executing the conflict. Capacity
 exhaustion paused dispatch and resumed after fresh telemetry.
+
+Migration `0018` adds the bounded `bridge_recovery_attempts` state machine for
+RV-008.6. It preserves request/correlation identity across retry, records River
+failure and recovery events, and creates at most one Steward escalation when a
+bounded retry budget is exhausted. It does not add browser authority or create
+mailbox requests.
 
 ## Runtime and deployment topology
 
@@ -303,14 +311,15 @@ it does not replace the operational troubleshooting checkpoints.
 - [Capability registry and dispatch](troubleshooting/checkpoints/RIV-CAP-0001_CAPABILITY_DISPATCH.md)
 - [Lane ownership and result reconciliation](troubleshooting/checkpoints/RIV-CAP-0002_LANE_RECONCILIATION.md)
 - [Steward seed and schema boundary](troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md)
+- [Bridge replay and recovery](troubleshooting/checkpoints/RIV-MCP-0011_BRIDGE_REPLAY_RECOVERY.md)
 
 ## Next bounded continuation
 
-After the local control-plane acceptance, the next bounded continuations are the
-remaining momentum/stale/retry/checkpoint acceptance and external schema refresh for
-the new `submit_steward_seed` tool. Do not promote a waypoint from implementation
-alone: each requires its own objective, evidence, and authoritative PostgreSQL
-transition. RV-008.5 still requires an actual Steward seed and explicit confirmation.
+RV-008.5 seed promotion and RV-008.6 bridge replay/recovery are complete. The
+recovery path is intentionally bounded: retry the same recovery identity while it
+is retryable, preserve correlation, and route exhausted recovery to its durable
+Steward checkpoint. Do not create replacement requests to mask a bridge failure.
+The next waypoint must be recomputed from authoritative PostgreSQL state.
 
 ## Roadmap checkpoint snapshot
 
@@ -322,7 +331,8 @@ Authoritative operational state at this deployment checkpoint:
 - RV-008.3: completed
 - RV-004.5: completed
 - RV-008.4: completed
-- RV-008.5: pending Steward checkpoint
+- RV-008.5: completed by explicit Steward-confirmed seed promotion
+- RV-008.6: completed by induced retry/recovery and exactly-once escalation acceptance
 - RV-005.3: completed
 - RV-005.4: completed
 - RV-005.5: completed at its authorized checkpoint

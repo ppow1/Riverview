@@ -164,6 +164,16 @@ ENTRIES = [
         "Repeat the bounded conflict/release or reconciliation probe and verify one owner and one typed decision.",
         "docs/operations/troubleshooting/checkpoints/RIV-CAP-0002_LANE_RECONCILIATION.md",
     ),
+    (
+        "RIV-MCP-0011",
+        "Bounded bridge replay and recovery",
+        "A bridge wake or MCP transport failure needs correlation-preserving retry or exactly-once escalation.",
+        ["transport-failure", "duplicate-replay", "retry-exhaustion", "correlation-loss"],
+        ["Inspect bridge_recovery_attempts and River events by recovery_id and correlation_id."],
+        "Retry only the same recovery identity within its bounded budget; escalate once when exhausted.",
+        "Run the induced failure/recovery acceptance and verify one recovery identity, preserved lineage, and at most one escalation.",
+        "docs/operations/troubleshooting/checkpoints/RIV-MCP-0011_BRIDGE_REPLAY_RECOVERY.md",
+    ),
 ]
 
 
@@ -179,8 +189,8 @@ def sync() -> dict[str, object]:
         for checkpoint_id, title, summary, classes, probes, repair, verify, source in ENTRIES:
             cookbook_entry = f"CB-{checkpoint_id}"
             entry_applicability = dict(applicability)
-            if checkpoint_id in {"RIV-GRC-0004", "RIV-CAP-0001", "RIV-CAP-0002", "RIV-EXE-0001", "RIV-MCP-0010"}:
-                entry_applicability.update({"kernel": ">=0.14.0", "waypoint": "RV-005.3/RV-006.1/RV-006.4/RV-006.5/RV-008.5", "authority": "bounded_control_plane"})
+            if checkpoint_id in {"RIV-GRC-0004", "RIV-CAP-0001", "RIV-CAP-0002", "RIV-EXE-0001", "RIV-MCP-0010", "RIV-MCP-0011"}:
+                entry_applicability.update({"kernel": ">=0.14.0", "waypoint": "RV-005.3/RV-006.1/RV-006.4/RV-006.5/RV-008.5/RV-008.6", "authority": "bounded_control_plane"})
             entry_applicability["source_path"] = source
             entry_applicability["title"] = title
             entry_applicability["summary"] = summary

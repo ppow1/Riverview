@@ -41,11 +41,21 @@ class StewardSeedStore:
         if confirmer != "steward":
             raise PermissionError("RIV-0085-0002: only the Steward may promote a seed draft.")
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT correlation_id,seed_text,status FROM steward_seed_drafts WHERE seed_id=%s FOR UPDATE", (seed_id,))
+            cursor.execute(
+                "SELECT correlation_id,seed_text,status,objective_id FROM steward_seed_drafts WHERE seed_id=%s FOR UPDATE",
+                (seed_id,),
+            )
             row = cursor.fetchone()
-            if row is None or row[2] != "draft":
+            if row is None:
                 raise RuntimeError("RIV-0085-0002: seed draft is not promotable.")
-            cursor.execute("UPDATE steward_seed_drafts SET status='confirmed',confirmed_at=now() WHERE seed_id=%s", (seed_id,))
+            if row[2] == "promoted" and row[3] is not None:
+                return row[3]
+            if row[2] != "draft":
+                raise RuntimeError("RIV-0085-0002: seed draft is not promotable.")
+            cursor.execute(
+                "UPDATE steward_seed_drafts SET status='confirmed',confirmed_at=now() WHERE seed_id=%s",
+                (seed_id,),
+            )
         objective_id = ObjectiveStore().create(
             f"seed:{seed_id}",
             "Steward seed draft",
