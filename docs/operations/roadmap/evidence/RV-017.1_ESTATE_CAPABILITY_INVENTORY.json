@@ -1,0 +1,16 @@
+{
+  "waypoint": "RV-017.1",
+  "captured_at": "2026-08-15",
+  "sources": [
+    {"capability": "Riverview PostgreSQL operational state", "state": "active", "provenance": "authoritative database probe", "classification": "operational"},
+    {"capability": "Riverview GitHub source/history", "state": "active", "provenance": "verified remote refs", "classification": "operational"},
+    {"capability": "Riverview Comms/MCP", "state": "active", "provenance": "live bounded MCP acceptance", "classification": "operational"},
+    {"capability": "Playwright fixed doorbell", "state": "active", "provenance": "published bridge and acceptance evidence", "classification": "operational"},
+    {"capability": "Codex local adapter", "state": "active", "provenance": "remote-verified execution evidence", "classification": "operational"},
+    {"capability": "Ollama RTX 4090", "state": "active", "provenance": "measured provider registry evidence", "classification": "operational"},
+    {"capability": "llama.cpp P100", "state": "active", "provenance": "CUDA1 measured provider evidence", "classification": "operational"},
+    {"capability": "Estate Open WebUI", "state": "active-unintegrated", "provenance": "process/HTTP probe; Estate-owned", "classification": "external-boundary"}
+  ],
+  "unknowns": ["undocumented Estate resident behavior", "unverified legacy parity", "physical ownership not inferable from software"],
+  "rule": "Inventory distinguishes active, active-unintegrated, unknown, and intentionally absent capabilities; no undocumented capability is inferred."
+}

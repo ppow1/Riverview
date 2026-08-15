@@ -294,6 +294,36 @@ ENTRIES = [
         "Verify authenticated model access and one correlated provider-neutral request against the Riverview-owned endpoint.",
         "docs/operations/troubleshooting/checkpoints/RIV-UI-0008_OPENWEBUI_RIVERVIEW_BOUNDARY.md",
     ),
+    (
+        "RIV-SEC-0002",
+        "Protected reference broker boundary",
+        "A caller requests protected data without the explicit bounded identity, capability, purpose, and classification decision.",
+        ["identity-missing", "capability-denied", "purpose-missing", "protected-payload", "implicit-admin"],
+        ["Inspect only bounded reference metadata and the typed decision; never retrieve the protected payload for diagnosis."],
+        "Deny by default and repair only the bounded request envelope; do not widen ordinary River or Comms authority.",
+        "Run synthetic denied/approved decisions and verify no protected payload enters River, logs, or MCP.",
+        "docs/operations/troubleshooting/checkpoints/RIV-SEC-0002_UNDERCURRENT_BROKER.md",
+    ),
+    (
+        "RIV-CTRL-0001",
+        "Device and control inventory boundary",
+        "A present control lacks stable identity, bounded capability, status, provenance, or an evidence-backed mapping.",
+        ["device-missing", "duplicate-identity", "stale-status", "mapping-unknown", "physical-evidence-missing"],
+        ["Use present-only operating-system records and retain exact instance IDs, class/status, raw counts, and source."],
+        "Re-run bounded discovery and preserve prior inventory; do not infer physical ownership or action mappings.",
+        "Compare raw/class counts and representative stable IDs with the structured inventory evidence.",
+        "docs/operations/troubleshooting/checkpoints/RIV-CTRL-0001_DEVICE_INVENTORY.md",
+    ),
+    (
+        "RIV-MIG-0001",
+        "Estate capability inventory boundary",
+        "An Estate capability is assumed active, equivalent, deprecated, or retired without authoritative evidence.",
+        ["provenance-missing", "parity-assumed", "capability-unknown", "estate-modification", "classification-missing"],
+        ["Record bounded capability/state/provenance/classification and explicit unknowns from source and runtime probes."],
+        "Re-probe the bounded source and preserve prior inventory; do not infer parity or modify Estate.",
+        "Compare every row with its source and verify unknowns remain explicit.",
+        "docs/operations/troubleshooting/checkpoints/RIV-MIG-0001_CAPABILITY_INVENTORY.md",
+    ),
 ]
 
 

@@ -1,0 +1,23 @@
+{
+  "waypoint": "RV-011.1",
+  "captured_at": "2026-08-15",
+  "source": "Windows Get-PnpDevice -PresentOnly",
+  "raw_present_records": 94,
+  "class_counts": {
+    "Bluetooth": 16,
+    "HIDClass": 47,
+    "Keyboard": 9,
+    "Mouse": 5,
+    "USB": 17
+  },
+  "controls": [
+    {"identity": "USB\\VID_0FD9&PID_008F\\A00NA32533KHWX", "kind": "USB Input Device", "capability": "HID/control input", "status": "OK", "provenance": "Windows PnP"},
+    {"identity": "HID\\VID_0FD9&PID_008F\\9&2BDE821E&0&0000", "kind": "consumer control", "capability": "consumer-control input", "status": "OK", "provenance": "Windows PnP"},
+    {"identity": "class:Keyboard", "kind": "HID Keyboard Device", "capability": "keyboard input", "status": "OK", "provenance": "Windows PnP aggregate; per-device records retained in probe output"},
+    {"identity": "class:Mouse", "kind": "HID-compliant mouse", "capability": "mouse input", "status": "OK", "provenance": "Windows PnP aggregate; per-device records retained in probe output"},
+    {"identity": "class:Bluetooth", "kind": "Bluetooth control/audio endpoints", "capability": "Bluetooth input/transport", "status": "OK", "provenance": "Windows PnP aggregate; mappings not inferred"}
+  ],
+  "legacy_profiles": "not promoted; no implicit action mappings were inferred",
+  "unknowns": ["physical cable ownership", "unlabeled rotary mappings", "operator-owned action profiles"],
+  "acceptance": "Every discoverable control has an identity, bounded capability classification, status, and provenance; unknown physical ownership remains explicit."
+}
