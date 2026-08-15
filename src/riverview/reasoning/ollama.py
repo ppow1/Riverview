@@ -10,6 +10,7 @@ import json
 from datetime import UTC, datetime
 from http.client import RemoteDisconnected
 from urllib.error import URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from uuid import UUID, uuid4
 
@@ -18,7 +19,8 @@ from .contracts import ReasoningRequest, ReasoningResponse
 
 class OllamaReasoningAdapter:
     def __init__(self, *, endpoint: str = "http://127.0.0.1:11434", timeout_seconds: int = 60) -> None:
-        if endpoint not in {"http://127.0.0.1:11434", "http://localhost:11434"}:
+        parsed = urlparse(endpoint)
+        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"} or not parsed.port:
             raise ValueError("RIV-REASON-0002: Ollama adapter is loopback-only.")
         if not 1 <= timeout_seconds <= 300:
             raise ValueError("RIV-REASON-0002: timeout is outside its bound.")

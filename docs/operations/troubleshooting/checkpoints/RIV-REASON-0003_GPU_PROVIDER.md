@@ -18,7 +18,7 @@ The RTX 4090 adapter returns a typed response with GPU/model evidence. The P100 
 
 ## KNOWN FAILURE / REPAIR
 
-Missing device, unsupported model, runtime mismatch, timeout, or unchanged resource evidence fails closed. Repair the local runtime/adapter registration; do not invent parity.
+Missing device, unsupported model, runtime mismatch, timeout, or unchanged resource evidence fails closed. The 2026-08-15 P100 probe started an isolated Ollama endpoint with `CUDA_VISIBLE_DEVICES=0`; the request returned, but P100 memory remained `9 MiB` while the RTX 4090 rose from `16692` to `22826 MiB`. This proves the Windows runtime ignored the attempted P100 binding for that process. Repair the local runtime/adapter registration or reject the task; do not invent parity.
 
 ## VERIFY
 
@@ -30,4 +30,4 @@ Do not route protected payloads, expose GPU controls through MCP, or claim a GPU
 
 ## EVIDENCE
 
-Source: `src/riverview/reasoning/gpu.py`; Cookbook entry: `RIV-REASON-0003`.
+Source: `src/riverview/reasoning/gpu.py`; Cookbook entry: `RIV-REASON-0003`. Runtime endpoint and measured device must both be recorded; an HTTP success is not GPU acceptance.

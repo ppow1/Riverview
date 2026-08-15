@@ -48,6 +48,7 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-WRK-0009` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â notification-loop invariant failure
 
 - `RIV-UI-0001` through `RIV-UI-0006` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â status routing, projection, bind, acceptance, environment, and exit failures
+- `RIV-UI-0008` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Riverview Open WebUI ownership and authenticated model-access boundary
 
 - `RIV-RDM-0001` through `RIV-RDM-0006` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â roadmap source and persistence failures
 

@@ -22,6 +22,7 @@ class GpuEvidence:
     model: str
     status: str
     reason: str
+    runtime_endpoint: str
 
 
 def _inventory() -> list[dict[str, str]]:
@@ -34,11 +35,12 @@ def _inventory() -> list[dict[str, str]]:
 
 
 class LocalGpuReasoningAdapter:
-    def __init__(self, adapter_id: str, expected_name: str) -> None:
+    def __init__(self, adapter_id: str, expected_name: str, *, endpoint: str = "http://127.0.0.1:11434") -> None:
         if adapter_id not in {"rtx4090", "p100"}:
             raise ValueError("RIV-REASON-0003: GPU adapter identity is closed.")
         self.adapter_id = adapter_id
         self.expected_name = expected_name
+        self.endpoint = endpoint
 
     def complete(self, model: str, request: ReasoningRequest) -> tuple[ReasoningResponse | None, GpuEvidence]:
         devices = _inventory()
@@ -47,11 +49,21 @@ class LocalGpuReasoningAdapter:
             raise RuntimeError("RIV-REASON-0003: named GPU is unavailable.")
         device = matches[0]
         before = int(device["used"])
-        if self.adapter_id == "p100":
-            evidence = GpuEvidence(self.adapter_id, device["name"], device["driver"], int(device["total"]), before, before, model, "rejected", "current local Ollama model runtime is not bound to the P100 adapter")
-            return None, evidence
-        result = OllamaReasoningAdapter(timeout_seconds=90).complete(model, request)
+        result = OllamaReasoningAdapter(endpoint=self.endpoint, timeout_seconds=90).complete(model, request)
         after_devices = {item["index"]: item for item in _inventory()}
         after = int(after_devices[device["index"]]["used"])
-        evidence = GpuEvidence(self.adapter_id, device["name"], device["driver"], int(device["total"]), before, after, model, "succeeded", "bounded Ollama request completed on the measured RTX 4090 runtime")
+        if after <= before:
+            evidence = GpuEvidence(
+                self.adapter_id, device["name"], device["driver"], int(device["total"]),
+                before, after, model, "rejected",
+                f"runtime endpoint {self.endpoint} completed but did not use the named {device['name']} device",
+                self.endpoint,
+            )
+            return None, evidence
+        evidence = GpuEvidence(
+            self.adapter_id, device["name"], device["driver"], int(device["total"]),
+            before, after, model, "succeeded",
+            f"bounded Ollama request completed on the measured {device['name']} runtime",
+            self.endpoint,
+        )
         return result, evidence

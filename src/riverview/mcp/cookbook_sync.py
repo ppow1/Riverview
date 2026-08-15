@@ -284,6 +284,16 @@ ENTRIES = [
         "Emit twice, deliver once, and verify one durable notification identity/state transition.",
         "docs/operations/troubleshooting/checkpoints/RIV-NOT-0001_EXACTLY_ONCE.md",
     ),
+    (
+        "RIV-UI-0008",
+        "Riverview Open WebUI ownership and authentication boundary",
+        "The health endpoint is reachable but authenticated model access is unavailable or the listener is not Riverview-owned.",
+        ["health-only", "authentication-required", "wrong-service-instance", "credential-boundary", "provider-unavailable"],
+        ["Inspect the exact listener process, bounded health/config/model status probes, and only approved Riverview configuration paths; never read secret values."],
+        "Use the approved Riverview-owned service and authentication path, or stop at the missing credential/service boundary; do not reuse an unrelated Estate instance.",
+        "Verify authenticated model access and one correlated provider-neutral request against the Riverview-owned endpoint.",
+        "docs/operations/troubleshooting/checkpoints/RIV-UI-0008_OPENWEBUI_RIVERVIEW_BOUNDARY.md",
+    ),
 ]
 
 
