@@ -17,6 +17,10 @@ KNOWN FAILURE: `RIV-CAP-0001` rejects invalid registration; `RIV-CAP-0002` rejec
 missing or overcommitted capacity; no selection is a provider/checkpoint boundary,
 not permission to use an unregistered process.
 
+An execution envelope referencing an unregistered capability is rejected by the
+PostgreSQL capability foreign key. Register and measure the named capability first;
+never bypass the registry with a direct process call.
+
 REPAIR: Refresh measured capability evidence or bounded telemetry. Do not substitute a
 descriptive provider label for a health probe.
 

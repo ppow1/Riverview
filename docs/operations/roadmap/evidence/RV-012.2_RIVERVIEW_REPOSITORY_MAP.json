@@ -1,0 +1,16 @@
+{
+  "schema": "rv-012.2-repository-map-v1",
+  "repository_identity": "ppow1/Riverview",
+  "root": "A:/Riverview/repo",
+  "entry_points": ["src/riverview", "tools", "tests"],
+  "runtime_seams": ["src/riverview/mcp", "src/riverview/grace", "src/riverview/relay", "src/riverview/doorbell", "src/riverview/status"],
+  "dependency_seams": ["pyproject.toml", "src/riverview/database", ".venv"],
+  "test_seams": ["tests", "pytest", "ruff"],
+  "data_seams": ["PostgreSQL via src/riverview/database", "database/migrations", "runtime/diagnostics"],
+  "deployment_seams": ["Caddy VPS Riverview Comms", "loopback backend 127.0.0.1:11825", "tools/powershell"],
+  "authoritative_sources": ["PostgreSQL operational state", "GitHub source/history", "database/migrations", "docs/operations/roadmap"],
+  "diagnostic_locations": ["src/riverview/diagnostics", "src/riverview/mcp/cookbook_sync.py", "docs/operations/troubleshooting/checkpoints"],
+  "mutable_ownership": ["src/riverview", "tests", "docs/operations", "database/migrations"],
+  "unknowns": ["external RTX 4090/P100 adapter process isolation", "CueMastery project-specific export availability"],
+  "boundary": "Map is evidence; it grants no authority to rewrite unrelated systems."
+}

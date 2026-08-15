@@ -1,0 +1,29 @@
+{
+  "schema": "rv-012.3-decomposition-v1",
+  "intake_id": "8c0c3977-f4da-417e-97e5-e1d7ab0998c8",
+  "correlation_id": "8381af51-cc08-4ceb-ac32-f1cb8f03d2a3",
+  "tasks": [
+    {
+      "task_id": "rv0123-comms-observability",
+      "objective_id": "riverview-autonomy-continuation",
+      "instruction": "Add bounded provider/diagnostic status projection coverage and tests.",
+      "allowed_paths": ["src/riverview/status", "tests/test_diagnostics_non_regression.py"],
+      "provider_need": "codex-cli",
+      "acceptance": ["pytest", "Ruff", "status projection query", "diagnostic checkpoint evidence"],
+      "checkpoint": "RIV-DIA-0001",
+      "merge_owner": "grace:reconciliation"
+    },
+    {
+      "task_id": "rv0123-classification-contract",
+      "objective_id": "riverview-autonomy-continuation",
+      "instruction": "Add deterministic classification/reference boundary tests and Cookbook coverage.",
+      "allowed_paths": ["src/riverview/classification", "tests/test_provider_neutral_contracts.py", "docs/operations/troubleshooting/checkpoints"],
+      "provider_need": "codex-cli",
+      "acceptance": ["unknown fails closed", "protected reference remains metadata-only", "Cookbook synchronized"],
+      "checkpoint": "RIV-SEC-0001",
+      "merge_owner": "grace:reconciliation"
+    }
+  ],
+  "conflict_policy": "Reject overlapping mutable paths; unrelated lanes continue.",
+  "acceptance_owner": "grace:reconciliation"
+}

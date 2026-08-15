@@ -5,6 +5,7 @@ import pytest
 
 from riverview.classification import Classification, StorageReference, classify_label
 from riverview.reasoning import (
+    LocalGpuReasoningAdapter,
     OllamaReasoningAdapter,
     ReasoningProvider,
     ReasoningRequest,
@@ -38,3 +39,8 @@ def test_classification_and_reference_fail_closed() -> None:
 def test_ollama_adapter_is_loopback_only() -> None:
     with pytest.raises(ValueError, match="loopback"):
         OllamaReasoningAdapter(endpoint="https://example.invalid")
+
+
+def test_gpu_adapter_identity_is_closed() -> None:
+    with pytest.raises(ValueError, match="identity"):
+        LocalGpuReasoningAdapter("unknown", "GPU")
