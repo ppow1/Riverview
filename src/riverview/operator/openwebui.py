@@ -16,6 +16,29 @@ from uuid import UUID
 
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 
+UI_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Riverview Operator</title>
+<style>body{font:16px sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem}textarea{width:100%;height:8rem}input,button{margin:.4rem 0;padding:.5rem}#result{white-space:pre-wrap;background:#f3f3f3;padding:1rem}</style></head>
+<body><h1>Riverview Operator</h1><p id="status">Authenticate, enter text, optionally select a harmless artifact, then submit.</p>
+<label>Riverview bearer <input id="token" type="password" autocomplete="off"></label><br>
+<textarea id="message" placeholder="Enter a bounded operator request"></textarea><br>
+<input id="artifact" type="file"><br><button id="send">Submit</button>
+<pre id="result"></pre>
+<script>
+const $=id=>document.getElementById(id);
+async function hash(file){const bytes=await file.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+async function submit(){
+  $('status').textContent='Submitting bounded request…'; $('result').textContent='';
+  const file=$('artifact').files[0]; const refs=[];
+  if(file) refs.push('browser-artifact:'+file.name+':'+await hash(file));
+  const correlation=crypto.randomUUID(), request=crypto.randomUUID();
+  const response=await fetch('/api/chat',{method:'POST',headers:{'Authorization':'Bearer '+$('token').value,'Content-Type':'application/json'},body:JSON.stringify({request_id:request,correlation_id:correlation,message:$('message').value,context_refs:refs,classification:'operational',model:'qwen3-coder:30b-qwencode-20k'})});
+  const body=await response.json(); $('status').textContent=response.ok?'Completed':'Rejected';
+  $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,response:body.response||body.error},null,2);
+}
+$('send').addEventListener('click',()=>submit().catch(error=>{$('status').textContent='Failed';$('result').textContent=String(error);}));
+</script></body></html>"""
+
 
 @dataclass(frozen=True, slots=True)
 class OpenWebUIConfig:
@@ -47,11 +70,21 @@ class RiverviewOpenWebUIService:
                 self.end_headers()
                 self.wfile.write(body)
 
+            def _send_html(self, body: str) -> None:
+                encoded = body.encode()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+
             def _auth(self) -> bool:
                 return self.headers.get("Authorization") == f"Bearer {service.config.bearer_token}"
 
             def do_GET(self) -> None:
-                if self.path == "/health":
+                if self.path == "/":
+                    self._send_html(UI_HTML)
+                elif self.path == "/health":
                     self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity})
                 elif self.path == "/api/models" and self._auth():
                     self._send(HTTPStatus.OK, {"data": [{"id": "riverview-provider-neutral"}]})
@@ -77,7 +110,7 @@ class RiverviewOpenWebUIService:
                         expires_at=__import__("datetime").datetime.now(__import__("datetime").UTC), allowed_authority=("read:bounded", "return:advisory"),
                     )
                     response = service.provider(str(payload.get("model", "approved")), request)
-                    self._send(HTTPStatus.OK, {"service": service.config.service_identity, "response": response.as_typed_payload()})
+                    self._send(HTTPStatus.OK, {"service": service.config.service_identity, "context_refs": list(request.context_refs), "response": response.as_typed_payload()})
                 except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):  # bounded protocol error
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "bounded_request_rejected", "checkpoint": "RIV-UI-0009"})
 
