@@ -199,6 +199,12 @@ restricted runner completed it, and Grace finalized the objective. Its durable
 work-order evidence is `f5250284-584d-4448-8890-5035af378d59` with correlation
 `05080b5e-92cc-425d-8477-f49626d05700`.
 
+Migration `0017` adds exclusive relative-path lanes and typed reconciliation
+records. An overlapping lane was rejected and safely reacquired after release; the
+same continuation correlation also produced one durable conflicting-result decision
+(`db4676fb-8fe4-47e6-a204-1489e5fb6619`) without executing the conflict. Capacity
+exhaustion paused dispatch and resumed after fresh telemetry.
+
 ## Runtime and deployment topology
 
 The local HTTP implementation can be started with the repository's accepted
@@ -295,6 +301,7 @@ it does not replace the operational troubleshooting checkpoints.
 - [Autonomous control-plane and Codex adapter](troubleshooting/checkpoints/RIV-EXE-0001_AUTONOMOUS_CONTROL_PLANE.md)
 - [Grace momentum and checkpoint routing](troubleshooting/checkpoints/RIV-GRC-0004_MOMENTUM_CONTROL.md)
 - [Capability registry and dispatch](troubleshooting/checkpoints/RIV-CAP-0001_CAPABILITY_DISPATCH.md)
+- [Lane ownership and result reconciliation](troubleshooting/checkpoints/RIV-CAP-0002_LANE_RECONCILIATION.md)
 - [Steward seed and schema boundary](troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md)
 
 ## Next bounded continuation
@@ -325,7 +332,9 @@ Authoritative operational state at this deployment checkpoint:
 - RV-006.3: completed at its authorized checkpoint
 - RV-007.1: completed
 - RV-007.2: completed
-- RV-006.4/006.5/006.6: pending and dependency-ready as applicable
+- RV-006.4: completed
+- RV-006.5: completed
+- RV-006.6: completed
 - RV-007.3/007.4: pending; hardware/provider evidence not present
 - RV-007.6: pending until all declared adapter dependencies complete
 
