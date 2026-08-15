@@ -345,6 +345,7 @@ ENTRIES = [
         "Fail safe, restore the authoritative projection, and require explicit confirmation for destructive events.", "Rerun induced fault and shutdown-guard tests.", "docs/operations/troubleshooting/checkpoints/RIV-CTRL-0005_PHYSICAL_SAFETY.md",
     ),
     ("RIV-KNW-0004", "Candidate extraction boundary", "Extraction must preserve provenance and uncertainty without creating authority.", ["attribution-uncertain", "source-rewrite", "candidate-authority"], ["Validate source reference, kind, confidence, classification, and ambiguity."], "Retain candidates as evidence and require explicit promotion for decisions.", "Replay extraction and verify no work or source mutation.", "docs/operations/troubleshooting/checkpoints/RIV-KNW-0004_EXTRACTION.md"),
+    ("RIV-UI-0009", "Riverview-owned Open WebUI service boundary", "Riverview operator requests must use an isolated authenticated service and preserve typed reasoning correlation.", ["wrong-service", "authentication", "bounded-payload", "correlation-loss", "provider-failure"], ["Probe loopback health, authenticated models, and bounded chat with service identity and correlation."], "Restart only the Riverview service and repair its bounded configuration; never reuse Estate state or add shell/SQL authority.", "Run authenticated model discovery and one typed provider request with preserved correlation.", "docs/operations/troubleshooting/checkpoints/RIV-UI-0009_RIVERVIEW_OPENWEBUI_SERVICE.md"),
 ]
 
 
