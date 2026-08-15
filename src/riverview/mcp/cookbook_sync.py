@@ -344,6 +344,7 @@ ENTRIES = [
         ["stuck-input", "duplicate-tap", "profile-drift", "disconnect", "destructive-unguarded"], ["Classify the event and inspect explicit confirmation without invoking physical action."],
         "Fail safe, restore the authoritative projection, and require explicit confirmation for destructive events.", "Rerun induced fault and shutdown-guard tests.", "docs/operations/troubleshooting/checkpoints/RIV-CTRL-0005_PHYSICAL_SAFETY.md",
     ),
+    ("RIV-KNW-0004", "Candidate extraction boundary", "Extraction must preserve provenance and uncertainty without creating authority.", ["attribution-uncertain", "source-rewrite", "candidate-authority"], ["Validate source reference, kind, confidence, classification, and ambiguity."], "Retain candidates as evidence and require explicit promotion for decisions.", "Replay extraction and verify no work or source mutation.", "docs/operations/troubleshooting/checkpoints/RIV-KNW-0004_EXTRACTION.md"),
 ]
 
 

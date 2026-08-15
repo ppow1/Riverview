@@ -1,0 +1,11 @@
+{
+  "waypoint": "RV-009.4",
+  "project": "CueMastery",
+  "source": "indexed bounded conversation material",
+  "candidates": [
+    {"id":"CueMastery:candidate:1","kind":"source_explicit_decision","text":"Use bounded retrieval","source_ref":"conversation:50b0460a-0757-4d88-b702-9c57586b68c6/turn:M-C319-COMMS7-SPEC-HANDOFF","confidence":1.0,"classification":"operational"},
+    {"id":"CueMastery:candidate:2","kind":"ambiguous","text":"Further project work requires owner-scoped acceptance","source_ref":"conversation:50b0460a-0757-4d88-b702-9c57586b68c6","confidence":0.6,"ambiguity":"exact pilot task and acceptance not explicit","classification":"operational"}
+  ],
+  "execution_created": 0,
+  "source_history_modified": false
+}

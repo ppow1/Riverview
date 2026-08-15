@@ -1,0 +1,13 @@
+{
+  "waypoint":"RV-017.2",
+  "rows":[
+    {"capability":"PostgreSQL operational authority","classification":"PARITY_REQUIRED","evidence":"RIV-017.1 inventory + Charter"},
+    {"capability":"ChatGPT browser wake","classification":"INTENTIONAL_DIFFERENCE","evidence":"RV-008.3; wake-only boundary"},
+    {"capability":"Typed mailbox transport","classification":"PARITY_REQUIRED","evidence":"RV-004.5/RV-008.6"},
+    {"capability":"Open WebUI","classification":"MIGRATION_REQUIRED","evidence":"RIV-UI-0008; Estate-owned service only"},
+    {"capability":"Undercurrent payload access","classification":"PROTECTED_DIFFERENCE","evidence":"RIV-SEC-0002"},
+    {"capability":"Physical cable ownership","classification":"UNKNOWN_REQUIRES_DECISION","evidence":"RV-015.1 worksheet"}
+  ],
+  "unresolved_count":1,
+  "source_history_modified":false
+}

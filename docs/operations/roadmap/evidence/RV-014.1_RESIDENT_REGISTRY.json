@@ -1,0 +1,8 @@
+{
+  "waypoint":"RV-014.1",
+  "records":[],
+  "known_records":0,
+  "ambiguous_records":0,
+  "unknown":"No authoritative Estate resident records are present in the Riverview source set; registry schema is prepared without inventing residents.",
+  "authority":"resident identity remains outside generated model prose"
+}
