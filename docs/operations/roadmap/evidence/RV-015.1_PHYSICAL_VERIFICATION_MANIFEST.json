@@ -1,0 +1,17 @@
+{
+  "waypoint":"RV-015.1",
+  "source":"bounded Windows runtime probes",
+  "records":[
+    {"id":"NET-IF-23","group":"NETWORK","host":"local","device":"Ethernet 2","port":"ifIndex 23","connection":"TAP-Windows Adapter V9","inferred_destination":null,"physical_destination":"CONFIRM","label_present":"CONFIRM","action":"Confirm cable endpoint and label"},
+    {"id":"NET-IF-42","group":"NETWORK","host":"local","device":"vEthernet (Default Switch)","port":"ifIndex 42","connection":"Hyper-V Virtual Ethernet Adapter","inferred_destination":"virtual switch","physical_destination":"N/A virtual","label_present":"N/A","action":"Confirm virtual-only interface"},
+    {"id":"NET-IF-9","group":"NETWORK","host":"local","device":"Ethernet 3","port":"ifIndex 9","connection":"Realtek PCIe GbE Family Controller","inferred_destination":null,"physical_destination":"CONFIRM","label_present":"CONFIRM","action":"Confirm cable endpoint and label"},
+    {"id":"USB-COM-4","group":"USB / CONTROL","host":"local","device":"Bluetooth Serial","port":"COM4","connection":"BTHENUM serial","inferred_destination":null,"physical_destination":"N/A wireless or confirm peer","label_present":"N/A","action":"Confirm paired control peer if applicable"},
+    {"id":"USB-HID-048D-5702","group":"USB / CONTROL","host":"local","device":"USB Input Device","port":"VID_048D/PID_5702","connection":"HID","inferred_destination":null,"physical_destination":"CONFIRM","label_present":"CONFIRM","action":"Identify attached control/device endpoint"},
+    {"id":"USB-HID-25A7-FA07","group":"USB / CONTROL","host":"local","device":"HID vendor-defined device","port":"VID_25A7/PID_FA07","connection":"HID","inferred_destination":null,"physical_destination":"CONFIRM","label_present":"CONFIRM","action":"Identify attached control/device endpoint"},
+    {"id":"USB-COMPOSITE-4037-2804","group":"USB / CONTROL","host":"local","device":"USB Composite Device","port":"VID_4037/PID_2804","connection":"USB composite","inferred_destination":null,"physical_destination":"CONFIRM","label_present":"CONFIRM","action":"Identify attached device and cable"},
+    {"id":"USB-COMPOSITE-1189-8890","group":"USB / CONTROL","host":"local","device":"USB Composite Device","port":"VID_1189/PID_8890","connection":"USB composite","inferred_destination":null,"physical_destination":"CONFIRM","label_present":"CONFIRM","action":"Identify attached device and cable"},
+    {"id":"POWER-UPS","group":"POWER / UPS","host":"local","device":"UPS/power mapping","port":null,"connection":"not machine-discoverable","inferred_destination":null,"physical_destination":"CONFIRM outlet/device","label_present":"CONFIRM","action":"Record outlet and circuit"}
+  ],
+  "known_machine_facts":"Additional present HID/USB records remain available from the same bounded PnP probe; no physical destination is inferred as observed.",
+  "human_fields":"physical_destination,label_present,installed cable identity, rack/power ownership"
+}

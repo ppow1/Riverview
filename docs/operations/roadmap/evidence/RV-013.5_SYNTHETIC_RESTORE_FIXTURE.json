@@ -1,0 +1,10 @@
+{
+  "waypoint":"RV-013.5",
+  "dependency":"RV-015.5",
+  "fixture_id":"synthetic-sensitive-reference-001",
+  "payload":"not stored; reference-only",
+  "classification":"sensitive",
+  "operations":["encrypt","backup","restore","decrypt","verify-hash","verify-classification"],
+  "secrets":"none",
+  "promotion":"blocked until RV-015.5 recovery drill is accepted"
+}
