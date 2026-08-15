@@ -14,6 +14,7 @@ const RUNTIME_ROOT = path.resolve(ROOT, '..', 'runtime');
 const CONFIG = process.env.RIVERVIEW_DOORBELL_CONFIG || path.join(RUNTIME_ROOT, 'doorbell', 'config', 'doorbell.json');
 const JOURNAL = path.join(RUNTIME_ROOT, 'doorbell', 'diagnostics', 'evidence.json');
 const CHATGPT_CONVERSATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = CHATGPT_CONVERSATION_ID;
 
 function now() { return new Date().toISOString(); }
 function targetRef(id) { return `target-sha256:${crypto.createHash('sha256').update(id).digest('hex')}`; }
@@ -60,4 +61,4 @@ async function preflight() { const out = { bridge_version: VERSION, browser_runt
 async function ring(input) { validate(input); const started = now(); const config = loadConfig(); const key = `${input.request_id}:${input.correlation_id}`; const journal = readJournal(); if (journal[key]?.status === 'succeeded') return { ...journal[key], status: 'already_succeeded' }; const target = await exactTarget(config); const connection = connect(target, input.timeout_seconds * 1000); await connection.opened; const probe = await connection.call('Runtime.evaluate', { returnByValue: true, expression: READINESS }); if (!probe?.result?.value?.authenticated) throw Error('RIV-PLY-0004'); if (!probe?.result?.value?.composer) throw Error('RIV-PLY-0007'); const action = await connection.call('Runtime.evaluate', { returnByValue: true, expression: FIXED_ACTION }); connection.socket.close(); if (action?.result?.value !== 'submitted') throw Error('RIV-PLY-0008'); const output = result(input, 'succeeded', null, `riverview://doorbell/${crypto.randomUUID()}`, started, crypto.randomUUID(), config); journal[key] = output; writeJournal(journal); return output; }
 async function main() { try { if (process.argv.includes('--preflight')) { console.log(JSON.stringify(await preflight())); return; } if (!process.argv.includes('--ring')) throw Error('RIV-PLY-0002'); let text = ''; for await (const chunk of process.stdin) text += chunk; console.log(JSON.stringify(await ring(JSON.parse(text)))); } catch (error) { console.log(JSON.stringify({ operation: OPERATION, bridge_version: VERSION, status: 'failed', failure_class: error.message || 'RIV-PLY-0002' })); process.exitCode = 2; } }
 if (require.main === module) main();
-module.exports = { FIXED_ACTION, OPERATION, WAKE_TEXT, loadConfig, selectExactTarget };
+module.exports = { FIXED_ACTION, OPERATION, WAKE_TEXT, loadConfig, selectExactTarget, validate };
