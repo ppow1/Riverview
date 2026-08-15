@@ -1,9 +1,9 @@
 # Riverview Comms
 
-Version: 0.14.0
-Checkpoint date: 2026-08-14
-Status: external MCP accepted; bounded mailbox writes are deployed; the
-designated ChatGPT conversation has not yet completed the RV-004.5 response loop.
+Version: 0.15.0
+Checkpoint date: 2026-08-15
+Status: external MCP accepted; RV-004.5 is complete; the bounded RV-008.4
+Grace response-consumption acceptance is recorded pending roadmap promotion.
 
 ## Purpose and authority
 
@@ -31,7 +31,7 @@ dependency on Estate runtime, credentials, tools, browser state, or data.
 ## Designated reasoning boundary
 
 - ChatGPT project: `Riverview_001`
-- Designated conversation ID: `6a7f910b-1308-83ea-91a3-654e4a7aa4e7`
+- Designated conversation ID: `6a804df2-a580-83ea-addc-753a6dc93f75`
 - Fixed doorbell wake text: `Riverview doorbell v1: inspect the Riverview MCP mailbox.`
 
 The browser doorbell targets exactly this configured conversation. Playwright
@@ -95,6 +95,25 @@ operation fixes its category to `advice` and escalation to `false`; it accepts
 only an existing active reasoning claim. A response completes the request
 transactionally. Timeout expiry and exactly-once Steward escalation
 are performed by the bounded mailbox service, not by arbitrary ChatGPT input.
+
+## Grace response-consumption contract
+
+RV-008.4 consumes durable responses through
+`riverview.grace.responses.GraceResponseConsumer`. Migration `0013` stores one
+consumption per `response_id`, preserving request/correlation identity,
+consumer/version, objective context, evaluation outcome, and timestamp.
+
+Grace accepts only completed River-classified responses from the designated
+reasoning producer with the `rv-008.4-response-v1` envelope and required
+evidence. Supported categories are `advice`, `escalation`, and `seed_result`;
+only bounded non-escalating advice produces the declared `advisory_accepted`
+objective outcome. Consumption retries reconcile to the original consumption
+row and do not duplicate objective progression or River events.
+
+This contract does not submit Steward seeds, create work, dispatch providers,
+run momentum evaluation, mutate the roadmap, or grant conversation text
+execution authority. A Steward seed remains a later RV-008.5 input, not a work
+order.
 
 The new schema is externally deployed and lists 19 tools. A real RV-004.5
 request was created and its fixed doorbell wake succeeded, but the designated
@@ -218,14 +237,15 @@ it does not replace the operational troubleshooting checkpoints.
 - [Browser doorbell and end-to-end acceptance](troubleshooting/checkpoints/RIV-PLY-0002_BROWSER_DOORBELL_END_TO_END.md)
 - [Promotion evidence](troubleshooting/checkpoints/RIV-RDM-0007_PROMOTION_EVIDENCE.md)
 - [Full-loop mailbox](troubleshooting/checkpoints/RIV-MCP-0009_FULL_LOOP_MAILBOX.md)
+- [Grace reasoning-response consumption](troubleshooting/checkpoints/RIV-GRC-0003_REASONING_RESPONSE_CONSUMPTION.md)
 
 ## Next bounded continuation
 
 After external MCP acceptance:
 
-1. RV-008.4: implement bounded reasoning-response return.
-2. RV-004.5: later implement the full correlated mailbox loop at its Steward checkpoint.
-3. Preserve the existing request/correlation evidence without fabricating a response.
+1. Promote RV-008.4 only after its recorded Grace consumption evidence is independently verified.
+2. Evaluate RV-008.5 readiness at its Steward checkpoint; do not implement it in this tranche.
+3. Evaluate RV-005.3 readiness separately; do not start its momentum loop here.
 
 ## Roadmap checkpoint snapshot
 
@@ -234,8 +254,11 @@ Authoritative operational state at this deployment checkpoint:
 - RV-005.2: completed
 - RV-008.1: completed
 - RV-008.2: completed
-- RV-008.3: pending
-- RV-004.5: pending
+- RV-008.3: completed
+- RV-004.5: completed
+- RV-008.4: pending at its authoritative promotion gate
+- RV-008.5: pending Steward checkpoint
+- RV-005.3: pending and dependency-ready
 
 This is a dated recovery snapshot, not a replacement for PostgreSQL authority.
 PostgreSQL remains the authoritative operational state and must be queried for
