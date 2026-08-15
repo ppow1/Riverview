@@ -1,8 +1,15 @@
 {
   "waypoint":"RV-014.1",
-  "records":[],
-  "known_records":0,
+  "records":[
+    {"resident_id":"RES-000001","canonical_reference":"estate://residents/res-000001","source_reference":"A:/theestate/data/objects/RES-000001.json","name":"Alfred","office":"Manager of Administration","classification":"operational","certainty":"verified"},
+    {"resident_id":"RES-000002","canonical_reference":"estate://residents/res-000002","source_reference":"A:/theestate/data/objects/RES-000002.json","name":"Ingrid","office":"Manager of Security","classification":"operational","certainty":"verified"},
+    {"resident_id":"RES-000003","canonical_reference":"estate://residents/res-000003","source_reference":"A:/theestate/data/objects/RES-000003.json","name":"Helen","office":"Manager of Human Resources","classification":"operational","certainty":"verified"},
+    {"resident_id":"RES-000004","canonical_reference":"estate://residents/res-000004","source_reference":"A:/theestate/data/objects/RES-000004.json","name":"Eleanor","office":"Manager of Archives / Registrar","classification":"operational","certainty":"verified"},
+    {"resident_id":"RES-000005","canonical_reference":"estate://residents/res-000005","source_reference":"A:/theestate/data/objects/RES-000005.json","name":"Marie","office":"Manager of Research","classification":"operational","certainty":"verified"},
+    {"resident_id":"RES-000006","canonical_reference":"estate://residents/res-000006","source_reference":"A:/theestate/data/objects/RES-000006.json","name":"Judy","office":"General Counsel","classification":"operational","certainty":"verified"}
+  ],
+  "known_records":6,
   "ambiguous_records":0,
-  "unknown":"No authoritative Estate resident records are present in the Riverview source set; registry schema is prepared without inventing residents.",
-  "authority":"resident identity remains outside generated model prose"
+  "unknown":"Resident narrative and capabilities remain reference-only until separately classified and approved.",
+  "authority":"resident identity is sourced from bounded Estate object records, never generated model prose"
 }
