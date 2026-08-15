@@ -99,6 +99,10 @@ request was created and its fixed doorbell wake succeeded, but the designated
 conversation did not acknowledge or claim it during the bounded observation
 window. No second wake was sent and no response was fabricated.
 
+That request is now outside its expiry deadline because schema refresh completed
+after mailbox expiry. It remains historical evidence only and must not be
+revived; a fresh bounded request is required for a subsequent live acceptance.
+
 Riverview Comms explicitly does not expose arbitrary SQL, filesystem access,
 shell or process authority, secrets, arbitrary writes, roadmap mutation,
 work-order creation, Undercurrent, or general browser control. The three

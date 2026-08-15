@@ -50,6 +50,10 @@ timeout escalation; replay reports zero additional escalations.
   connected application has not executed the new typed write path, often
   because its application schema is stale or requires a UI refresh. This state
   was observed for one authorized RV-004.5 attempt.
+- `SCHEMA REFRESH COMPLETED AFTER MAILBOX REQUEST EXPIRY`: the prior request's
+  expiry deadline passed before the designated conversation had the refreshed
+  write-capable schema. Treat that lineage as expired even if its pending row
+  has not yet been swept by the expiry worker.
 
 ## REPAIR
 
@@ -61,6 +65,8 @@ its supported registration path if discovery is stale.
 After deployment, refresh or reconnect the Riverview Comms application in the
 designated conversation once if the platform has not refreshed its tool schema.
 Then verify tool discovery before considering a new live acceptance request.
+Only after that verification create a fresh bounded request with a sufficient
+but finite TTL.
 
 ## VERIFY
 
@@ -77,6 +83,7 @@ outside the typed response operation.
 
 Do not issue a second wake for a request whose first wake outcome is known, and
 do not mark a pending request completed to compensate for a stale ChatGPT schema.
+Do not revive or mutate a request whose expiry deadline has passed.
 
 ## EVIDENCE
 
