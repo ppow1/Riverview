@@ -48,8 +48,9 @@ Riverview-owned profile under `A:\Riverview\runtime\browser\profile`.
   matcher without enabling fallback discovery.
 - The final authorized attempt returned durable `succeeded` evidence, but a
   bounded 51-second PostgreSQL observation still showed the request as
-  unacknowledged, unclaimed, and pending with no response. Browser success is
-  not downstream reasoning success.
+  unacknowledged, unclaimed, and pending with no response. This correctly
+  separates RV-008.3 browser-wake acceptance from later RV-008.4 response
+  return and RV-004.5 full-loop mailbox behavior.
 
 ## REPAIR
 
@@ -65,11 +66,10 @@ Rerun both preflights. For a live attempt, reconcile the returned attempt,
 request, and correlation identities with PostgreSQL mailbox/River evidence and
 then verify that the designated conversation used Riverview Comms.
 
-For the current live checkpoint, also verify the same request's acknowledgement,
-claim, response, completion, and River-event lineage through PostgreSQL. The
-absence of those states after a bounded observation is a downstream Comms /
-reasoning-boundary failure; it is not evidence that another browser wake is
-safe.
+For later response-return or full-loop work, verify the same request's
+acknowledgement, claim, response, completion, and River-event lineage through
+PostgreSQL. Do not pull those later criteria backward into RV-008.3 or add
+write authority to the read-only Comms surface.
 
 ## DO NOT
 

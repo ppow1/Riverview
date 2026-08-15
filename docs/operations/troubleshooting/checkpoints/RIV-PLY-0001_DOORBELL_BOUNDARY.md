@@ -1,9 +1,11 @@
 <!-- Version: 0.3.0 -->
-# RIV-PLY-0001 - Riverview-owned doorbell is not live-accepted
+# RIV-PLY-0001 - Riverview-owned doorbell acceptance
 
 Component owner: Riverview `tools/riverview_doorbell_bridge.cjs`,
 `tools/riverview_browser_runtime.cjs`, and
-`riverview.doorbell.browser_bridge`. RV-008.3 remains a Steward checkpoint.
+`riverview.doorbell.browser_bridge`. RV-008.3 bounded wake acceptance is
+complete; later response-return and full-loop behavior remain separate
+waypoints.
 
 Inputs: a typed `DoorbellRequest`. Riverview accepts only the literal target
 selector `riverview-designated` and mailbox resource `riverview://mailbox`.
@@ -51,7 +53,7 @@ Provenance: Estate browser mechanics were inspected as reference only. Estate
 source, data, configuration, profile, and worker state are not runtime
 dependencies.
 
-Applicability: RV-008.3 bounded implementation; not live-accepted.
+Applicability: RV-008.3 bounded implementation and accepted live wake evidence.
 
 Escalation boundary: missing authenticated profile/session or any request for
 arbitrary browser interaction requires the Steward; RV-004.5 remains blocked.

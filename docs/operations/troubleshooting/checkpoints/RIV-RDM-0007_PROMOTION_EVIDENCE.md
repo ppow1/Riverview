@@ -31,8 +31,10 @@ SHA, Comms version, and doorbell evidence reference across the records.
 
 ## EXPECTED HEALTHY RESULT
 
-Only a genuinely accepted end-to-end browser-to-ChatGPT-to-Comms-to-PostgreSQL
-result permits the normal RV-008.3 transition. The resulting PostgreSQL row is
+Only a genuinely accepted browser-to-designated-ChatGPT wake, with bounded
+failure/Steward escalation evidence, permits the normal RV-008.3 transition.
+Mailbox response/claim/completion evidence is not required for this waypoint;
+those belong to RV-008.4 and RV-004.5. The resulting PostgreSQL row is
 `completed`; RV-004.5 remains untouched until its own dependency evaluation.
 
 ## KNOWN FAILURE RESULT
@@ -42,8 +44,9 @@ result permits the normal RV-008.3 transition. The resulting PostgreSQL row is
 - `RIV-RDM-0008`: published source SHA mismatch.
 - `RIV-RDM-0009`: dependency state mismatch.
 
-The current tranche intentionally remains pending because HTTPS ingress and
-ChatGPT application acceptance were not proven.
+The current live evidence includes HTTPS/MCP acceptance, designated ChatGPT
+Comms acceptance, exact target wake evidence, and the bounded induced-timeout
+acceptance signal.
 
 ## REPAIR
 
@@ -53,9 +56,9 @@ the status directly, rewrite history, or infer PostgreSQL state from GitHub.
 
 ## VERIFY
 
-Rerun the exact live acceptance, verify all identities and River/mailbox
-evidence, then query PostgreSQL after the accepted transition. Confirm
-RV-004.5 was not implemented or activated.
+Verify all identities and River/mailbox wake evidence, then query PostgreSQL
+after the accepted transition. Confirm RV-004.5 was not implemented or
+activated.
 
 ## DO NOT
 

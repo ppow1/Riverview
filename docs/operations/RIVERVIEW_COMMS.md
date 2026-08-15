@@ -3,7 +3,7 @@
 Version: 0.12.0
 Checkpoint date: 2026-08-14
 Status: external MCP accepted; Riverview Comms is connected to the designated
-ChatGPT conversation; RV-008.3 live mailbox completion remains pending.
+ChatGPT conversation; RV-008.3 bounded wake acceptance is complete.
 
 ## Purpose and authority
 
@@ -133,11 +133,12 @@ conversation. Through the real ChatGPT/MCP boundary, `current_position` and
 checkpoint. PostgreSQL, not GitHub conversation context, remains operational
 authority.
 
-The single authorized doorbell attempt subsequently succeeded at the browser
-boundary with attempt identity `ad57b894-5960-420d-be76-1ea33bd62212`. A
-bounded typed-state observation found no acknowledgement, claim, response, or
-completion event. This is not end-to-end success; RV-008.3 remains pending
-until mailbox-side reasoning evidence is present.
+The single authorized doorbell attempt succeeded at the browser boundary with
+attempt identity `ad57b894-5960-420d-be76-1ea33bd62212`. A bounded typed-state
+observation found no acknowledgement, claim, response, or completion event.
+That downstream behavior is not an RV-008.3 acceptance requirement: reasoning
+response return belongs to RV-008.4, and the full correlated mailbox loop
+belongs to RV-004.5. The request remains durable evidence of the wake boundary.
 
 ## Current DNS and TLS checkpoint
 
@@ -158,10 +159,10 @@ discovery, and bounded PostgreSQL-backed reads pass.
 Detailed symptom, diagnostic, repair, and verification procedures remain in
 [`RIV-COMMS-0003_HTTPS_AUTH_REGISTRATION.md`](troubleshooting/checkpoints/RIV-COMMS-0003_HTTPS_AUTH_REGISTRATION.md).
 
-The next bounded action is to diagnose why the designated connected conversation
-did not acknowledge or claim the mailbox request, using only the typed
-Comms/mailbox path. Do not ring a second time for this request. DNS records and
-the domain-wide wildcard/root records must not be changed.
+The next bounded action is the RV-008.4 reasoning-response-return waypoint.
+Do not ring a second time for this request or add write authority to the
+read-only Comms surface. DNS records and the domain-wide wildcard/root records
+must not be changed.
 
 ## Recovery and troubleshooting
 
@@ -178,10 +179,9 @@ it does not replace the operational troubleshooting checkpoints.
 
 After external MCP acceptance:
 
-1. Diagnose the missing typed mailbox acknowledgement/claim in the designated conversation.
-2. Reconfirm the `mailbox_requests` projection and correlation identity without broadening authority.
-3. Promote RV-008.3 only after genuine end-to-end success.
-4. Evaluate RV-004.5 dependency readiness without starting RV-004.5.
+1. RV-008.4: implement bounded reasoning-response return.
+2. RV-004.5: later implement the full correlated mailbox loop at its Steward checkpoint.
+3. Preserve the existing request/correlation evidence without fabricating a response.
 
 ## Roadmap checkpoint snapshot
 
