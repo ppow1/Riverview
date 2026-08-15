@@ -34,12 +34,20 @@ event, one `grace.response.evaluated` event, and—only for
   objective stage.
 - Replaying the same response returns the original consumption identity and
   creates no duplicate logical consumption or objective progression.
+- During first application, an unqualified joined `status` column caused a
+  PostgreSQL ambiguity before the consumption transaction. The transaction
+  rolled back with no consumption or objective mutation; qualifying objective
+  and stage columns repaired the defect.
 
 ## REPAIR
 
 Restore only the missing bounded state or declared objective/stage. Do not
 rewrite mailbox history, fabricate response evidence, or turn advisory text
 into a work order.
+
+For the SQL ambiguity, qualify every joined objective/stage field and rerun the
+same response-consumption acceptance. Do not retry a partially committed
+consumption or create a second response.
 
 ## VERIFY
 

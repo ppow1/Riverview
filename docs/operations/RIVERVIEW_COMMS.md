@@ -2,8 +2,8 @@
 
 Version: 0.15.0
 Checkpoint date: 2026-08-15
-Status: external MCP accepted; RV-004.5 is complete; the bounded RV-008.4
-Grace response-consumption acceptance is recorded pending roadmap promotion.
+Status: external MCP accepted; RV-004.5 and RV-008.4 are complete; RV-008.5
+remains at its Steward checkpoint.
 
 ## Purpose and authority
 
@@ -243,9 +243,8 @@ it does not replace the operational troubleshooting checkpoints.
 
 After external MCP acceptance:
 
-1. Promote RV-008.4 only after its recorded Grace consumption evidence is independently verified.
-2. Evaluate RV-008.5 readiness at its Steward checkpoint; do not implement it in this tranche.
-3. Evaluate RV-005.3 readiness separately; do not start its momentum loop here.
+1. Evaluate RV-008.5 readiness at its Steward checkpoint; do not implement it in this tranche.
+2. Evaluate RV-005.3 readiness separately; do not start its momentum loop here.
 
 ## Roadmap checkpoint snapshot
 
@@ -256,7 +255,7 @@ Authoritative operational state at this deployment checkpoint:
 - RV-008.2: completed
 - RV-008.3: completed
 - RV-004.5: completed
-- RV-008.4: pending at its authoritative promotion gate
+- RV-008.4: completed
 - RV-008.5: pending Steward checkpoint
 - RV-005.3: pending and dependency-ready
 
