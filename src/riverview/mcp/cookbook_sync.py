@@ -154,6 +154,16 @@ ENTRIES = [
         "Verify one draft by idempotency key, no work order creation, explicit confirmation, and the expected schema at the actual boundary.",
         "docs/operations/troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md",
     ),
+    (
+        "RIV-CAP-0002",
+        "Lane ownership or result reconciliation failure",
+        "A path is already owned or a typed provider result does not match an execution envelope.",
+        ["path-conflict", "wrong-owner", "correlation-mismatch", "foreign-result", "conflicting-result"],
+        ["Inspect execution_lanes, lane_path_owners, execution_envelopes, execution_results, and reconciliation_records."],
+        "Release only the verified lane owner or reject the foreign/conflicting result; preserve all historical evidence.",
+        "Repeat the bounded conflict/release or reconciliation probe and verify one owner and one typed decision.",
+        "docs/operations/troubleshooting/checkpoints/RIV-CAP-0002_LANE_RECONCILIATION.md",
+    ),
 ]
 
 
@@ -169,8 +179,8 @@ def sync() -> dict[str, object]:
         for checkpoint_id, title, summary, classes, probes, repair, verify, source in ENTRIES:
             cookbook_entry = f"CB-{checkpoint_id}"
             entry_applicability = dict(applicability)
-            if checkpoint_id in {"RIV-GRC-0004", "RIV-CAP-0001", "RIV-EXE-0001", "RIV-MCP-0010"}:
-                entry_applicability.update({"kernel": ">=0.14.0", "waypoint": "RV-005.3/RV-006.1/RV-007.1/RV-008.5", "authority": "bounded_control_plane"})
+            if checkpoint_id in {"RIV-GRC-0004", "RIV-CAP-0001", "RIV-CAP-0002", "RIV-EXE-0001", "RIV-MCP-0010"}:
+                entry_applicability.update({"kernel": ">=0.14.0", "waypoint": "RV-005.3/RV-006.1/RV-006.4/RV-006.5/RV-008.5", "authority": "bounded_control_plane"})
             entry_applicability["source_path"] = source
             entry_applicability["title"] = title
             entry_applicability["summary"] = summary

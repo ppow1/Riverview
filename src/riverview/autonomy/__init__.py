@@ -7,6 +7,7 @@ from .control import (
     ExecutionEnvelope,
     ExecutionResult,
     GraceMomentum,
+    LaneRegistry,
     ResultReconciler,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "ExecutionEnvelope",
     "ExecutionResult",
     "GraceMomentum",
+    "LaneRegistry",
     "ResultReconciler",
 ]

@@ -393,3 +393,38 @@ class ResultReconciler:
             cursor.execute("UPDATE execution_results SET commit_sha=%s,remote_verified_sha=%s WHERE execution_id=%s", (commit_sha, remote_verified_sha, execution_id))
             if cursor.rowcount != 1:
                 raise RuntimeError("RIV-EXE-0005: execution result is missing.")
+
+    def record_decision(self, execution_id: UUID, correlation_id: UUID, decision: str, reason: str, evidence_refs: tuple[str, ...], idempotency_key: str) -> UUID:
+        if decision not in {"accepted", "rejected", "conflict", "checkpoint"} or not reason:
+            raise ValueError("RIV-REC-0001: reconciliation decision is invalid.")
+        reconciliation_id = uuid4()
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""INSERT INTO reconciliation_records(reconciliation_id,execution_id,correlation_id,decision,reason,evidence_refs,idempotency_key)
+                VALUES(%s,%s,%s,%s,%s,%s::jsonb,%s) ON CONFLICT(idempotency_key) DO NOTHING""", (reconciliation_id, execution_id, correlation_id, decision, reason, _json(evidence_refs), idempotency_key))
+            cursor.execute("SELECT reconciliation_id FROM reconciliation_records WHERE idempotency_key=%s", (idempotency_key,))
+            return cursor.fetchone()[0]
+
+
+class LaneRegistry:
+    """Exclusive relative-path ownership for separable execution lanes."""
+
+    def acquire(self, lane_key: str, owner_id: str, correlation_id: UUID, allowed_paths: tuple[str, ...]) -> UUID:
+        if not lane_key or not owner_id or not allowed_paths or any(Path(path).is_absolute() for path in allowed_paths):
+            raise ValueError("RIV-CAP-0003: lane ownership input is invalid.")
+        lane_id = uuid4()
+        with connect() as connection, connection.cursor() as cursor:
+            for path in sorted(set(allowed_paths)):
+                cursor.execute("SELECT lane_id FROM lane_path_owners WHERE relative_path=%s FOR UPDATE", (path,))
+                if cursor.fetchone() is not None:
+                    raise RuntimeError("RIV-CAP-0003: path is already owned by another active lane.")
+            cursor.execute("INSERT INTO execution_lanes(lane_id,lane_key,correlation_id,owner_id,allowed_paths,state) VALUES(%s,%s,%s,%s,%s::jsonb,'active')", (lane_id, lane_key, correlation_id, owner_id, _json(allowed_paths)))
+            for path in sorted(set(allowed_paths)):
+                cursor.execute("INSERT INTO lane_path_owners(relative_path,lane_id,owner_id) VALUES(%s,%s,%s)", (path, lane_id, owner_id))
+        return lane_id
+
+    def release(self, lane_id: UUID, owner_id: str) -> None:
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("UPDATE execution_lanes SET state='released',released_at=now() WHERE lane_id=%s AND owner_id=%s AND state='active'", (lane_id, owner_id))
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-CAP-0003: lane is not active or owner does not match.")
+            cursor.execute("DELETE FROM lane_path_owners WHERE lane_id=%s", (lane_id,))
