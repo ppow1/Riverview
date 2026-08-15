@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { OPERATION, WAKE_TEXT, selectExactTarget, validate } = require('../tools/riverview_doorbell_bridge.cjs');
+const { FIXED_ACTION, OPERATION, WAKE_TEXT, isVerifiedSubmission, selectExactTarget, validate } = require('../tools/riverview_doorbell_bridge.cjs');
 
 const id = '00000000-0000-4000-8000-000000000000';
 const page = conversationId => ({ type: 'page', url: `https://chatgpt.com/c/${conversationId}`, webSocketDebuggerUrl: 'ws://riverview-test' });
@@ -19,4 +19,12 @@ assert.throws(() => validate({ operation: OPERATION, request_id: 'bad', correlat
 test('bridge contract fixes operation and wake text', () => {
   assert.equal(OPERATION, 'ring_riverview_doorbell');
   assert.equal(WAKE_TEXT, 'Riverview doorbell v1: inspect the Riverview MCP mailbox.');
+});
+
+test('submission requires the fixed send control and composer transition', () => {
+  assert.equal(isVerifiedSubmission({ submitted: true, click_invoked: true, composer_cleared: true }), true);
+  assert.equal(isVerifiedSubmission({ submitted: true, click_invoked: true, composer_cleared: false }), false);
+  assert.match(FIXED_ACTION, /data-testid="send-button"/);
+  assert.match(FIXED_ACTION, /composer_cleared/);
+  assert.doesNotMatch(FIXED_ACTION, /KeyboardEvent/);
 });

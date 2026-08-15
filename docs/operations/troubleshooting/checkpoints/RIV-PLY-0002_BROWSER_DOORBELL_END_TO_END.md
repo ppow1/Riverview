@@ -1,4 +1,4 @@
-<!-- Version: 0.10.0 -->
+<!-- Version: 0.11.0 -->
 # RIV-PLY-0002 - Browser and doorbell end-to-end boundary
 
 Owner: Riverview browser runtime and bounded doorbell adapter.
@@ -53,6 +53,59 @@ Riverview-owned profile under `A:\Riverview\runtime\browser\profile`.
   return and RV-004.5 full-loop mailbox behavior.
 
 ## REPAIR
+
+### COMPOSER POPULATED BUT SUBMIT NOT EXECUTED
+
+**SYMPTOM**
+
+The fixed wake text is visible in the exact configured composer and the send
+control is enabled, but the message remains unsent. A prior bridge result may
+incorrectly report success.
+
+**LIKELY BOUNDARY**
+
+The browser submit boundary, not target resolution or MCP/mailbox state.
+
+**SAFE DIAGNOSTIC**
+
+Use the bounded bridge evidence and inspect only metadata: send-control click
+invocation and whether the composer transitioned away from its populated state.
+Do not inspect response text or page contents.
+
+**EXPECTED HEALTHY RESULT**
+
+The fixed send control is enabled, one click is invoked, the composer clears,
+and the result contains `submit_verified=true`.
+
+**KNOWN FAILURE**
+
+The previous implementation treated a button click or synthetic Enter event as
+submission without verifying the post-click state. Composer population was a
+false-positive success condition.
+
+**REPAIR**
+
+Use only the deterministic send-button allowlist in the Riverview-owned bridge.
+Do not use Enter as a fallback. Permit idempotent retry of journal entries that
+lack verified submission evidence.
+
+**VERIFY**
+
+Run both preflights, then use the already-authorized request once after repair.
+Require `submit_verified=true` and reconcile the same request/correlation IDs
+through typed mailbox evidence.
+
+**DO NOT**
+
+Do not manually press Send, scrape a response, retry a verified attempt, create
+a replacement request while the current request is valid, or broaden browser
+selectors/authority.
+
+**EVIDENCE**
+
+Retain only the metadata-only doorbell evidence reference under the Riverview
+runtime diagnostics path. The known false-positive attempt remains historical
+evidence and is not treated as a verified submission.
 
 Use the Riverview-owned runtime start/recovery command and configuration
 bootstrap. If authentication is missing, require the one-time Steward login
