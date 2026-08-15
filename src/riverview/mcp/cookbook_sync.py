@@ -324,6 +324,26 @@ ENTRIES = [
         "Compare every row with its source and verify unknowns remain explicit.",
         "docs/operations/troubleshooting/checkpoints/RIV-MIG-0001_CAPABILITY_INVENTORY.md",
     ),
+    (
+        "RIV-CTRL-0002", "Gesture grammar ambiguity and destructive guard", "A control/event/context maps ambiguously or a destructive action lacks a guarded hold.",
+        ["ambiguous-mapping", "destructive-unguarded", "context-missing"], ["Validate the bounded control/event/context key and destructive event class."],
+        "Reject the mapping, add explicit context, and keep destructive actions behind guarded holds.", "Rerun grammar conflict and guard tests.", "docs/operations/troubleshooting/checkpoints/RIV-CTRL-0002_GESTURE_GRAMMAR.md",
+    ),
+    (
+        "RIV-SEC-0003", "Credential lifecycle boundary", "Credential metadata is missing, expired, revoked, or a secret value appears in an operational record.",
+        ["metadata-invalid", "expired", "revoked", "secret-leak"], ["Inspect only owner/classification/reference/fingerprint/status/version/expiry."],
+        "Rotate or revoke reference metadata; never expose the secret.", "Verify expired/revoked synthetic credentials fail closed.", "docs/operations/troubleshooting/checkpoints/RIV-SEC-0003_CREDENTIAL_LIFECYCLE.md",
+    ),
+    (
+        "RIV-CTRL-0003", "Control projection and disconnect recovery", "A control display diverges from the authoritative projection or a disconnect becomes an action.",
+        ["projection-drift", "disconnect", "offline-state", "secondary-authority"], ["Compare control ID, projection version, state, acknowledgement, and disconnect event."],
+        "Refresh from PostgreSQL and represent disconnect as offline; never execute an action from display state.", "Rerun projection, identity, gesture, and disconnect tests.", "docs/operations/troubleshooting/checkpoints/RIV-CTRL-0003_STREAMDECK_PROJECTION.md",
+    ),
+    (
+        "RIV-CTRL-0005", "Physical safety and recovery boundary", "A physical input fault or destructive gesture could produce an unsafe action.",
+        ["stuck-input", "duplicate-tap", "profile-drift", "disconnect", "destructive-unguarded"], ["Classify the event and inspect explicit confirmation without invoking physical action."],
+        "Fail safe, restore the authoritative projection, and require explicit confirmation for destructive events.", "Rerun induced fault and shutdown-guard tests.", "docs/operations/troubleshooting/checkpoints/RIV-CTRL-0005_PHYSICAL_SAFETY.md",
+    ),
 ]
 
 
