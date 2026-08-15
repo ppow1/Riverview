@@ -1,4 +1,4 @@
-<!-- Version: 0.11.0 -->
+<!-- Version: 0.12.0 -->
 # RIV-PLY-0002 - Browser and doorbell end-to-end boundary
 
 Owner: Riverview browser runtime and bounded doorbell adapter.
@@ -106,6 +106,51 @@ selectors/authority.
 Retain only the metadata-only doorbell evidence reference under the Riverview
 runtime diagnostics path. The known false-positive attempt remains historical
 evidence and is not treated as a verified submission.
+
+### SEND CONTROL OUTSIDE COMPOSER FORM
+
+**SYMPTOM**
+
+The exact composer is present and the allowlisted send button is enabled, but
+the bridge returns `RIV-PLY-0008` before clicking it.
+
+**LIKELY BOUNDARY**
+
+Selector scoping at the ChatGPT composer/send boundary.
+
+**SAFE DIAGNOSTIC**
+
+On the exact target only, inspect metadata for composer presence and the count
+and enabled state of the allowlisted send button. Do not inspect text or DOM
+content.
+
+**EXPECTED HEALTHY RESULT**
+
+Exactly one enabled allowlisted send control is found and the fixed action can
+click it.
+
+**KNOWN FAILURE**
+
+The bridge scoped the send-button lookup to the composer’s nearest form. The
+current ChatGPT layout exposes the enabled `data-testid="send-button"` outside
+that form, so the bounded lookup failed closed without sending.
+
+**REPAIR**
+
+Use the fixed global allowlist for the send control. Keep exact target
+resolution, fixed wake text, post-click composer-transition verification, and
+no fallback browser authority.
+
+**VERIFY**
+
+Run both preflights and, only with explicit authorization, execute one repaired
+wake. Require `submit_verified=true`; do not retry the failed lineage
+automatically.
+
+**DO NOT**
+
+Do not broaden selectors, inspect unrelated buttons, manually click Send, or
+create another mailbox request to mask this boundary defect.
 
 Use the Riverview-owned runtime start/recovery command and configuration
 bootstrap. If authentication is missing, require the one-time Steward login

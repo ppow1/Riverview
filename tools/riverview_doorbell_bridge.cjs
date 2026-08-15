@@ -1,12 +1,12 @@
 // Riverview-owned bounded RV-008.3 browser bridge.
-// Version: 1.1.0 | 2026-08-14
+// Version: 1.2.0 | 2026-08-15
 // No arbitrary browser, prompt, selector, navigation, or script interface.
 
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const OPERATION = 'ring_riverview_doorbell';
 const WAKE_TEXT = 'Riverview doorbell v1: inspect the Riverview MCP mailbox.';
 const ROOT = path.resolve(__dirname, '..');
@@ -52,7 +52,7 @@ function connect(target, timeout) {
   return { socket, opened, call };
 }
 const READINESS = `(()=>{const b=document.body?.innerText||'';const blocked=/log in|sign in|verify you are human|captcha|something went wrong/i.test(b);const e=document.querySelector('#prompt-textarea[contenteditable="true"],div[contenteditable="true"][aria-label="Chat with ChatGPT"]');const r=e?.getBoundingClientRect?.();return {authenticated:!blocked,composer:!!e&&!!r&&r.width>0&&r.height>0&&!e.disabled};})()`;
-const FIXED_ACTION = `(async()=>{const e=document.querySelector('#prompt-textarea[contenteditable="true"],div[contenteditable="true"][aria-label="Chat with ChatGPT"]');if(!e)return {failure_class:'RIV-PLY-0007'};e.focus();e.replaceChildren();const p=document.createElement('p');p.textContent=${JSON.stringify(WAKE_TEXT)};e.appendChild(p);e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:${JSON.stringify(WAKE_TEXT)}}));const b=e.closest('form')?.querySelector('button[data-testid="send-button"],button[aria-label="Send prompt"],button[aria-label="Send message"]');const enabled=!!b&&!b.disabled&&b.getAttribute('aria-disabled')!=='true';if(!enabled)return {failure_class:'RIV-PLY-0008',composer_populated:true,send_control_found:!!b,send_control_enabled:false};b.click();await new Promise(resolve=>setTimeout(resolve,750));const remaining=(e.innerText||e.textContent||'').trim().length;return {submitted:true,composer_populated:true,send_control_found:true,send_control_enabled:true,click_invoked:true,composer_cleared:remaining===0};})()`;
+const FIXED_ACTION = `(async()=>{const e=document.querySelector('#prompt-textarea[contenteditable="true"],div[contenteditable="true"][aria-label="Chat with ChatGPT"]');if(!e)return {failure_class:'RIV-PLY-0007'};e.focus();e.replaceChildren();const p=document.createElement('p');p.textContent=${JSON.stringify(WAKE_TEXT)};e.appendChild(p);e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:${JSON.stringify(WAKE_TEXT)}}));const b=document.querySelector('button[data-testid="send-button"],button[aria-label="Send prompt"],button[aria-label="Send message"]');const enabled=!!b&&!b.disabled&&b.getAttribute('aria-disabled')!=='true';if(!enabled)return {failure_class:'RIV-PLY-0008',composer_populated:true,send_control_found:!!b,send_control_enabled:false};b.click();await new Promise(resolve=>setTimeout(resolve,750));const remaining=(e.innerText||e.textContent||'').trim().length;return {submitted:true,composer_populated:true,send_control_found:true,send_control_enabled:true,click_invoked:true,composer_cleared:remaining===0};})()`;
 function readJournal() { try { return JSON.parse(fs.readFileSync(JOURNAL, 'utf8')); } catch { return {}; } }
 function writeJournal(value) { fs.mkdirSync(path.dirname(JOURNAL), { recursive: true }); const tmp = `${JOURNAL}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n'); fs.renameSync(tmp, JOURNAL); }
 function isVerifiedSubmission(action) { return action?.submitted === true && action?.click_invoked === true && action?.composer_cleared === true; }

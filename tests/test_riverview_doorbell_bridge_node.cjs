@@ -25,6 +25,7 @@ test('submission requires the fixed send control and composer transition', () =>
   assert.equal(isVerifiedSubmission({ submitted: true, click_invoked: true, composer_cleared: true }), true);
   assert.equal(isVerifiedSubmission({ submitted: true, click_invoked: true, composer_cleared: false }), false);
   assert.match(FIXED_ACTION, /data-testid="send-button"/);
+  assert.match(FIXED_ACTION, /document\.querySelector\('button\[data-testid="send-button"/);
   assert.match(FIXED_ACTION, /composer_cleared/);
   assert.doesNotMatch(FIXED_ACTION, /KeyboardEvent/);
 });
