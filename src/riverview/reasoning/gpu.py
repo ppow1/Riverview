@@ -8,6 +8,7 @@ import subprocess
 from dataclasses import dataclass
 
 from .contracts import ReasoningRequest, ReasoningResponse
+from .llama_cpp import LlamaCppReasoningAdapter
 from .ollama import OllamaReasoningAdapter
 
 
@@ -35,12 +36,15 @@ def _inventory() -> list[dict[str, str]]:
 
 
 class LocalGpuReasoningAdapter:
-    def __init__(self, adapter_id: str, expected_name: str, *, endpoint: str = "http://127.0.0.1:11434") -> None:
+    def __init__(self, adapter_id: str, expected_name: str, *, endpoint: str = "http://127.0.0.1:11434", runtime: str = "ollama") -> None:
         if adapter_id not in {"rtx4090", "p100"}:
             raise ValueError("RIV-REASON-0003: GPU adapter identity is closed.")
         self.adapter_id = adapter_id
         self.expected_name = expected_name
         self.endpoint = endpoint
+        if runtime not in {"ollama", "llama-cpp"}:
+            raise ValueError("RIV-REASON-0003: GPU runtime identity is closed.")
+        self.runtime = runtime
 
     def complete(self, model: str, request: ReasoningRequest) -> tuple[ReasoningResponse | None, GpuEvidence]:
         devices = _inventory()
@@ -49,7 +53,8 @@ class LocalGpuReasoningAdapter:
             raise RuntimeError("RIV-REASON-0003: named GPU is unavailable.")
         device = matches[0]
         before = int(device["used"])
-        result = OllamaReasoningAdapter(endpoint=self.endpoint, timeout_seconds=90).complete(model, request)
+        adapter = (LlamaCppReasoningAdapter if self.runtime == "llama-cpp" else OllamaReasoningAdapter)(endpoint=self.endpoint, timeout_seconds=90)
+        result = adapter.complete(model, request)
         after_devices = {item["index"]: item for item in _inventory()}
         after = int(after_devices[device["index"]]["used"])
         if after <= before:

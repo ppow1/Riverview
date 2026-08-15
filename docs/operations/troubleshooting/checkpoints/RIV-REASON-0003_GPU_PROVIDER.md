@@ -18,7 +18,7 @@ The RTX 4090 adapter returns a typed response with GPU/model evidence. The P100 
 
 ## KNOWN FAILURE / REPAIR
 
-Missing device, unsupported model, runtime mismatch, timeout, or unchanged resource evidence fails closed. The 2026-08-15 P100 probe started an isolated Ollama endpoint with `CUDA_VISIBLE_DEVICES=0`; the request returned, but P100 memory remained `9 MiB` while the RTX 4090 rose from `16692` to `22826 MiB`. This proves the Windows runtime ignored the attempted P100 binding for that process. Repair the local runtime/adapter registration or reject the task; do not invent parity.
+Missing device, unsupported model, runtime mismatch, timeout, or unchanged resource evidence fails closed. The 2026-08-15 P100 probe started an isolated Ollama endpoint with `CUDA_VISIBLE_DEVICES=0`; the request returned, but P100 memory remained `9 MiB` while the RTX 4090 rose from `16692` to `22826 MiB`. This proves the Windows Ollama runtime ignored the attempted P100 binding for that process. The bounded repair is the explicit local `llama-server` path with `--device CUDA1 --main-gpu 1`; a measured run increased P100 memory from `15296` to `15376 MiB` while RTX memory remained `23208 MiB`. Repair the local runtime/adapter registration or reject the task; do not invent parity.
 
 ## VERIFY
 
@@ -30,4 +30,4 @@ Do not route protected payloads, expose GPU controls through MCP, or claim a GPU
 
 ## EVIDENCE
 
-Source: `src/riverview/reasoning/gpu.py`; Cookbook entry: `RIV-REASON-0003`. Runtime endpoint and measured device must both be recorded; an HTTP success is not GPU acceptance.
+Source: `src/riverview/reasoning/gpu.py`, `src/riverview/reasoning/llama_cpp.py`; Cookbook entry: `RIV-REASON-0003`. Runtime endpoint and measured device must both be recorded; an HTTP success is not GPU acceptance.
