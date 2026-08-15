@@ -402,7 +402,10 @@ class ResultReconciler:
             cursor.execute("""INSERT INTO reconciliation_records(reconciliation_id,execution_id,correlation_id,decision,reason,evidence_refs,idempotency_key)
                 VALUES(%s,%s,%s,%s,%s,%s::jsonb,%s) ON CONFLICT(idempotency_key) DO NOTHING""", (reconciliation_id, execution_id, correlation_id, decision, reason, _json(evidence_refs), idempotency_key))
             cursor.execute("SELECT reconciliation_id FROM reconciliation_records WHERE idempotency_key=%s", (idempotency_key,))
-            return cursor.fetchone()[0]
+            result = cursor.fetchone()[0]
+            if decision in {"rejected", "conflict", "checkpoint"}:
+                cursor.execute("UPDATE execution_envelopes SET status='escalated',finished_at=COALESCE(finished_at,now()),updated_at=now() WHERE execution_id=%s", (execution_id,))
+            return result
 
 
 class LaneRegistry:
