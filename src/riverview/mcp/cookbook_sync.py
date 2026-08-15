@@ -184,6 +184,36 @@ ENTRIES = [
         "Resolve the active binding again and require one verified active role binding with replacement lineage where applicable.",
         "docs/operations/troubleshooting/checkpoints/RIV-COMMS-0004_BINDING_ROLLOVER.md",
     ),
+    (
+        "RIV-REASON-0001",
+        "Provider-neutral reasoning contract failure",
+        "A reasoning participant or typed envelope is unavailable, unsupported, oversized, or unauthorized.",
+        ["contract-mismatch", "unsupported-capability", "provider-failure", "invalid-response", "classification-denied"],
+        ["Validate the bounded request/response/provider contract and inspect measured capability health separately."],
+        "Repair the adapter registration or bounded envelope; do not add provider-specific authority.",
+        "Run provider-neutral contract tests and verify the no-OpenAI-route authority audit.",
+        "docs/operations/troubleshooting/checkpoints/RIV-REASON-0001_PROVIDER_CONTRACT.md",
+    ),
+    (
+        "RIV-SEC-0001",
+        "Closed classification or reference boundary",
+        "An unknown or protected artifact is entering ordinary River, Comms, provider, or source storage.",
+        ["classification-denied", "reference-invalid", "protected-payload", "unknown-class"],
+        ["Validate the closed classification label and inspect only bounded reference metadata."],
+        "Reject unknown/protected ordinary-path access and retain payloads in their authorized classified store.",
+        "Run classification/reference tests and the ordinary River authority audit.",
+        "docs/operations/troubleshooting/checkpoints/RIV-SEC-0001_CLASSIFICATION_REFERENCE.md",
+    ),
+    (
+        "RIV-INT-0001",
+        "Project intake completeness",
+        "An intake is incomplete or is being treated as executable work before owner intent and acceptance are complete.",
+        ["incomplete-intake", "missing-acceptance", "inferred-goal", "premature-dispatch"],
+        ["Call ProjectIntake.missing_fields() and validate only bounded intake metadata."],
+        "Name missing fields and obtain owner-provided values; keep drafts out of dispatch and roadmap mutation.",
+        "Run intake contract tests and confirm no work order or roadmap transition was created.",
+        "docs/operations/troubleshooting/checkpoints/RIV-INT-0001_PROJECT_INTAKE.md",
+    ),
 ]
 
 

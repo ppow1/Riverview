@@ -1,6 +1,6 @@
 # Riverview Comms interaction matrix
 
-Version: 0.19.0
+Version: 0.20.0
 Status: canonical schema-freeze audit
 
 This matrix classifies the foreseeable ChatGPT-facing interaction for every
@@ -57,3 +57,13 @@ boundaries; it does not copy conversation history or carry credentials.
 
 Detailed boundary and recovery procedures are in
 [`RIV-COMMS-0004_BINDING_ROLLOVER.md`](troubleshooting/checkpoints/RIV-COMMS-0004_BINDING_ROLLOVER.md).
+
+## Provider-neutral reasoning and intake
+
+Reasoning uses `riverview-reasoning-v1` envelopes and a durable provider registry;
+ChatGPT is one adapter and provider registration does not grant execution, SQL,
+filesystem, shell, roadmap, Steward, or protected-data authority. Project intake is
+durable intent metadata and remains out of dispatch until its declared workflow and
+acceptance are satisfied. Classification is closed and unknown labels fail closed;
+large/private material is represented by bounded references rather than embedded in
+ordinary River or Comms payloads.

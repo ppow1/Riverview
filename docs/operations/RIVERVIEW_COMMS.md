@@ -1,6 +1,6 @@
 # Riverview Comms
 
-Version: 0.19.0
+Version: 0.20.0
 Checkpoint date: 2026-08-15
 Status: external MCP accepted; RV-004.5 and RV-008.4 are complete; the bounded
 autonomous control-plane foundation is implemented locally; RV-008.5 and RV-008.6
