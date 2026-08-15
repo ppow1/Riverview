@@ -353,3 +353,11 @@ class ResultReconciler:
             )
             cursor.execute("UPDATE execution_envelopes SET status='reconciled',updated_at=now() WHERE execution_id=%s", (execution_id,))
         return {"execution_id": str(execution_id), "changed_paths": changed, "outside_scope": outside, "reconciled": True}
+
+    def record_publication(self, execution_id: UUID, commit_sha: str, remote_verified_sha: str) -> None:
+        if len(commit_sha) != 40 or len(remote_verified_sha) != 40 or commit_sha != remote_verified_sha:
+            raise ValueError("RIV-EXE-0005: publication SHA must be independently exact.")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("UPDATE execution_results SET commit_sha=%s,remote_verified_sha=%s WHERE execution_id=%s", (commit_sha, remote_verified_sha, execution_id))
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-EXE-0005: execution result is missing.")

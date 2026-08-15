@@ -176,6 +176,15 @@ and Steward routing without silently changing objective intent. A retry-safe fai
 is limited to one retry; otherwise a durable checkpoint is required. The named
 Codex adapter is not exposed through MCP as a generic execution operation.
 
+A second real continuation objective completed through the same path with
+objective `autonomous-loop.continuation.e0ec4851-6385-479a-b6a9-4156a22e78c4`,
+correlation `36009669-1d48-47dc-bd22-d8d2b6a712c6`, execution
+`5a6f7154-e9e4-43d6-8c23-6f6623e91d0f`, and typed result
+`c1a7919e-46ec-4cca-a323-ce3998a31f1f`. Grace completed declared plan, execute,
+and reconcile stages; Codex changed only `tests/fixtures/autonomy/CONTINUATION.md`.
+Publication of that fixture remains separately verified before the result is treated
+as a published source claim.
+
 Migration `0015` adds the bounded Steward seed draft boundary. The MCP
 `submit_steward_seed` operation creates exactly one idempotent draft for the fixed
 consumer `chatgpt:riverview_001`; only an explicit `steward` confirmer can promote
