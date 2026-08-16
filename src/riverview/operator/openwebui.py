@@ -7,6 +7,7 @@ provider-neutral adapter.
 from __future__ import annotations
 
 import json
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -19,8 +20,9 @@ from riverview.reasoning import ReasoningRequest, ReasoningResponse
 UI_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Riverview Operator</title>
 <style>body{font:16px sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem}textarea{width:100%;height:8rem}input,button{margin:.4rem 0;padding:.5rem}#result{white-space:pre-wrap;background:#f3f3f3;padding:1rem}</style></head>
-<body><h1>Riverview Operator</h1><p id="status">Authenticate, enter text, optionally select a harmless artifact, then submit.</p>
-<label>Riverview bearer <input id="token" type="password" autocomplete="off"></label><br>
+<body><h1>Riverview Operator</h1><p id="status">Use the local credential handoff, then enter text and optionally select a harmless artifact.</p>
+<button id="local-auth">Use local Riverview credential</button><br>
+<label>Manual bearer fallback <input id="token" type="password" autocomplete="off"></label><br>
 <textarea id="message" placeholder="Enter a bounded operator request"></textarea><br>
 <input id="artifact" type="file"><br><button id="send">Submit</button>
 <pre id="result"></pre>
@@ -36,6 +38,8 @@ async function submit(){
   const body=await response.json(); $('status').textContent=response.ok?'Completed':'Rejected';
   $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,response:body.response||body.error},null,2);
 }
+async function localAuth(){const response=await fetch('/session',{method:'POST'}); $('status').textContent=response.ok?'Authenticated through local Riverview credential handoff':'Authentication handoff failed';}
+$('local-auth').addEventListener('click',()=>localAuth().catch(error=>{$('status').textContent='Authentication handoff failed';}));
 $('send').addEventListener('click',()=>submit().catch(error=>{$('status').textContent='Failed';$('result').textContent=String(error);}));
 </script></body></html>"""
 
@@ -59,6 +63,7 @@ class RiverviewOpenWebUIService:
     def __init__(self, config: OpenWebUIConfig, provider: Callable[[str, ReasoningRequest], ReasoningResponse]) -> None:
         self.config = config
         self.provider = provider
+        self.sessions: set[str] = set()
         service = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -79,7 +84,19 @@ class RiverviewOpenWebUIService:
                 self.wfile.write(encoded)
 
             def _auth(self) -> bool:
-                return self.headers.get("Authorization") == f"Bearer {service.config.bearer_token}"
+                bearer = self.headers.get("Authorization")
+                cookie = self.headers.get("Cookie", "")
+                session = next((part.split("=", 1)[1] for part in cookie.split("; ") if part.startswith("rv_session=")), "")
+                return bearer == f"Bearer {service.config.bearer_token}" or session in service.sessions
+
+            def _session(self) -> None:
+                session = secrets.token_urlsafe(32)
+                service.sessions.add(session)
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Set-Cookie", f"rv_session={session}; HttpOnly; SameSite=Strict; Path=/")
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"authenticated":true}')
 
             def do_GET(self) -> None:
                 if self.path == "/":
@@ -94,6 +111,9 @@ class RiverviewOpenWebUIService:
                     self._send(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
             def do_POST(self) -> None:
+                if self.path == "/session":
+                    self._session()
+                    return
                 if self.path != "/api/chat" or not self._auth():
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                     return

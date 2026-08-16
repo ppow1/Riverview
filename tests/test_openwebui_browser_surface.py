@@ -21,5 +21,6 @@ def test_browser_operator_surface_is_real_html_and_artifact_aware() -> None:
         assert 'type="file"' in page
         assert "crypto.subtle.digest" in page
         assert "/api/chat" in page
+        assert "Use local Riverview credential" in page
     finally:
         service.stop()
