@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from uuid import UUID
 
+from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.residents.gateway import ResidentConversationGateway
 
@@ -82,7 +83,19 @@ class RiverviewOpenWebUIService:
         self.provider = provider
         self.resident_gateway = resident_gateway or ResidentConversationGateway.from_evidence()
         self.sessions: set[str] = set()
+        self.diagnostics = DiagnosticStore()
         service = self
+
+        def diagnostic(checkpoint: str, operation: str, failure_class: str, summary: str) -> None:
+            try:
+                service.diagnostics.emit(DiagnosticEvent(
+                    checkpoint_id=checkpoint, component="riverview.operator.openwebui", operation=operation,
+                    severity=Severity.ERROR, failure_class=failure_class, summary=summary[:500],
+                    cookbook_entry=f"CB-{checkpoint}", evidence_refs=("operator://bounded-metadata",),
+                    recovery_state=RecoveryState.UNVERIFIED,
+                ))
+            except (OSError, RuntimeError, TypeError, ValueError):
+                pass
 
         class Handler(BaseHTTPRequestHandler):
             def _send(self, status: HTTPStatus, payload: dict[str, object]) -> None:
@@ -154,6 +167,7 @@ class RiverviewOpenWebUIService:
                         result = capture_windows_speech()
                         self._send(HTTPStatus.OK, {"provider_id": result.provider_id, "text": result.text, "retention": result.retention})
                     except (RuntimeError, ValueError):
+                        diagnostic("RIV-UI-0015", "microphone_capture", "microphone_worker_failure", "Bounded local microphone capture failed.")
                         self._send(HTTPStatus.BAD_GATEWAY, {"error": "local_transcription_unavailable", "checkpoint": "RIV-UI-0015"})
                     return
                 if self.path == "/api/rooms":
@@ -190,14 +204,17 @@ class RiverviewOpenWebUIService:
                         room_text = self.path.removeprefix("/api/rooms/").removesuffix("/chat").strip("/")
                         length = int(self.headers.get("Content-Length", "0"))
                         payload = json.loads(self.rfile.read(length))
-                        responses = service.resident_gateway.room_chat(UUID(room_text), str(payload["message"]), provider=lambda request: service.provider("approved", request), interface_id=service.config.service_identity, correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
+                        model = str(payload.get("model", "qwen3-coder:30b-qwencode-20k"))
+                        responses = service.resident_gateway.room_chat(UUID(room_text), str(payload["message"]), provider=lambda request: service.provider(model, request), interface_id=service.config.service_identity, correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
                         self._send(HTTPStatus.OK, {"responses": responses, "no_authority_expansion": True})
-                    except (KeyError, TypeError, ValueError, LookupError, PermissionError, RuntimeError):
+                    except (KeyError, TypeError, ValueError, LookupError, PermissionError, RuntimeError) as exc:
+                        diagnostic("RIV-RES-0002", "room_chat", "room_provider_or_membership_failure", f"Bounded room request failed: {type(exc).__name__}.")
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "room_chat_rejected", "checkpoint": "RIV-RES-0002"})
                     return
                 if self.path != "/api/chat" or not self._auth():
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                     return
+                resident_id = ""
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
                     if length <= 0 or length > 16_384:
@@ -226,7 +243,8 @@ class RiverviewOpenWebUIService:
                         response = service.provider(str(payload.get("model", "approved")), request)
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "response": response.as_typed_payload()}
                     self._send(HTTPStatus.OK, body)
-                except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):  # bounded protocol error
+                except (AttributeError, KeyError, TypeError, ValueError, RuntimeError) as exc:  # bounded protocol error
+                    diagnostic("RIV-RES-0002" if resident_id else "RIV-UI-0009", "resident_chat" if resident_id else "operator_chat", "resident_provider_failure" if resident_id else "bounded_request_failure", f"Bounded operator request failed: {type(exc).__name__}.")
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "bounded_request_rejected", "checkpoint": "RIV-UI-0009"})
 
             def log_message(self, *_args: object) -> None:
