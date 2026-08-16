@@ -31,7 +31,7 @@ UI_HTML = """<!doctype html>
 <label>Resident <select id="resident"><option value="">General Riverview operator</option></select></label><br>
 <span id="resident-state">Active resident: General operator · session: none</span><br>
 <button id="create-room">Create Alfred · Ingrid · Helen room</button> <span id="room-state"></span><br>
-<label>Manual bearer fallback <input id="token" type="password" autocomplete="off"></label><br>
+<label>Advanced/debug bearer fallback (not required for normal local use) <input id="token" type="password" autocomplete="off"></label><br>
 <button id="mic">Capture bounded local microphone transcription</button><br>
 <textarea id="message" placeholder="Enter a bounded operator request"></textarea><br>
 <input id="artifact" type="file"><br><button id="send">Submit</button>
