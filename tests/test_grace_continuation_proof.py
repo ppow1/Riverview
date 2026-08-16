@@ -36,6 +36,27 @@ def test_continuation_stops_at_no_progress_boundary() -> None:
     assert result["stop_reason"] == "no_progress_or_external_boundary"
 
 
+def test_continuation_does_not_redispatch_a_steward_checkpoint() -> None:
+    engine = ContinuousMomentumEngine()
+    guarded = {"objective_key": "one", "stage_key": "approve", "steward_checkpoint": True}
+    ready = {"objective_key": "one", "stage_key": "build", "steward_checkpoint": False}
+    engine.frontier = Mock(side_effect=[[guarded, ready], [], []])  # type: ignore[method-assign]
+    engine.cycle = Mock(return_value={
+        "evaluated": [
+            {"objective_key": "one", "stage_key": "approve", "decision": "ready"},
+            {"objective_key": "one", "stage_key": "build", "decision": "ready"},
+        ]
+    })  # type: ignore[method-assign]
+    redispatch = Mock()
+
+    result = engine.cycle_until_quiescent(redispatch=redispatch)
+
+    redispatch.assert_called_once_with(
+        {"objective_key": "one", "stage_key": "build", "decision": "ready"}
+    )
+    assert result["redispatched"] == 1
+
+
 def test_continuation_cycle_bound_is_validated() -> None:
     try:
         ContinuousMomentumEngine().cycle_until_quiescent(max_cycles=0)

@@ -248,8 +248,6 @@ class GraceMomentum:
 class ContinuousMomentumEngine:
     """Run one bounded, event-driven Grace cycle across independent objectives."""
 
-    _MAX_CONTINUATION_CYCLES = 64
-
     def frontier(self, *, limit: int = 16) -> list[dict[str, Any]]:
         if not 1 <= limit <= 64:
             raise ValueError("RIV-GRC-0004: frontier limit is outside the bounded range.")
@@ -313,7 +311,17 @@ class ContinuousMomentumEngine:
                 break
             result = self.cycle(limit=limit, correlation_id=correlation)
             cycles.append(result)
-            ready = [item for item in result["evaluated"] if item["decision"] == "ready"]
+            eligible = {
+                (item["objective_key"], item["stage_key"])
+                for item in current
+                if not item.get("steward_checkpoint", False)
+            }
+            ready = [
+                item
+                for item in result["evaluated"]
+                if item["decision"] == "ready"
+                and (item["objective_key"], item["stage_key"]) in eligible
+            ]
             if redispatch is not None:
                 for item in ready:
                     redispatch(item)
@@ -334,36 +342,6 @@ class ContinuousMomentumEngine:
             "redispatched": redispatched,
             "remaining_frontier": self.frontier(limit=limit),
             "stop_reason": stop_reason,
-            "bounded": True,
-        }
-
-    def continue_until_quiescent(
-        self,
-        *,
-        limit: int = 16,
-        max_cycles: int = 8,
-        correlation_id: UUID | None = None,
-    ) -> dict[str, Any]:
-        """Iteratively evaluate ready snapshots until drained or the cycle bound is met."""
-        if not 1 <= max_cycles <= self._MAX_CONTINUATION_CYCLES:
-            raise ValueError("RIV-GRC-0004: continuation cycle bound is outside the bounded range.")
-
-        correlation_id = correlation_id or uuid4()
-        cycle_results: list[dict[str, Any]] = []
-        remaining_frontier = self.frontier(limit=limit)
-
-        # This is deliberately iterative. Each evaluation may make a different
-        # stage ready, so take a new durable frontier snapshot after every cycle.
-        while remaining_frontier and len(cycle_results) < max_cycles:
-            cycle_results.append(self._evaluate_frontier(remaining_frontier, correlation_id=correlation_id))
-            remaining_frontier = self.frontier(limit=limit)
-
-        return {
-            "correlation_id": str(correlation_id),
-            "cycle_count": len(cycle_results),
-            "cycles": cycle_results,
-            "remaining_frontier": remaining_frontier,
-            "remaining_frontier_count": len(remaining_frontier),
             "bounded": True,
         }
 
