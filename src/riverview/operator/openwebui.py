@@ -300,6 +300,8 @@ class RiverviewOpenWebUIService:
                         )
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "resident": resident_metadata, "session_id": str(session.session_id), "response": response.as_typed_payload()}
                         emit_event("resident.response.completed", "resident", resident_id, request.correlation_id, {"session_id": str(session.session_id), "resident_id": resident_id, "provider": str(payload.get("model", "approved")), "classification": request.classification})
+                        if resident_metadata.get("grace_addressed"):
+                            emit_event("grace.conversation.completed", "grace", resident_id, request.correlation_id, {"execution_intent_detected": bool(resident_metadata.get("execution_intent_detected")), "seed_promotion_required": bool(resident_metadata.get("execution_requires_seed_promotion")), "objective_created": False})
                     else:
                         response = service.provider(str(payload.get("model", "approved")), request)
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "response": response.as_typed_payload()}
