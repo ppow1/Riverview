@@ -5,7 +5,7 @@
   "required_core_contract": "riverview-core-contract-1.0",
   "module_type": "ui",
   "events_consumed": ["diagnostic.checkpoint", "resident.response.completed", "room.turn.completed"],
-  "events_emitted": ["operator.message.submitted", "operator.snapshot.created", "microphone.transcript.completed"],
+  "events_emitted": ["resident.message.submitted", "resident.response.completed", "operator.response.completed", "room.created", "room.turn.completed", "operator.snapshot.created", "microphone.transcript.completed", "grace.conversation.completed"],
   "actions_requested": ["resident.chat", "room.chat", "operator.snapshot"],
   "projections_read": ["resident.registry", "room.state", "diagnostics.recent"],
   "capabilities_registered": ["browser.operator", "resident.selection", "snapshot.export"],

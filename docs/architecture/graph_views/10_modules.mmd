@@ -18,9 +18,12 @@ flowchart LR
     event_diagnostic_checkpoint["diagnostic.checkpoint"]
     event_resident_response_completed["resident.response.completed"]
     event_room_turn_completed["room.turn.completed"]
-    event_operator_message_submitted["operator.message.submitted"]
+    event_resident_message_submitted["resident.message.submitted"]
+    event_operator_response_completed["operator.response.completed"]
+    event_room_created["room.created"]
     event_operator_snapshot_created["operator.snapshot.created"]
     event_microphone_transcript_completed["microphone.transcript.completed"]
+    event_grace_conversation_completed["grace.conversation.completed"]
     route__["/"]
     route__session["/session"]
     route__api_chat["/api/chat"]
@@ -34,9 +37,14 @@ flowchart LR
     event_diagnostic_checkpoint -->|consumed by| riverview_operator
     event_resident_response_completed -->|consumed by| riverview_operator
     event_room_turn_completed -->|consumed by| riverview_operator
-    riverview_operator -->|emitted by| event_operator_message_submitted
+    riverview_operator -->|emitted by| event_resident_message_submitted
+    riverview_operator -->|emitted by| event_resident_response_completed
+    riverview_operator -->|emitted by| event_operator_response_completed
+    riverview_operator -->|emitted by| event_room_created
+    riverview_operator -->|emitted by| event_room_turn_completed
     riverview_operator -->|emitted by| event_operator_snapshot_created
     riverview_operator -->|emitted by| event_microphone_transcript_completed
+    riverview_operator -->|emitted by| event_grace_conversation_completed
     riverview_operator -->|protected by checkpoint| diagnostics
     riverview_operator -->|protected by checkpoint| diagnostics
     riverview_operator -->|protected by checkpoint| diagnostics

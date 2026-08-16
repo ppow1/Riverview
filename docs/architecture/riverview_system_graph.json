@@ -1478,7 +1478,55 @@
       "relation": "emitted by",
       "source": "riverview.operator",
       "source_ref": "config/modules/operator.json",
-      "target": "event.operator.message.submitted",
+      "target": "event.resident.message.submitted",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
+      "target": "event.resident.response.completed",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
+      "target": "event.operator.response.completed",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
+      "target": "event.room.created",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
+      "target": "event.room.turn.completed",
       "views": [
         "events",
         "context",
@@ -1503,6 +1551,18 @@
       "source": "riverview.operator",
       "source_ref": "config/modules/operator.json",
       "target": "event.microphone.transcript.completed",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
+      "target": "event.grace.conversation.completed",
       "views": [
         "events",
         "context",
@@ -1787,9 +1847,14 @@
         "room.turn.completed"
       ],
       "events_emitted": [
-        "operator.message.submitted",
+        "resident.message.submitted",
+        "resident.response.completed",
+        "operator.response.completed",
+        "room.created",
+        "room.turn.completed",
         "operator.snapshot.created",
-        "microphone.transcript.completed"
+        "microphone.transcript.completed",
+        "grace.conversation.completed"
       ],
       "module_id": "riverview.operator",
       "module_type": "ui",
@@ -2366,9 +2431,31 @@
       ]
     },
     {
-      "id": "event.operator.message.submitted",
+      "id": "event.resident.message.submitted",
       "kind": "event",
-      "label": "operator.message.submitted",
+      "label": "resident.message.submitted",
+      "source": "config/modules/operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "id": "event.operator.response.completed",
+      "kind": "event",
+      "label": "operator.response.completed",
+      "source": "config/modules/operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "id": "event.room.created",
+      "kind": "event",
+      "label": "room.created",
       "source": "config/modules/operator.json",
       "views": [
         "events",
@@ -2391,6 +2478,17 @@
       "id": "event.microphone.transcript.completed",
       "kind": "event",
       "label": "microphone.transcript.completed",
+      "source": "config/modules/operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules"
+      ]
+    },
+    {
+      "id": "event.grace.conversation.completed",
+      "kind": "event",
+      "label": "grace.conversation.completed",
       "source": "config/modules/operator.json",
       "views": [
         "events",
