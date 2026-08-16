@@ -65,10 +65,10 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
         if node_id in node_ids:
             return
         node_ids.add(node_id)
-        nodes.append({"id": node_id, "label": label, "kind": kind, "source": source, "views": list(views)})
+        nodes.append({"id": node_id, "label": label, "kind": kind, "source": source, "views": list(dict.fromkeys(views))})
 
     def add_edge(source: str, target: str, relation: str, source_ref: str, *, views: tuple[str, ...] = (), checkpoint: str | None = None, manual: bool = False) -> None:
-        item = {"source": source, "target": target, "relation": relation, "source_ref": source_ref, "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION" if manual else "DERIVED", "views": list(views)}
+        item = {"source": source, "target": target, "relation": relation, "source_ref": source_ref, "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION" if manual else "DERIVED", "views": list(dict.fromkeys(views))}
         if checkpoint:
             item["checkpoint"] = checkpoint
         edges.append(item)
@@ -200,31 +200,32 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     for path in sorted(manifest_dir.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         module_id = data["module_id"]
-        manifests.append({"path": str(path), **data})
-        add_node(module_id, data["display_name"], "module", str(path), modules)
+        source_path = f"config/modules/{path.name}"
+        manifests.append({"path": source_path, **data})
+        add_node(module_id, data["display_name"], "module", source_path, modules)
         declared_runtime = {"riverview.operator": "operator_runtime", "riverview.reasoning.ollama": "ollama"}.get(module_id)
         if declared_runtime:
-            add_edge(module_id, declared_runtime, "DECLARES/IMPLEMENTS runtime component", str(path), views=modules + context)
-        add_edge(module_id, "core_contract" if data["required_core_contract"] else "river", "requires core contract", str(path), views=modules)
+            add_edge(module_id, declared_runtime, "DECLARES/IMPLEMENTS runtime component", source_path, views=modules + context)
+        add_edge(module_id, "core_contract" if data["required_core_contract"] else "river", "requires core contract", source_path, views=modules)
         for dependency in data.get("dependencies", []):
             target = {"resident.gateway": "resident_gateway_contract", "reasoning.contract": "reasoning_contract", "river": "river"}.get(dependency, dependency)
             if target not in node_ids:
                 add_node(target, target, "contract", str(path), modules)
-            add_edge(module_id, target, "declares dependency", str(path), views=modules)
+            add_edge(module_id, target, "declares dependency", source_path, views=modules)
         for event_name in data.get("events_consumed", []):
             event_id = f"event.{event_name}"
-            add_node(event_id, event_name, "event", str(path), event + modules)
-            add_edge(event_id, module_id, "consumed by", str(path), views=event + modules)
+            add_node(event_id, event_name, "event", source_path, event + modules)
+            add_edge(event_id, module_id, "consumed by", source_path, views=event + modules)
         for event_name in data.get("events_emitted", []):
             event_id = f"event.{event_name}"
-            add_node(event_id, event_name, "event", str(path), event + modules)
-            add_edge(module_id, event_id, "emitted by", str(path), views=event + modules)
+            add_node(event_id, event_name, "event", source_path, event + modules)
+            add_edge(module_id, event_id, "emitted by", source_path, views=event + modules)
         for checkpoint in data.get("diagnostics", []):
-            add_edge(module_id, "diagnostics", "protected by checkpoint", str(path), views=modules + failures, checkpoint=checkpoint)
+            add_edge(module_id, "diagnostics", "protected by checkpoint", source_path, views=modules + failures, checkpoint=checkpoint)
         for route in data.get("routes", []):
             route_id = f"route.{route}"
-            add_node(route_id, route, "route", str(path), modules + services)
-            add_edge(module_id, route_id, "exposes route", str(path), views=modules + services)
+            add_node(route_id, route, "route", source_path, modules + services)
+            add_edge(module_id, route_id, "exposes route", source_path, views=modules + services)
 
     questions = {
         "1_wake_grace": {"status": "PASS", "evidence": ["river->grace", "RIV-GRC-0004"]},

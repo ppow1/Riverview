@@ -31,7 +31,6 @@
       "target": "operator_runtime",
       "views": [
         "modules",
-        "context",
         "context"
       ]
     },
@@ -43,7 +42,6 @@
       "target": "operator_contract",
       "views": [
         "modules",
-        "context",
         "context"
       ]
     },
@@ -69,8 +67,7 @@
       "target": "snapshot_runtime",
       "views": [
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
@@ -109,9 +106,7 @@
       "views": [
         "resident",
         "events",
-        "character",
-        "resident",
-        "events"
+        "character"
       ]
     },
     {
@@ -124,9 +119,7 @@
       "views": [
         "resident",
         "events",
-        "character",
-        "resident",
-        "events"
+        "character"
       ]
     },
     {
@@ -149,7 +142,6 @@
       "target": "river",
       "views": [
         "events",
-        "context",
         "context"
       ]
     },
@@ -175,7 +167,6 @@
       "views": [
         "engineering",
         "events",
-        "events",
         "context"
       ]
     },
@@ -189,7 +180,6 @@
       "views": [
         "engineering",
         "events",
-        "events",
         "context"
       ]
     },
@@ -201,7 +191,6 @@
       "target": "river",
       "views": [
         "engineering",
-        "events",
         "events",
         "context"
       ]
@@ -215,7 +204,6 @@
       "target": "grace",
       "views": [
         "engineering",
-        "events",
         "events",
         "context"
       ]
@@ -285,7 +273,6 @@
       "views": [
         "engineering",
         "events",
-        "events",
         "context"
       ]
     },
@@ -297,7 +284,6 @@
       "target": "verification",
       "views": [
         "engineering",
-        "events",
         "events",
         "context"
       ]
@@ -322,7 +308,6 @@
       "target": "river",
       "views": [
         "engineering",
-        "events",
         "events",
         "context"
       ]
@@ -350,8 +335,7 @@
       "views": [
         "failures",
         "context",
-        "events",
-        "context"
+        "events"
       ]
     },
     {
@@ -362,7 +346,6 @@
       "target": "grace",
       "views": [
         "engineering",
-        "events",
         "events",
         "context"
       ]
@@ -375,7 +358,6 @@
       "target": "relay",
       "views": [
         "engineering",
-        "events",
         "events",
         "context"
       ]
@@ -401,7 +383,6 @@
       "target": "grace",
       "views": [
         "engineering",
-        "events",
         "events",
         "context"
       ]
@@ -487,9 +468,7 @@
       "views": [
         "resident",
         "events",
-        "character",
-        "resident",
-        "events"
+        "character"
       ]
     },
     {
@@ -500,7 +479,6 @@
       "target": "river",
       "views": [
         "resident",
-        "events",
         "events",
         "context"
       ]
@@ -527,8 +505,6 @@
       "target": "character_runtime",
       "views": [
         "character",
-        "resident",
-        "events",
         "resident",
         "events"
       ]
@@ -566,8 +542,6 @@
       "views": [
         "character",
         "resident",
-        "events",
-        "resident",
         "events"
       ]
     },
@@ -591,8 +565,6 @@
       "target": "resident_expression",
       "views": [
         "character",
-        "resident",
-        "events",
         "resident",
         "events"
       ]
@@ -671,7 +643,6 @@
         "room",
         "resident",
         "events",
-        "events",
         "context"
       ]
     },
@@ -700,9 +671,7 @@
         "room",
         "resident",
         "events",
-        "character",
-        "resident",
-        "events"
+        "character"
       ]
     },
     {
@@ -784,8 +753,7 @@
       "target": "operator_runtime",
       "views": [
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
@@ -796,7 +764,6 @@
       "target": "mailbox",
       "views": [
         "comms",
-        "events",
         "events",
         "context"
       ]
@@ -809,7 +776,6 @@
       "target": "doorbell",
       "views": [
         "comms",
-        "events",
         "events",
         "context"
       ]
@@ -834,7 +800,6 @@
       "views": [
         "comms",
         "events",
-        "events",
         "context"
       ]
     },
@@ -847,7 +812,6 @@
       "views": [
         "comms",
         "events",
-        "events",
         "context"
       ]
     },
@@ -859,7 +823,6 @@
       "target": "grace",
       "views": [
         "comms",
-        "events",
         "events",
         "context"
       ]
@@ -886,7 +849,6 @@
       "target": "notifications",
       "views": [
         "notifications",
-        "events",
         "events",
         "context"
       ]
@@ -999,8 +961,7 @@
       "views": [
         "services",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
@@ -1425,11 +1386,10 @@
       "derivation": "DERIVED",
       "relation": "DECLARES/IMPLEMENTS runtime component",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "operator_runtime",
       "views": [
         "modules",
-        "context",
         "context"
       ]
     },
@@ -1437,7 +1397,7 @@
       "derivation": "DERIVED",
       "relation": "requires core contract",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "core_contract",
       "views": [
         "modules",
@@ -1448,7 +1408,7 @@
       "derivation": "DERIVED",
       "relation": "declares dependency",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "river",
       "views": [
         "modules",
@@ -1459,7 +1419,7 @@
       "derivation": "DERIVED",
       "relation": "declares dependency",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "reasoning_contract",
       "views": [
         "modules",
@@ -1470,7 +1430,7 @@
       "derivation": "DERIVED",
       "relation": "declares dependency",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "resident_gateway_contract",
       "views": [
         "modules",
@@ -1481,78 +1441,72 @@
       "derivation": "DERIVED",
       "relation": "consumed by",
       "source": "event.diagnostic.checkpoint",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "riverview.operator",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "consumed by",
       "source": "event.resident.response.completed",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "riverview.operator",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "consumed by",
       "source": "event.room.turn.completed",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "riverview.operator",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "emitted by",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "event.operator.message.submitted",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "emitted by",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "event.operator.snapshot.created",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "emitted by",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "event.microphone.transcript.completed",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
@@ -1560,13 +1514,12 @@
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "diagnostics",
       "views": [
         "modules",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
@@ -1574,13 +1527,12 @@
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "diagnostics",
       "views": [
         "modules",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
@@ -1588,13 +1540,12 @@
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "diagnostics",
       "views": [
         "modules",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
@@ -1602,13 +1553,12 @@
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "diagnostics",
       "views": [
         "modules",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
@@ -1616,89 +1566,82 @@
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "diagnostics",
       "views": [
         "modules",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "exposes route",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "route./",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "exposes route",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "route./session",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "exposes route",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "route./api/chat",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "exposes route",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "route./api/rooms",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "exposes route",
       "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source_ref": "config/modules/operator.json",
       "target": "route./snapshot",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "DECLARES/IMPLEMENTS runtime component",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "ollama",
       "views": [
         "modules",
-        "context",
         "context"
       ]
     },
@@ -1706,7 +1649,7 @@
       "derivation": "DERIVED",
       "relation": "requires core contract",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "core_contract",
       "views": [
         "modules",
@@ -1717,7 +1660,7 @@
       "derivation": "DERIVED",
       "relation": "declares dependency",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "river",
       "views": [
         "modules",
@@ -1728,7 +1671,7 @@
       "derivation": "DERIVED",
       "relation": "declares dependency",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "reasoning_contract",
       "views": [
         "modules",
@@ -1739,39 +1682,36 @@
       "derivation": "DERIVED",
       "relation": "consumed by",
       "source": "event.reasoning.request.submitted",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "riverview.reasoning.ollama",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "emitted by",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "event.provider.response.completed",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "derivation": "DERIVED",
       "relation": "emitted by",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "event.provider.execution.failed",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
@@ -1779,13 +1719,12 @@
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "diagnostics",
       "views": [
         "modules",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     },
     {
@@ -1793,13 +1732,12 @@
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
       "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source_ref": "config/modules/reasoning_ollama.json",
       "target": "diagnostics",
       "views": [
         "modules",
         "context",
-        "failures",
-        "context"
+        "failures"
       ]
     }
   ],
@@ -1856,7 +1794,7 @@
       "module_id": "riverview.operator",
       "module_type": "ui",
       "module_version": "1.0.0",
-      "path": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "path": "config/modules/operator.json",
       "projections_read": [
         "resident.registry",
         "room.state",
@@ -1904,7 +1842,7 @@
       "module_id": "riverview.reasoning.ollama",
       "module_type": "provider",
       "module_version": "1.0.0",
-      "path": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "path": "config/modules/reasoning_ollama.json",
       "projections_read": [
         "provider.registry",
         "classification.policy"
@@ -2388,7 +2326,7 @@
       "id": "riverview.operator",
       "kind": "module",
       "label": "Riverview Operator surface",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "modules",
         "context"
@@ -2398,139 +2336,128 @@
       "id": "event.diagnostic.checkpoint",
       "kind": "event",
       "label": "diagnostic.checkpoint",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "event.resident.response.completed",
       "kind": "event",
       "label": "resident.response.completed",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "event.room.turn.completed",
       "kind": "event",
       "label": "room.turn.completed",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "event.operator.message.submitted",
       "kind": "event",
       "label": "operator.message.submitted",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "event.operator.snapshot.created",
       "kind": "event",
       "label": "operator.snapshot.created",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "event.microphone.transcript.completed",
       "kind": "event",
       "label": "microphone.transcript.completed",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "route./",
       "kind": "route",
       "label": "/",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "id": "route./session",
       "kind": "route",
       "label": "/session",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "id": "route./api/chat",
       "kind": "route",
       "label": "/api/chat",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "id": "route./api/rooms",
       "kind": "route",
       "label": "/api/rooms",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "id": "route./snapshot",
       "kind": "route",
       "label": "/snapshot",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "source": "config/modules/operator.json",
       "views": [
         "modules",
         "context",
-        "services",
-        "context"
+        "services"
       ]
     },
     {
       "id": "riverview.reasoning.ollama",
       "kind": "module",
       "label": "Loopback Ollama reasoning adapter",
-      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source": "config/modules/reasoning_ollama.json",
       "views": [
         "modules",
         "context"
@@ -2540,36 +2467,33 @@
       "id": "event.reasoning.request.submitted",
       "kind": "event",
       "label": "reasoning.request.submitted",
-      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source": "config/modules/reasoning_ollama.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "event.provider.response.completed",
       "kind": "event",
       "label": "provider.response.completed",
-      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source": "config/modules/reasoning_ollama.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     },
     {
       "id": "event.provider.execution.failed",
       "kind": "event",
       "label": "provider.execution.failed",
-      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "source": "config/modules/reasoning_ollama.json",
       "views": [
         "events",
         "context",
-        "modules",
-        "context"
+        "modules"
       ]
     }
   ],
