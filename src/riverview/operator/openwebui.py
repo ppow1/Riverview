@@ -24,6 +24,7 @@ UI_HTML = """<!doctype html>
 <body><h1>Riverview Operator</h1><p id="status">Use the local credential handoff, then enter an instruction and optionally attach a harmless artifact. Attachments are reference-only unless the selected provider explicitly supports content inspection.</p>
 <button id="local-auth">Use local Riverview credential</button><br>
 <label>Resident <select id="resident"><option value="">General Riverview operator</option></select></label><br>
+<span id="resident-state">Active resident: General operator · session: none</span><br>
 <button id="create-room">Create Alfred · Ingrid · Helen room</button> <span id="room-state"></span><br>
 <label>Manual bearer fallback <input id="token" type="password" autocomplete="off"></label><br>
 <button id="mic">Capture bounded local microphone transcription</button><br>
@@ -43,17 +44,18 @@ async function submit(){
   const residentId=$('resident').value;
   if(window.riverviewRoomId&&residentId){const roomResponse=await fetch('/api/rooms/'+window.riverviewRoomId+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:$('message').value,correlation_id:correlation})});const roomBody=await roomResponse.json();$('status').textContent=roomResponse.ok?'Room responses completed':'Room turn rejected';$('result').textContent=JSON.stringify({correlation_id:correlation,room_responses:roomBody.responses||roomBody},null,2);return;}
   const response=await fetch('/api/chat',{method:'POST',headers:{'Authorization':'Bearer '+$('token').value,'Content-Type':'application/json'},body:JSON.stringify({request_id:request,correlation_id:correlation,message:$('message').value,context_refs:refs,resident_id:residentId,session_id:residentSessions[residentId]||'',classification:'operational',model:'qwen3-coder:30b-qwencode-20k'})});
-  const body=await response.json(); $('status').textContent=response.ok?(body.artifact_semantics==='reference_only'?'Completed — artifact attached as reference-only; image content was not inspected.':'Completed'):'Rejected';
+  const body=await response.json(); if(response.ok&&body.resident){$('resident-state').textContent='Active resident: '+body.resident.resident_name+' · session: '+body.resident.session_id+' · character: '+(body.resident.character_version||'unknown');} $('status').textContent=response.ok?(body.artifact_semantics==='reference_only'?'Completed — artifact attached as reference-only; image content was not inspected.':'Completed'):'Rejected';
   if(response.ok&&residentId&&body.session_id)residentSessions[residentId]=body.session_id;
-  $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,artifact_semantics:body.artifact_semantics||'none',response:body.response||body.error},null,2);
+  $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,artifact_semantics:body.artifact_semantics||'none',resident:body.resident||null,session_id:body.session_id||null,response:body.response||body.error},null,2);
 }
-async function localAuth(){const response=await fetch('/session',{method:'POST'}); $('status').textContent=response.ok?'Authenticated through local Riverview credential handoff':'Authentication handoff failed';}
+async function localAuth(){const response=await fetch('/session',{method:'POST'}); if(response.ok){$('status').textContent='Authenticated through local Riverview credential handoff';await loadResidents();}else $('status').textContent='Authentication handoff failed';}
 async function loadResidents(){const response=await fetch('/api/residents');if(!response.ok)return;const body=await response.json();for(const resident of body.residents){const option=document.createElement('option');option.value=resident.resident_id;option.textContent=resident.name+' — '+resident.role;$('resident').appendChild(option);}}
 async function createRoom(){const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participants:['RES-000001','RES-000002','RES-000003']})});const body=await response.json();if(!response.ok)throw Error(body.error||'room creation failed');$('room-state').textContent='Room '+body.room_id+' ready; use the selected resident to submit a bounded turn.';window.riverviewRoomId=body.room_id;}
 async function mic(){ $('status').textContent='Listening for up to 8 seconds…'; const response=await fetch('/api/transcribe',{method:'POST'}); const body=await response.json(); if(!response.ok) throw Error(body.error||'transcription failed'); $('message').value=body.text; $('status').textContent='Local transcription ready; review before submitting.'; }
 $('local-auth').addEventListener('click',()=>localAuth().catch(error=>{$('status').textContent='Authentication handoff failed';}));
 $('mic').addEventListener('click',()=>mic().catch(error=>{$('status').textContent='Local transcription failed: '+error;}));
 $('send').addEventListener('click',()=>submit().catch(error=>{$('status').textContent='Failed';$('result').textContent=String(error);}));
+ $('resident').addEventListener('change',()=>{const option=$('resident').selectedOptions[0];$('resident-state').textContent=option&&option.value?'Active resident: '+option.textContent+' · session: '+(residentSessions[option.value]||'not started'):'Active resident: General operator · session: none';});
  $('create-room').addEventListener('click',()=>createRoom().catch(error=>{$('room-state').textContent='Room unavailable';}));
 loadResidents().catch(()=>{});
 </script></body></html>"""
