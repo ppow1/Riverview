@@ -1,53 +1,70 @@
 flowchart LR
-    river['{node["label"]}']
-    grace['{node["label"]}']
-    relay['{node["label"]}']
-    providers['{node["label"]}']
-    diagnostics['{node["label"]}']
-    notifications['{node["label"]}']
-    operator['{node["label"]}']
-    residents['{node["label"]}']
-    room['{node["label"]}']
-    snapshot['{node["label"]}']
-    ollama['{node["label"]}']
-    mcp['{node["label"]}']
-    projects['{node["label"]}']
-    undercurrent['{node["label"]}']
-    controls['{node["label"]}']
-    spatial['{node["label"]}']
-    reasoning_contract['{node["label"]}']
-    resident_gateway['{node["label"]}']
-    steward['{node["label"]}']
-    riverview_operator['{node["label"]}']
-    riverview_reasoning_ollama['{node["label"]}']
-    operator -->|publishes operator/resident/room events| river
-    operator -->|submits bounded resident requests| residents
-    operator -->|submits room turns| room
-    operator -->|requests diagnostic bundle| snapshot
-    operator -->|receives browser/microphone input| controls
-    residents -->|checks classification and bounded references| undercurrent
-    residents -->|selects eligible provider| providers
-    room -->|orchestrates participant sessions| residents
-    providers -->|dispatches local reasoning| ollama
-    river -->|wakes CME on durable events| grace
-    grace -->|evaluates ready objective stages| relay
-    relay -->|dispatches execution work| providers
-    river -->|records event/checkpoint lineage| diagnostics
-    diagnostics -->|routes bounded escalation| notifications
-    mcp -->|reads bounded Comms/mailbox state| river
-    steward -->|addresses Grace and accepts bounded decisions| mcp
-    projects -->|promotes explicit engineering seed| grace
-    undercurrent -->|protects classified state boundary| river
-    spatial -->|future spatial projection| operator
+    steward["Steward"]
+    river["River event runtime / PostgreSQL"]
+    grace["Grace / CME"]
+    objective_state["Objective and stage state"]
+    relay["Relay / work-order lifecycle"]
+    execution_envelope["Execution envelope"]
+    providers["Provider registry / capacity"]
+    diagnostics["Diagnostics / Cookbook"]
+    notifications["Steward notification store"]
+    undercurrent["Undercurrent classification/security"]
+    verification["Verification / reconciliation"]
+    publication["Controlled Git publication"]
+    mailbox["PostgreSQL mailbox"]
+    chatgpt["ChatGPT reasoning participant"]
+    character_canon["Versioned accepted character canon"]
+    flow_event_operator_snapshot_created["operator.snapshot.created"]
+    riverview_operator["Riverview Operator surface"]
+    event_diagnostic_checkpoint["diagnostic.checkpoint"]
+    event_resident_response_completed["resident.response.completed"]
+    event_room_turn_completed["room.turn.completed"]
+    event_operator_message_submitted["operator.message.submitted"]
+    event_operator_snapshot_created["operator.snapshot.created"]
+    event_microphone_transcript_completed["microphone.transcript.completed"]
+    route__["/"]
+    route__session["/session"]
+    route__api_chat["/api/chat"]
+    route__api_rooms["/api/rooms"]
+    route__snapshot["/snapshot"]
+    riverview_reasoning_ollama["Loopback Ollama reasoning adapter"]
+    event_reasoning_request_submitted["reasoning.request.submitted"]
+    event_provider_response_completed["provider.response.completed"]
+    event_provider_execution_failed["provider.execution.failed"]
+    grace -->|evaluates readiness/checkpoints| objective_state
+    objective_state -->|records objective/stage events| river
+    river -->|wakes reevaluation| grace
+    verification -->|emits completion/failure event| river
+    river -->|completion/failure causes reevaluation| grace
+    grace -->|redispatches ready work or escalates| relay
+    grace -->|records no-ready/capacity/quiescence decision| diagnostics
+    providers -->|provider completion is not global quiescence| grace
+    river -->|stores correlated reasoning request| mailbox
+    chatgpt -->|submits correlated advisory response| mailbox
+    mailbox -->|records response event/correlation| river
+    river -->|response event enables continuation| grace
+    river -->|checkpoint/critical event creates notification| notifications
+    river -->|CONSUMED/EVALUATED| diagnostics
     riverview_operator -->|declares dependency| river
-    riverview_operator -->|declares dependency| reasoning_contract
-    riverview_operator -->|declares dependency| resident_gateway
-    riverview_operator -->|uses checkpoint| diagnostics
-    riverview_operator -->|uses checkpoint| diagnostics
-    riverview_operator -->|uses checkpoint| diagnostics
-    riverview_operator -->|uses checkpoint| diagnostics
-    riverview_operator -->|uses checkpoint| diagnostics
+    event_diagnostic_checkpoint -->|consumed by| riverview_operator
+    event_resident_response_completed -->|consumed by| riverview_operator
+    event_room_turn_completed -->|consumed by| riverview_operator
+    riverview_operator -->|emitted by| event_operator_message_submitted
+    riverview_operator -->|emitted by| event_operator_snapshot_created
+    riverview_operator -->|emitted by| event_microphone_transcript_completed
+    riverview_operator -->|protected by checkpoint| diagnostics
+    riverview_operator -->|protected by checkpoint| diagnostics
+    riverview_operator -->|protected by checkpoint| diagnostics
+    riverview_operator -->|protected by checkpoint| diagnostics
+    riverview_operator -->|protected by checkpoint| diagnostics
+    riverview_operator -->|exposes route| route__
+    riverview_operator -->|exposes route| route__session
+    riverview_operator -->|exposes route| route__api_chat
+    riverview_operator -->|exposes route| route__api_rooms
+    riverview_operator -->|exposes route| route__snapshot
     riverview_reasoning_ollama -->|declares dependency| river
-    riverview_reasoning_ollama -->|declares dependency| reasoning_contract
-    riverview_reasoning_ollama -->|uses checkpoint| diagnostics
-    riverview_reasoning_ollama -->|uses checkpoint| diagnostics
+    event_reasoning_request_submitted -->|consumed by| riverview_reasoning_ollama
+    riverview_reasoning_ollama -->|emitted by| event_provider_response_completed
+    riverview_reasoning_ollama -->|emitted by| event_provider_execution_failed
+    riverview_reasoning_ollama -->|protected by checkpoint| diagnostics
+    riverview_reasoning_ollama -->|protected by checkpoint| diagnostics

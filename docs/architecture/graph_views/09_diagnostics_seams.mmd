@@ -1,0 +1,23 @@
+flowchart LR
+    steward["Steward"]
+    river["River event runtime / PostgreSQL"]
+    grace["Grace / CME"]
+    objective_state["Objective and stage state"]
+    relay["Relay / work-order lifecycle"]
+    execution_envelope["Execution envelope"]
+    providers["Provider registry / capacity"]
+    diagnostics["Diagnostics / Cookbook"]
+    notifications["Steward notification store"]
+    undercurrent["Undercurrent classification/security"]
+    verification["Verification / reconciliation"]
+    publication["Controlled Git publication"]
+    mailbox["PostgreSQL mailbox"]
+    chatgpt["ChatGPT reasoning participant"]
+    character_canon["Versioned accepted character canon"]
+    flow_event_provider_execution_failed["provider.execution.failed"]
+    flow_event_diagnostic_checkpoint_fired["diagnostic.checkpoint.fired"]
+    grace -->|records no-ready/capacity/quiescence decision| diagnostics
+    providers -->|EMITS| flow_event_provider_execution_failed
+    river -->|CONSUMED/EVALUATED| diagnostics
+    diagnostics -->|EMITS| flow_event_diagnostic_checkpoint_fired
+    river -->|CONSUMED/EVALUATED| notifications

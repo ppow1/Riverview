@@ -1,0 +1,39 @@
+flowchart LR
+    steward["Steward"]
+    river["River event runtime / PostgreSQL"]
+    grace["Grace / CME"]
+    objective_state["Objective and stage state"]
+    relay["Relay / work-order lifecycle"]
+    execution_envelope["Execution envelope"]
+    providers["Provider registry / capacity"]
+    diagnostics["Diagnostics / Cookbook"]
+    notifications["Steward notification store"]
+    undercurrent["Undercurrent classification/security"]
+    verification["Verification / reconciliation"]
+    publication["Controlled Git publication"]
+    mailbox["PostgreSQL mailbox"]
+    chatgpt["ChatGPT reasoning participant"]
+    character_canon["Versioned accepted character canon"]
+    flow_event_objective_stage_ready["objective.stage.ready"]
+    flow_event_provider_execution_completed["provider.execution.completed"]
+    flow_event_provider_execution_failed["provider.execution.failed"]
+    flow_event_codex_execution_completed["codex.execution.completed"]
+    grace -->|evaluates readiness/checkpoints| objective_state
+    objective_state -->|records objective/stage events| river
+    river -->|wakes reevaluation| grace
+    grace -->|enqueues declared action| relay
+    relay -->|creates bounded execution| execution_envelope
+    execution_envelope -->|requests capability selection| providers
+    verification -->|publishes only reconciled result| publication
+    verification -->|emits completion/failure event| river
+    river -->|completion/failure causes reevaluation| grace
+    grace -->|redispatches ready work or escalates| relay
+    grace -->|records no-ready/capacity/quiescence decision| diagnostics
+    providers -->|provider completion is not global quiescence| grace
+    grace -->|EMITS| flow_event_objective_stage_ready
+    river -->|CONSUMED/EVALUATED| relay
+    providers -->|EMITS| flow_event_provider_execution_completed
+    river -->|CONSUMED/EVALUATED| verification
+    providers -->|EMITS| flow_event_provider_execution_failed
+    river -->|CONSUMED/EVALUATED| diagnostics
+    river -->|CONSUMED/EVALUATED| verification

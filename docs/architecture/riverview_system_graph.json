@@ -10,401 +10,2720 @@
     "RIV-RES-0002",
     "RIV-REASON-0001",
     "RIV-REASON-0002",
+    "RIV-CHAR-0004",
     "RIV-DIA-0001",
     "RIV-DIA-0002",
     "RIV-GRC-0004",
+    "RIV-EXE-0001",
+    "RIV-EXE-0003",
     "RIV-NOT-0001",
-    "RIV-MCP-0006"
+    "RIV-MCP-0006",
+    "RIV-ARCH-0001",
+    "RIV-INF-0001",
+    "RIV-SPAT-0004"
   ],
   "edges": [
     {
-      "checkpoint": "RIV-UI-0009",
-      "derivation": "derived",
-      "relation": "publishes operator/resident/room events",
-      "source": "operator",
-      "source_ref": "openwebui.py:emit_event",
-      "target": "river"
+      "derivation": "DERIVED",
+      "relation": "IMPLEMENTS",
+      "source": "operator_module",
+      "source_ref": "config/modules/operator.json",
+      "target": "operator_runtime",
+      "views": [
+        "modules",
+        "context",
+        "context"
+      ]
     },
     {
-      "checkpoint": "RIV-RES-0001",
-      "derivation": "derived",
-      "relation": "submits bounded resident requests",
-      "source": "operator",
-      "source_ref": "openwebui.py:/api/chat",
-      "target": "residents"
-    },
-    {
-      "checkpoint": "RIV-RES-0002",
-      "derivation": "derived",
-      "relation": "submits room turns",
-      "source": "operator",
-      "source_ref": "openwebui.py:/api/rooms",
-      "target": "room"
-    },
-    {
-      "checkpoint": "RIV-UI-0019",
-      "derivation": "derived",
-      "relation": "requests diagnostic bundle",
-      "source": "operator",
-      "source_ref": "openwebui.py:/snapshot",
-      "target": "snapshot"
-    },
-    {
-      "checkpoint": "RIV-UI-0015",
-      "derivation": "derived",
-      "relation": "receives browser/microphone input",
-      "source": "operator",
-      "source_ref": "openwebui.py:/api/transcribe",
-      "target": "controls"
-    },
-    {
-      "checkpoint": "RIV-RES-0001",
-      "derivation": "derived",
-      "relation": "checks classification and bounded references",
-      "source": "residents",
-      "source_ref": "residents/gateway.py",
-      "target": "undercurrent"
-    },
-    {
-      "checkpoint": "RIV-REASON-0001",
-      "derivation": "derived",
-      "relation": "selects eligible provider",
-      "source": "residents",
-      "source_ref": "reasoning/contract.py",
-      "target": "providers"
-    },
-    {
-      "checkpoint": "RIV-RES-0002",
-      "derivation": "derived",
-      "relation": "orchestrates participant sessions",
-      "source": "room",
-      "source_ref": "residents/gateway.py:room_chat",
-      "target": "residents"
-    },
-    {
-      "checkpoint": "RIV-REASON-0002",
-      "derivation": "derived",
-      "relation": "dispatches local reasoning",
-      "source": "providers",
-      "source_ref": "reasoning/provider_registry.py",
-      "target": "ollama"
-    },
-    {
-      "checkpoint": "RIV-GRC-0004",
-      "derivation": "derived",
-      "relation": "wakes CME on durable events",
-      "source": "river",
-      "source_ref": "river/events.py + grace",
-      "target": "grace"
-    },
-    {
-      "checkpoint": "RIV-GRC-0004",
-      "derivation": "derived",
-      "relation": "evaluates ready objective stages",
-      "source": "grace",
-      "source_ref": "grace/objectives.py",
-      "target": "relay"
-    },
-    {
-      "checkpoint": "RIV-REASON-0001",
-      "derivation": "derived",
-      "relation": "dispatches execution work",
-      "source": "relay",
-      "source_ref": "relay/work_orders.py",
-      "target": "providers"
-    },
-    {
-      "checkpoint": "RIV-DIA-0001",
-      "derivation": "derived",
-      "relation": "records event/checkpoint lineage",
-      "source": "river",
-      "source_ref": "river/store.py",
-      "target": "diagnostics"
-    },
-    {
-      "checkpoint": "RIV-NOT-0001",
-      "derivation": "derived",
-      "relation": "routes bounded escalation",
-      "source": "diagnostics",
-      "source_ref": "notifications",
-      "target": "notifications"
-    },
-    {
-      "checkpoint": "RIV-MCP-0006",
-      "derivation": "derived",
-      "relation": "reads bounded Comms/mailbox state",
-      "source": "mcp",
-      "source_ref": "mcp",
-      "target": "river"
-    },
-    {
-      "derivation": "manual",
-      "relation": "addresses Grace and accepts bounded decisions",
-      "source": "steward",
-      "source_ref": "Comms / Steward boundary",
-      "target": "mcp"
-    },
-    {
-      "derivation": "manual",
-      "relation": "promotes explicit engineering seed",
-      "source": "projects",
-      "source_ref": "grace/objective_acceptance.py",
-      "target": "grace"
-    },
-    {
-      "derivation": "manual",
-      "relation": "protects classified state boundary",
-      "source": "undercurrent",
-      "source_ref": "classification contracts",
-      "target": "river"
-    },
-    {
-      "derivation": "manual",
-      "relation": "future spatial projection",
-      "source": "spatial",
-      "source_ref": "spatial prototype (deferred)",
-      "target": "operator"
-    },
-    {
-      "derivation": "derived",
-      "relation": "declares dependency",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "river"
-    },
-    {
-      "derivation": "derived",
-      "relation": "declares dependency",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "reasoning.contract"
-    },
-    {
-      "derivation": "derived",
-      "relation": "declares dependency",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "resident.gateway"
-    },
-    {
-      "checkpoint": "RIV-UI-0013",
-      "derivation": "derived",
-      "relation": "uses checkpoint",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "diagnostics"
+      "derivation": "DERIVED",
+      "relation": "exposes",
+      "source": "operator_runtime",
+      "source_ref": "openwebui.py:UI_HTML",
+      "target": "operator_contract",
+      "views": [
+        "modules",
+        "context",
+        "context"
+      ]
     },
     {
       "checkpoint": "RIV-UI-0014",
-      "derivation": "derived",
-      "relation": "uses checkpoint",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "diagnostics"
+      "derivation": "DERIVED",
+      "relation": "authenticates local session",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:/session",
+      "target": "undercurrent",
+      "views": [
+        "context",
+        "resident",
+        "events"
+      ]
     },
     {
       "checkpoint": "RIV-UI-0019",
-      "derivation": "derived",
-      "relation": "uses checkpoint",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "diagnostics"
+      "derivation": "DERIVED",
+      "relation": "requests current DOM/state snapshot",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:/snapshot",
+      "target": "snapshot_runtime",
+      "views": [
+        "context",
+        "failures",
+        "context"
+      ]
     },
     {
-      "checkpoint": "RIV-UI-0020",
-      "derivation": "derived",
-      "relation": "uses checkpoint",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "diagnostics"
+      "checkpoint": "RIV-RES-0001",
+      "derivation": "DERIVED",
+      "relation": "USES",
+      "source": "operator_runtime",
+      "source_ref": "openwebui.py:/api/chat",
+      "target": "resident_gateway_contract",
+      "views": [
+        "modules",
+        "context",
+        "resident",
+        "events"
+      ]
     },
     {
-      "checkpoint": "RIV-RES-0002",
-      "derivation": "derived",
-      "relation": "uses checkpoint",
-      "source": "riverview.operator",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
-      "target": "diagnostics"
+      "derivation": "DERIVED",
+      "relation": "IMPLEMENTS",
+      "source": "resident_gateway_runtime",
+      "source_ref": "residents/gateway.py:ResidentConversationGateway",
+      "target": "resident_gateway_contract",
+      "views": [
+        "modules",
+        "context",
+        "resident",
+        "events"
+      ]
     },
     {
-      "derivation": "derived",
-      "relation": "declares dependency",
-      "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
-      "target": "river"
+      "derivation": "DERIVED",
+      "relation": "loads accepted version",
+      "source": "resident_gateway_runtime",
+      "source_ref": "residents/gateway.py:chat",
+      "target": "character_runtime",
+      "views": [
+        "resident",
+        "events",
+        "character",
+        "resident",
+        "events"
+      ]
     },
     {
-      "derivation": "derived",
-      "relation": "declares dependency",
-      "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
-      "target": "reasoning.contract"
+      "checkpoint": "RIV-CHAR-0004",
+      "derivation": "DERIVED",
+      "relation": "retrieves bounded continuity",
+      "source": "resident_gateway_runtime",
+      "source_ref": "residents/gateway.py:chat",
+      "target": "continuity_runtime",
+      "views": [
+        "resident",
+        "events",
+        "character",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "owned by",
+      "source": "operator_runtime",
+      "source_ref": "config/modules/operator.json",
+      "target": "operator_module",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0009",
+      "derivation": "DERIVED",
+      "relation": "publishes bounded workflow events",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events",
+        "context",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "submits accepted engineering seed",
+      "source": "steward",
+      "source_ref": "grace/objective_acceptance.py",
+      "target": "projects",
+      "views": [
+        "engineering",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "DERIVED",
+      "relation": "objective intake",
+      "source": "projects",
+      "source_ref": "autonomy/control.py:GraceMomentum",
+      "target": "grace",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "DERIVED",
+      "relation": "evaluates readiness/checkpoints",
+      "source": "grace",
+      "source_ref": "autonomy/control.py:GraceMomentum.evaluate",
+      "target": "objective_state",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "records objective/stage events",
+      "source": "objective_state",
+      "source_ref": "grace/objectives.py:EventStore",
+      "target": "river",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "DERIVED",
+      "relation": "wakes reevaluation",
+      "source": "river",
+      "source_ref": "river/store.py + autonomy/control.py",
+      "target": "grace",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "enqueues declared action",
+      "source": "grace",
+      "source_ref": "autonomy/control.py:enqueue_declared_action",
+      "target": "relay",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "creates bounded execution",
+      "source": "relay",
+      "source_ref": "autonomy/control.py:ExecutionEnvelope",
+      "target": "execution_envelope",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "requests capability selection",
+      "source": "execution_envelope",
+      "source_ref": "reasoning/provider_registry.py",
+      "target": "providers",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "selects Codex execution",
+      "source": "providers",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "codex",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "selects bounded local adapter",
+      "source": "providers",
+      "source_ref": "autonomy/control.py",
+      "target": "local_execution",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-EXE-0001",
+      "derivation": "DERIVED",
+      "relation": "returns result for reconciliation",
+      "source": "codex",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "verification",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "returns result for reconciliation",
+      "source": "local_execution",
+      "source_ref": "autonomy/control.py",
+      "target": "verification",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "publishes only reconciled result",
+      "source": "verification",
+      "source_ref": "autonomy/control.py:reconcile_repository",
+      "target": "publication",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-EXE-0001",
+      "derivation": "DERIVED",
+      "relation": "emits completion/failure event",
+      "source": "verification",
+      "source_ref": "autonomy/control.py:execution_results",
+      "target": "river",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-EXE-0003",
+      "derivation": "DERIVED",
+      "relation": "reports timeout/nonzero failure",
+      "source": "codex",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "provider_failure",
+      "views": [
+        "engineering",
+        "events",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "records failure and recovery seam",
+      "source": "provider_failure",
+      "source_ref": "diagnostics/checkpoints",
+      "target": "diagnostics",
+      "views": [
+        "failures",
+        "context",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "completion/failure causes reevaluation",
+      "source": "river",
+      "source_ref": "autonomy/control.py:run_grace_cycle",
+      "target": "grace",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "redispatches ready work or escalates",
+      "source": "grace",
+      "source_ref": "autonomy/control.py:run_grace_cycle",
+      "target": "relay",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "records no-ready/capacity/quiescence decision",
+      "source": "grace",
+      "source_ref": "autonomy/control.py:run_grace_cycle",
+      "target": "diagnostics",
+      "views": [
+        "engineering",
+        "events",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION",
+      "relation": "provider completion is not global quiescence",
+      "source": "providers",
+      "source_ref": "docs/architecture/RIVERVIEW_FOUNDATION.md",
+      "target": "grace",
+      "views": [
+        "engineering",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RES-0001",
+      "derivation": "DERIVED",
+      "relation": "authenticated resident message",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:/api/chat",
+      "target": "resident_gateway_runtime",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "creates authenticated session",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:/session",
+      "target": "resident_gateway_runtime",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RES-0001",
+      "derivation": "DERIVED",
+      "relation": "checks classification/authority",
+      "source": "resident_gateway_runtime",
+      "source_ref": "residents/gateway.py:chat",
+      "target": "undercurrent",
+      "views": [
+        "resident",
+        "events"
+      ]
     },
     {
       "checkpoint": "RIV-REASON-0001",
-      "derivation": "derived",
-      "relation": "uses checkpoint",
-      "source": "riverview.reasoning.ollama",
-      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
-      "target": "diagnostics"
+      "derivation": "DERIVED",
+      "relation": "selects eligible provider",
+      "source": "resident_gateway_runtime",
+      "source_ref": "residents/gateway.py:chat",
+      "target": "providers",
+      "views": [
+        "resident",
+        "events"
+      ]
     },
     {
       "checkpoint": "RIV-REASON-0002",
-      "derivation": "derived",
-      "relation": "uses checkpoint",
+      "derivation": "DERIVED",
+      "relation": "dispatches local reasoning",
+      "source": "providers",
+      "source_ref": "reasoning/ollama.py",
+      "target": "ollama",
+      "views": [
+        "resident",
+        "events",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "returns provider text for resident expression",
+      "source": "ollama",
+      "source_ref": "reasoning/contracts.py",
+      "target": "resident_expression",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "records session turns",
+      "source": "resident_gateway_runtime",
+      "source_ref": "characters/store.py:ContinuityStore.record_session",
+      "target": "session_history",
+      "views": [
+        "resident",
+        "events",
+        "character",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emits resident submitted/completed events",
+      "source": "resident_gateway_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "resident",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RES-0001",
+      "derivation": "DERIVED",
+      "relation": "reports identity/provider failures",
+      "source": "resident_gateway_runtime",
+      "source_ref": "operator/openwebui.py:RIV-RES-0002",
+      "target": "diagnostics",
+      "views": [
+        "resident",
+        "events",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "publishes accepted version",
+      "source": "character_canon",
+      "source_ref": "characters/store.py:CharacterStore",
+      "target": "character_runtime",
+      "views": [
+        "character",
+        "resident",
+        "events",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "proposes/reviews/publishes version",
+      "source": "character_designer",
+      "source_ref": "characters/workflow.py",
+      "target": "character_canon",
+      "views": [
+        "character",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "reviews continuity candidates",
+      "source": "character_designer",
+      "source_ref": "characters/store.py:ContinuityStore.publish",
+      "target": "accepted_continuity",
+      "views": [
+        "character",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "available to new sessions",
+      "source": "accepted_continuity",
+      "source_ref": "characters/store.py:accepted",
+      "target": "continuity_runtime",
+      "views": [
+        "character",
+        "resident",
+        "events",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION",
+      "relation": "candidate only until review",
+      "source": "session_history",
+      "source_ref": "characters/store.py:record_session",
+      "target": "accepted_continuity",
+      "views": [
+        "character",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "version constrains expression",
+      "source": "character_canon",
+      "source_ref": "residents/gateway.py:character_version",
+      "target": "resident_expression",
+      "views": [
+        "character",
+        "resident",
+        "events",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-REASON-0002",
+      "derivation": "DERIVED",
+      "relation": "returns bounded provider failure",
+      "source": "provider_failure",
+      "source_ref": "operator/openwebui.py:resident_provider_failure",
+      "target": "resident_gateway_runtime",
+      "views": [
+        "resident",
+        "events",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "DERIVED",
+      "relation": "creates room",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:/api/rooms",
+      "target": "room_runtime",
+      "views": [
+        "room",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "stores bounded room identity/context",
+      "source": "room_runtime",
+      "source_ref": "residents/gateway.py:create_room",
+      "target": "room_context",
+      "views": [
+        "room",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "opens participant sessions",
+      "source": "room_runtime",
+      "source_ref": "residents/gateway.py:room_chat",
+      "target": "resident_gateway_runtime",
+      "views": [
+        "room",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "runs ordered participant turns",
+      "source": "room_runtime",
+      "source_ref": "residents/gateway.py:room_chat",
+      "target": "providers",
+      "views": [
+        "room",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "DERIVED",
+      "relation": "emits room created/completed events",
+      "source": "room_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "room",
+        "resident",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "DERIVED",
+      "relation": "reports room/session failure",
+      "source": "room_runtime",
+      "source_ref": "operator/openwebui.py:RIV-RES-0002",
+      "target": "diagnostics",
+      "views": [
+        "room",
+        "resident",
+        "events",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "preserves bounded consequences",
+      "source": "room_context",
+      "source_ref": "residents/gateway.py:room_chat",
+      "target": "accepted_continuity",
+      "views": [
+        "room",
+        "resident",
+        "events",
+        "character",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0015",
+      "derivation": "DERIVED",
+      "relation": "starts explicit capture",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:/api/transcribe",
+      "target": "microphone_worker",
+      "views": [
+        "resident",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0015",
+      "derivation": "DERIVED",
+      "relation": "returns reviewable transcript",
+      "source": "microphone_worker",
+      "source_ref": "operator/local_speech.py",
+      "target": "operator_runtime",
+      "views": [
+        "resident",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0015",
+      "derivation": "DERIVED",
+      "relation": "reports unavailable/timeout worker",
+      "source": "microphone_worker",
+      "source_ref": "operator/openwebui.py:RIV-UI-0015",
+      "target": "diagnostics",
+      "views": [
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "hashes reference-only file",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:submit",
+      "target": "artifact_reference",
+      "views": [
+        "resident",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "passes bounded reference",
+      "source": "artifact_reference",
+      "source_ref": "reasoning/contracts.py",
+      "target": "resident_gateway_runtime",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION",
+      "relation": "provides bounded control input",
+      "source": "controls",
+      "source_ref": "control contracts",
+      "target": "operator_runtime",
+      "views": [
+        "context"
+      ]
+    },
+    {
+      "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION",
+      "relation": "future projection only; Quest deferred",
+      "source": "spatial",
+      "source_ref": "spatial prototype",
+      "target": "operator_runtime",
+      "views": [
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "stores correlated reasoning request",
+      "source": "river",
+      "source_ref": "mailbox/store.py",
+      "target": "mailbox",
+      "views": [
+        "comms",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "causes bounded wakeup",
+      "source": "mailbox",
+      "source_ref": "doorbell/browser_bridge.py",
+      "target": "doorbell",
+      "views": [
+        "comms",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "wakes designated external participant",
+      "source": "doorbell",
+      "source_ref": "doorbell/contract.py",
+      "target": "chatgpt",
+      "views": [
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "submits correlated advisory response",
+      "source": "chatgpt",
+      "source_ref": "mailbox/store.py",
+      "target": "mailbox",
+      "views": [
+        "comms",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "records response event/correlation",
+      "source": "mailbox",
+      "source_ref": "mailbox/store.py:RiverEvent",
+      "target": "river",
+      "views": [
+        "comms",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "response event enables continuation",
+      "source": "river",
+      "source_ref": "grace/objectives.py",
+      "target": "grace",
+      "views": [
+        "comms",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-MCP-0006",
+      "derivation": "DERIVED",
+      "relation": "reads bounded mailbox projection",
+      "source": "mcp",
+      "source_ref": "mcp/read_model.py",
+      "target": "mailbox",
+      "views": [
+        "comms",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-NOT-0001",
+      "derivation": "DERIVED",
+      "relation": "checkpoint/critical event creates notification",
+      "source": "river",
+      "source_ref": "notifications.py:NotificationStore.emit",
+      "target": "notifications",
+      "views": [
+        "notifications",
+        "events",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "delivers bounded summary/reference",
+      "source": "notifications",
+      "source_ref": "notifications.py:NotificationStore",
+      "target": "notification_delivery",
+      "views": [
+        "notifications",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "records delivered state",
+      "source": "notification_delivery",
+      "source_ref": "notifications.py:mark_delivered",
+      "target": "notification_ack",
+      "views": [
+        "notifications",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "notifies Pat of bounded escalation",
+      "source": "notifications",
+      "source_ref": "comms/bindings.py",
+      "target": "steward",
+      "views": [
+        "notifications",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "hosts HTTP surface",
+      "source": "operator_service",
+      "source_ref": "operator/live_service.py",
+      "target": "operator_runtime",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "uses authoritative DB",
+      "source": "operator_service",
+      "source_ref": "database/connection.py",
+      "target": "postgres_service",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION",
+      "relation": "does not own River state",
+      "source": "ollama",
+      "source_ref": "reasoning/ollama.py",
+      "target": "postgres_service",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "bounded local worker boundary",
+      "source": "microphone_worker",
+      "source_ref": "operator/local_speech.py",
+      "target": "operator_service",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "reads bounded projections",
+      "source": "mcp",
+      "source_ref": "mcp/read_model.py",
+      "target": "postgres_service",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "configured experimental LAN route",
+      "source": "spatial_service",
+      "source_ref": "spatial prototype",
+      "target": "spatial",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "fallback when persistence unavailable",
+      "source": "diagnostics",
+      "source_ref": "diagnostics/store.py",
+      "target": "diagnostic_spool",
+      "views": [
+        "services",
+        "context",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "flow_event.resident.message.submitted",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.resident.message.submitted",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "resident_gateway_runtime",
+      "views": [
+        "events",
+        "resident"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "resident_gateway_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "flow_event.resident.response.completed",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.resident.response.completed",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "resident_gateway_runtime",
+      "views": [
+        "events",
+        "resident"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "room_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "flow_event.room.created",
+      "views": [
+        "room",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.room.created",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "room_runtime",
+      "views": [
+        "events",
+        "room"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "room_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "flow_event.room.turn.completed",
+      "views": [
+        "room",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.room.turn.completed",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "room_runtime",
+      "views": [
+        "events",
+        "room"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "microphone_worker",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "flow_event.microphone.transcript.completed",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.microphone.transcript.completed",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "operator_runtime",
+      "views": [
+        "events",
+        "resident"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "snapshot_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "flow_event.operator.snapshot.created",
+      "views": [
+        "context",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.operator.snapshot.created",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "diagnostics",
+      "views": [
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "resident_gateway_runtime",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "flow_event.grace.conversation.completed",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.grace.conversation.completed",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "operator/openwebui.py:emit_event",
+      "target": "grace",
+      "views": [
+        "events",
+        "resident"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "grace",
+      "source_ref": "autonomy/control.py:GraceMomentum",
+      "target": "flow_event.objective.stage.ready",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.objective.stage.ready",
+      "source_ref": "autonomy/control.py:GraceMomentum",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "autonomy/control.py:GraceMomentum",
+      "target": "relay",
+      "views": [
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "providers",
+      "source_ref": "autonomy/control.py:execution_results",
+      "target": "flow_event.provider.execution.completed",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.provider.execution.completed",
+      "source_ref": "autonomy/control.py:execution_results",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "autonomy/control.py:execution_results",
+      "target": "verification",
+      "views": [
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "providers",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "flow_event.provider.execution.failed",
+      "views": [
+        "engineering",
+        "events",
+        "failures"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.provider.execution.failed",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "diagnostics",
+      "views": [
+        "events",
+        "engineering",
+        "failures"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "codex",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "flow_event.codex.execution.completed",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.codex.execution.completed",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "autonomy/control.py:CodexCliAdapter",
+      "target": "verification",
+      "views": [
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "diagnostics",
+      "source_ref": "diagnostics/store.py",
+      "target": "flow_event.diagnostic.checkpoint.fired",
+      "views": [
+        "failures",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.diagnostic.checkpoint.fired",
+      "source_ref": "diagnostics/store.py",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "diagnostics/store.py",
+      "target": "notifications",
+      "views": [
+        "events",
+        "failures"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "notifications",
+      "source_ref": "notifications.py:NotificationStore.emit",
+      "target": "flow_event.notification.queued",
+      "views": [
+        "notifications",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.notification.queued",
+      "source_ref": "notifications.py:NotificationStore.emit",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "notifications.py:NotificationStore.emit",
+      "target": "notification_delivery",
+      "views": [
+        "events",
+        "notifications"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DECLARES/IMPLEMENTS runtime component",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "operator_runtime",
+      "views": [
+        "modules",
+        "context",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "requires core contract",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "core_contract",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "declares dependency",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "river",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "declares dependency",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "reasoning_contract",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "declares dependency",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "resident_gateway_contract",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "consumed by",
+      "source": "event.diagnostic.checkpoint",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "riverview.operator",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "consumed by",
+      "source": "event.resident.response.completed",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "riverview.operator",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "consumed by",
+      "source": "event.room.turn.completed",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "riverview.operator",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "event.operator.message.submitted",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "event.operator.snapshot.created",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "event.microphone.transcript.completed",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0013",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0014",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0019",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0020",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "exposes route",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "route./",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "exposes route",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "route./session",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "exposes route",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "route./api/chat",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "exposes route",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "route./api/rooms",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "exposes route",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "route./snapshot",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DECLARES/IMPLEMENTS runtime component",
       "source": "riverview.reasoning.ollama",
       "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
-      "target": "diagnostics"
+      "target": "ollama",
+      "views": [
+        "modules",
+        "context",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "requires core contract",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "core_contract",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "declares dependency",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "river",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "declares dependency",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "reasoning_contract",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "consumed by",
+      "source": "event.reasoning.request.submitted",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "riverview.reasoning.ollama",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "event.provider.response.completed",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "emitted by",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "event.provider.execution.failed",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-REASON-0001",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-REASON-0002",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures",
+        "context"
+      ]
     }
   ],
   "generated_from": [
     "src/riverview/topology/graph.py",
     "config/modules/*.json",
-    "River event contract",
+    "src/riverview/river/events.py",
+    "src/riverview/autonomy/control.py",
+    "src/riverview/residents/gateway.py",
+    "src/riverview/characters/*.py",
+    "src/riverview/mailbox/store.py",
+    "src/riverview/notifications.py",
     "Cookbook checkpoint registry"
   ],
-  "manual_annotation_policy": "manual edges are explicit and source-referenced",
+  "manifests": [
+    {
+      "actions_requested": [
+        "resident.chat",
+        "room.chat",
+        "operator.snapshot"
+      ],
+      "authority": [
+        "read:bounded",
+        "return:advisory"
+      ],
+      "capabilities_registered": [
+        "browser.operator",
+        "resident.selection",
+        "snapshot.export"
+      ],
+      "dependencies": [
+        "river",
+        "reasoning.contract",
+        "resident.gateway"
+      ],
+      "diagnostics": [
+        "RIV-UI-0013",
+        "RIV-UI-0014",
+        "RIV-UI-0019",
+        "RIV-UI-0020",
+        "RIV-RES-0002"
+      ],
+      "display_name": "Riverview Operator surface",
+      "events_consumed": [
+        "diagnostic.checkpoint",
+        "resident.response.completed",
+        "room.turn.completed"
+      ],
+      "events_emitted": [
+        "operator.message.submitted",
+        "operator.snapshot.created",
+        "microphone.transcript.completed"
+      ],
+      "module_id": "riverview.operator",
+      "module_type": "ui",
+      "module_version": "1.0.0",
+      "path": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "projections_read": [
+        "resident.registry",
+        "room.state",
+        "diagnostics.recent"
+      ],
+      "recovery": "bounded failure, diagnostic checkpoint, retry without authority expansion",
+      "required_core_contract": "riverview-core-contract-1.0",
+      "routes": [
+        "/",
+        "/session",
+        "/api/chat",
+        "/api/rooms",
+        "/snapshot"
+      ],
+      "storage_owner": "module-runtime"
+    },
+    {
+      "actions_requested": [
+        "reasoning.complete"
+      ],
+      "authority": [
+        "read:bounded",
+        "return:advisory"
+      ],
+      "capabilities_registered": [
+        "reasoning.advice",
+        "reasoning.local-only"
+      ],
+      "dependencies": [
+        "river",
+        "reasoning.contract"
+      ],
+      "diagnostics": [
+        "RIV-REASON-0001",
+        "RIV-REASON-0002"
+      ],
+      "display_name": "Loopback Ollama reasoning adapter",
+      "events_consumed": [
+        "reasoning.request.submitted"
+      ],
+      "events_emitted": [
+        "provider.response.completed",
+        "provider.execution.failed"
+      ],
+      "module_id": "riverview.reasoning.ollama",
+      "module_type": "provider",
+      "module_version": "1.0.0",
+      "path": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "projections_read": [
+        "provider.registry",
+        "classification.policy"
+      ],
+      "recovery": "bounded provider failure and retry through registry",
+      "required_core_contract": "riverview-core-contract-1.0",
+      "routes": [],
+      "storage_owner": "core-provider-registry"
+    }
+  ],
+  "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections.",
   "nodes": [
+    {
+      "id": "steward",
+      "kind": "external",
+      "label": "Steward",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
     {
       "id": "river",
       "kind": "core",
       "label": "River event runtime / PostgreSQL",
-      "source": "graph.py:CORE_NODES"
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "grace",
       "kind": "core",
       "label": "Grace / CME",
-      "source": "graph.py:CORE_NODES"
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "objective_state",
+      "kind": "core",
+      "label": "Objective and stage state",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "relay",
       "kind": "core",
-      "label": "Relay / work orders",
-      "source": "graph.py:CORE_NODES"
+      "label": "Relay / work-order lifecycle",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "execution_envelope",
+      "kind": "core",
+      "label": "Execution envelope",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "providers",
       "kind": "core",
       "label": "Provider registry / capacity",
-      "source": "graph.py:CORE_NODES"
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "core_contract",
+      "kind": "contract",
+      "label": "Riverview core contract 1.0",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "reasoning_contract",
+      "kind": "contract",
+      "label": "Provider-neutral reasoning contract",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "diagnostics",
       "kind": "core",
       "label": "Diagnostics / Cookbook",
-      "source": "graph.py:CORE_NODES"
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "notifications",
       "kind": "core",
-      "label": "Notification contract",
-      "source": "graph.py:CORE_NODES"
-    },
-    {
-      "id": "operator",
-      "kind": "module",
-      "label": "Riverview Operator",
-      "source": "graph.py:CORE_NODES"
-    },
-    {
-      "id": "residents",
-      "kind": "module",
-      "label": "Resident/session gateway",
-      "source": "graph.py:CORE_NODES"
-    },
-    {
-      "id": "room",
-      "kind": "module",
-      "label": "Conference room orchestration",
-      "source": "graph.py:CORE_NODES"
-    },
-    {
-      "id": "snapshot",
-      "kind": "module",
-      "label": "Snapshot export",
-      "source": "graph.py:CORE_NODES"
-    },
-    {
-      "id": "ollama",
-      "kind": "module",
-      "label": "Local Ollama provider",
-      "source": "graph.py:CORE_NODES"
-    },
-    {
-      "id": "mcp",
-      "kind": "module",
-      "label": "MCP / Comms bridge",
-      "source": "graph.py:CORE_NODES"
-    },
-    {
-      "id": "projects",
-      "kind": "module",
-      "label": "Projects / engineering intake",
-      "source": "graph.py:CORE_NODES"
+      "label": "Steward notification store",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "undercurrent",
       "kind": "core",
-      "label": "Undercurrent security broker",
-      "source": "graph.py:CORE_NODES"
+      "label": "Undercurrent classification/security",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "operator_runtime",
+      "kind": "runtime",
+      "label": "Riverview Operator runtime",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "resident_gateway_runtime",
+      "kind": "runtime",
+      "label": "Resident/session gateway runtime",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "room_runtime",
+      "kind": "runtime",
+      "label": "Conference room orchestration",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "character_runtime",
+      "kind": "runtime",
+      "label": "Accepted character runtime",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "continuity_runtime",
+      "kind": "runtime",
+      "label": "Continuity/session stores",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "snapshot_runtime",
+      "kind": "runtime",
+      "label": "Snapshot export",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "operator_module",
+      "kind": "module",
+      "label": "Riverview Operator module",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "resident_gateway_contract",
+      "kind": "contract",
+      "label": "Resident gateway contract",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "operator_contract",
+      "kind": "contract",
+      "label": "Operator UI contract",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "ollama",
+      "kind": "runtime",
+      "label": "Ollama local reasoning",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "codex",
+      "kind": "runtime",
+      "label": "Codex CLI execution adapter",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "local_execution",
+      "kind": "runtime",
+      "label": "Local execution adapters",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "verification",
+      "kind": "core",
+      "label": "Verification / reconciliation",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "publication",
+      "kind": "core",
+      "label": "Controlled Git publication",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "mailbox",
+      "kind": "core",
+      "label": "PostgreSQL mailbox",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "doorbell",
+      "kind": "runtime",
+      "label": "Local browser doorbell / wakeup",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "mcp",
+      "kind": "module",
+      "label": "MCP / Comms read bridge",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "chatgpt",
+      "kind": "external",
+      "label": "ChatGPT reasoning participant",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "controls",
       "kind": "module",
-      "label": "Controls / device adapters",
-      "source": "graph.py:CORE_NODES"
+      "label": "Device/control adapters",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "microphone_worker",
+      "kind": "runtime",
+      "label": "PowerShell/System.Speech worker",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "artifact_reference",
+      "kind": "runtime",
+      "label": "Reference-only artifact intake",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
       "id": "spatial",
+      "kind": "deferred",
+      "label": "LAN WebXR / Quest prototype",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "projects",
       "kind": "module",
-      "label": "Spatial / Quest (deferred)",
-      "source": "graph.py:CORE_NODES"
+      "label": "Project intake / repository",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
-      "id": "reasoning.contract",
+      "id": "character_designer",
+      "kind": "module",
+      "label": "Character Designer workflow",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "session_history",
+      "kind": "runtime",
+      "label": "Session history",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "accepted_continuity",
+      "kind": "runtime",
+      "label": "Accepted durable continuity",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "character_canon",
+      "kind": "core",
+      "label": "Versioned accepted character canon",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "room_context",
+      "kind": "runtime",
+      "label": "Bounded shared room context",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "resident_expression",
       "kind": "contract",
-      "label": "Provider-neutral reasoning contract",
-      "source": "graph.py:CORE_NODES"
+      "label": "Resident expression boundary",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
-      "id": "resident.gateway",
-      "kind": "contract",
-      "label": "Resident gateway contract",
-      "source": "graph.py:CORE_NODES"
+      "id": "provider_failure",
+      "kind": "failure",
+      "label": "Provider failure/recovery seam",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
-      "id": "steward",
-      "kind": "external",
-      "label": "Steward",
-      "source": "graph.py:CORE_NODES"
+      "id": "diagnostic_spool",
+      "kind": "runtime",
+      "label": "Diagnostic fallback/spool",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
     },
     {
-      "contract": "riverview-core-contract-1.0",
+      "id": "notification_delivery",
+      "kind": "runtime",
+      "label": "Notification delivery",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "notification_ack",
+      "kind": "runtime",
+      "label": "Notification acknowledgement state",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "postgres_service",
+      "kind": "service",
+      "label": "PostgreSQL service",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "operator_service",
+      "kind": "service",
+      "label": "Operator service 127.0.0.1:18082",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "spatial_service",
+      "kind": "service",
+      "label": "Spatial service 192.168.1.88:18443 (deferred/experimental)",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "flow_event.resident.message.submitted",
+      "kind": "event",
+      "label": "resident.message.submitted",
+      "source": "operator/openwebui.py:emit_event",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.resident.response.completed",
+      "kind": "event",
+      "label": "resident.response.completed",
+      "source": "operator/openwebui.py:emit_event",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.room.created",
+      "kind": "event",
+      "label": "room.created",
+      "source": "operator/openwebui.py:emit_event",
+      "views": [
+        "room",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.room.turn.completed",
+      "kind": "event",
+      "label": "room.turn.completed",
+      "source": "operator/openwebui.py:emit_event",
+      "views": [
+        "room",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.microphone.transcript.completed",
+      "kind": "event",
+      "label": "microphone.transcript.completed",
+      "source": "operator/openwebui.py:emit_event",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.operator.snapshot.created",
+      "kind": "event",
+      "label": "operator.snapshot.created",
+      "source": "operator/openwebui.py:emit_event",
+      "views": [
+        "context",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.grace.conversation.completed",
+      "kind": "event",
+      "label": "grace.conversation.completed",
+      "source": "operator/openwebui.py:emit_event",
+      "views": [
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.objective.stage.ready",
+      "kind": "event",
+      "label": "objective.stage.ready",
+      "source": "autonomy/control.py:GraceMomentum",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.provider.execution.completed",
+      "kind": "event",
+      "label": "provider.execution.completed",
+      "source": "autonomy/control.py:execution_results",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.provider.execution.failed",
+      "kind": "event",
+      "label": "provider.execution.failed",
+      "source": "autonomy/control.py:CodexCliAdapter",
+      "views": [
+        "engineering",
+        "events",
+        "failures"
+      ]
+    },
+    {
+      "id": "flow_event.codex.execution.completed",
+      "kind": "event",
+      "label": "codex.execution.completed",
+      "source": "autonomy/control.py:CodexCliAdapter",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.diagnostic.checkpoint.fired",
+      "kind": "event",
+      "label": "diagnostic.checkpoint.fired",
+      "source": "diagnostics/store.py",
+      "views": [
+        "failures",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.notification.queued",
+      "kind": "event",
+      "label": "notification.queued",
+      "source": "notifications.py:NotificationStore.emit",
+      "views": [
+        "notifications",
+        "events"
+      ]
+    },
+    {
       "id": "riverview.operator",
-      "kind": "declared-module",
+      "kind": "module",
       "label": "Riverview Operator surface",
-      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json"
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "modules",
+        "context"
+      ]
     },
     {
-      "contract": "riverview-core-contract-1.0",
+      "id": "event.diagnostic.checkpoint",
+      "kind": "event",
+      "label": "diagnostic.checkpoint",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.resident.response.completed",
+      "kind": "event",
+      "label": "resident.response.completed",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.room.turn.completed",
+      "kind": "event",
+      "label": "room.turn.completed",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.operator.message.submitted",
+      "kind": "event",
+      "label": "operator.message.submitted",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.operator.snapshot.created",
+      "kind": "event",
+      "label": "operator.snapshot.created",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.microphone.transcript.completed",
+      "kind": "event",
+      "label": "microphone.transcript.completed",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "route./",
+      "kind": "route",
+      "label": "/",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "id": "route./session",
+      "kind": "route",
+      "label": "/session",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "id": "route./api/chat",
+      "kind": "route",
+      "label": "/api/chat",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "id": "route./api/rooms",
+      "kind": "route",
+      "label": "/api/rooms",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
+      "id": "route./snapshot",
+      "kind": "route",
+      "label": "/snapshot",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "views": [
+        "modules",
+        "context",
+        "services",
+        "context"
+      ]
+    },
+    {
       "id": "riverview.reasoning.ollama",
-      "kind": "declared-module",
+      "kind": "module",
       "label": "Loopback Ollama reasoning adapter",
-      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json"
+      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.reasoning.request.submitted",
+      "kind": "event",
+      "label": "reasoning.request.submitted",
+      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.provider.response.completed",
+      "kind": "event",
+      "label": "provider.response.completed",
+      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
+    },
+    {
+      "id": "event.provider.execution.failed",
+      "kind": "event",
+      "label": "provider.execution.failed",
+      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "views": [
+        "events",
+        "context",
+        "modules",
+        "context"
+      ]
     }
   ],
-  "schema_version": "riverview-system-graph-1.0",
+  "questions": {
+    "10_microphone": {
+      "evidence": [
+        "microphone_worker->operator_runtime->resident_gateway_runtime"
+      ],
+      "status": "PASS"
+    },
+    "11_microphone_failure": {
+      "evidence": [
+        "microphone_worker->diagnostics",
+        "RIV-UI-0015"
+      ],
+      "status": "PASS"
+    },
+    "12_steward_notification": {
+      "evidence": [
+        "river->notifications->notification_delivery->steward"
+      ],
+      "status": "PASS"
+    },
+    "13_snapshot": {
+      "evidence": [
+        "operator_runtime->snapshot_runtime",
+        "RIV-UI-0019"
+      ],
+      "status": "PASS"
+    },
+    "14_chatgpt_bridge": {
+      "evidence": [
+        "mailbox->doorbell->chatgpt->mailbox"
+      ],
+      "status": "PASS"
+    },
+    "15_ollama_failure": {
+      "evidence": [
+        "ollama->provider_failure->diagnostics"
+      ],
+      "status": "PASS"
+    },
+    "16_codex_failure": {
+      "evidence": [
+        "codex->provider_failure->diagnostics"
+      ],
+      "status": "PASS"
+    },
+    "17_operator_js": {
+      "evidence": [
+        "RIV-UI-0020"
+      ],
+      "status": "PASS"
+    },
+    "18_resident_identity": {
+      "evidence": [
+        "RIV-RES-0001",
+        "resident_expression"
+      ],
+      "status": "PASS"
+    },
+    "19_operator_module": {
+      "evidence": [
+        "riverview.operator->operator_runtime"
+      ],
+      "status": "PASS"
+    },
+    "1_wake_grace": {
+      "evidence": [
+        "river->grace",
+        "RIV-GRC-0004"
+      ],
+      "status": "PASS"
+    },
+    "20_operator_contract": {
+      "evidence": [
+        "riverview.operator->core_contract",
+        "operator_runtime->resident_gateway_contract"
+      ],
+      "status": "PASS"
+    },
+    "21_quest_deferred": {
+      "evidence": [
+        "spatial_service",
+        "spatial",
+        "deferred/experimental"
+      ],
+      "status": "PASS"
+    },
+    "2_trigger_execution": {
+      "evidence": [
+        "grace->relay->execution_envelope"
+      ],
+      "status": "PASS"
+    },
+    "3_completion_return": {
+      "evidence": [
+        "verification->river->grace"
+      ],
+      "status": "PASS"
+    },
+    "4_not_quiescence": {
+      "evidence": [
+        "providers->grace",
+        "provider completion is not global quiescence"
+      ],
+      "status": "PASS"
+    },
+    "5_postgresql": {
+      "evidence": [
+        "river",
+        "postgres_service",
+        "mcp->postgres_service"
+      ],
+      "status": "PASS"
+    },
+    "6_helen_to_model": {
+      "evidence": [
+        "operator_runtime->resident_gateway_runtime->providers->ollama"
+      ],
+      "status": "PASS"
+    },
+    "7_character_version": {
+      "evidence": [
+        "character_canon->character_runtime->resident_expression"
+      ],
+      "status": "PASS"
+    },
+    "8_continuity_distinction": {
+      "evidence": [
+        "session_history",
+        "accepted_continuity"
+      ],
+      "status": "PASS"
+    },
+    "9_room_turn": {
+      "evidence": [
+        "room_runtime->resident_gateway_runtime->providers"
+      ],
+      "status": "PASS"
+    }
+  },
+  "schema_version": "riverview-system-graph-2.0",
   "views": [
+    "character",
+    "comms",
     "context",
+    "engineering",
     "events",
-    "services",
     "failures",
     "modules",
+    "notifications",
     "resident",
     "room",
-    "engineering",
-    "mcp",
-    "notifications"
+    "services"
   ]
 }

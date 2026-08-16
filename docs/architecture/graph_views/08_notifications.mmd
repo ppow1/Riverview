@@ -1,0 +1,20 @@
+flowchart LR
+    steward["Steward"]
+    river["River event runtime / PostgreSQL"]
+    grace["Grace / CME"]
+    objective_state["Objective and stage state"]
+    relay["Relay / work-order lifecycle"]
+    execution_envelope["Execution envelope"]
+    providers["Provider registry / capacity"]
+    diagnostics["Diagnostics / Cookbook"]
+    notifications["Steward notification store"]
+    undercurrent["Undercurrent classification/security"]
+    verification["Verification / reconciliation"]
+    publication["Controlled Git publication"]
+    mailbox["PostgreSQL mailbox"]
+    chatgpt["ChatGPT reasoning participant"]
+    character_canon["Versioned accepted character canon"]
+    flow_event_notification_queued["notification.queued"]
+    river -->|checkpoint/critical event creates notification| notifications
+    notifications -->|notifies Pat of bounded escalation| steward
+    notifications -->|EMITS| flow_event_notification_queued
