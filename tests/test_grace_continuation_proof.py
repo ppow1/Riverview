@@ -36,6 +36,19 @@ def test_continuation_stops_at_no_progress_boundary() -> None:
     assert result["stop_reason"] == "no_progress_or_external_boundary"
 
 
+def test_continuation_uses_declared_action_when_no_callback_is_supplied() -> None:
+    engine = ContinuousMomentumEngine()
+    frontier = [{"objective_key": "one", "stage_key": "build", "declared_action": {"action_type": "relay.noop", "parameters": {}}}]
+    engine.frontier = Mock(side_effect=[frontier, [], []])  # type: ignore[method-assign]
+    engine.cycle = Mock(return_value={"evaluated": [{"objective_key": "one", "stage_key": "build", "decision": "ready", "declared_action": frontier[0]["declared_action"]}]})  # type: ignore[method-assign]
+    engine.enqueue_declared_action = Mock()  # type: ignore[method-assign]
+
+    result = engine.cycle_until_quiescent()
+
+    engine.enqueue_declared_action.assert_called_once_with("one", "build")
+    assert result["redispatched"] == 1
+
+
 def test_continuation_does_not_redispatch_a_steward_checkpoint() -> None:
     engine = ContinuousMomentumEngine()
     guarded = {"objective_key": "one", "stage_key": "approve", "steward_checkpoint": True}

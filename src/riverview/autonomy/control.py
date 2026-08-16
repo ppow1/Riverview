@@ -326,6 +326,11 @@ class ContinuousMomentumEngine:
                 for item in ready:
                     redispatch(item)
                     redispatched += 1
+            else:
+                for item in ready:
+                    if isinstance(item.get("declared_action"), dict):
+                        self.enqueue_declared_action(item["objective_key"], item["stage_key"])
+                        redispatched += 1
             next_frontier = self.frontier(limit=limit)
             if not next_frontier:
                 stop_reason = "frontier_empty"
