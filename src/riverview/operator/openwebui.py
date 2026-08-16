@@ -105,6 +105,9 @@ class RiverviewOpenWebUIService:
             def do_GET(self) -> None:
                 if self.path == "/":
                     self._send_html(UI_HTML)
+                elif self.path == "/spatial":
+                    from riverview.spatial.prototype import prototype_html
+                    self._send_html(prototype_html())
                 elif self.path == "/health":
                     self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity})
                 elif self.path == "/api/models" and self._auth():

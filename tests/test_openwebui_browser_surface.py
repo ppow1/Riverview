@@ -25,5 +25,8 @@ def test_browser_operator_surface_is_real_html_and_artifact_aware() -> None:
         assert "reference-only" in page
         assert "Enter an instruction describing what you want Riverview to do with this artifact." in page
         assert "Capture bounded local microphone transcription" in page
+        with urlopen("http://127.0.0.1:18083/spatial") as response:
+            spatial = response.read().decode()
+        assert "immersive-vr" in spatial
     finally:
         service.stop()
