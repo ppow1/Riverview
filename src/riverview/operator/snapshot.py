@@ -57,6 +57,18 @@ def _diagnostics() -> list[dict[str, Any]]:
         return []
 
 
+def _events() -> list[dict[str, Any]]:
+    """Return only bounded River lineage metadata; never event payloads."""
+    try:
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""SELECT event_id,event_type,aggregate_type,aggregate_id,correlation_id,causation_id,occurred_at
+                             FROM river_events ORDER BY sequence_id DESC LIMIT 25""")
+            columns = [item.name for item in cursor.description]
+            return [_redact(dict(zip(columns, row, strict=True))) for row in cursor.fetchall()]
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return []
+
+
 def build_snapshot(payload: dict[str, Any], *, service_identity: str, service_url: str, pid: int | None = None) -> tuple[bytes, str]:
     generated = datetime.now(UTC)
     dom = _safe_dom(str(payload.get("current_dom", "")))
@@ -71,6 +83,7 @@ def build_snapshot(payload: dict[str, Any], *, service_identity: str, service_ur
         "service_url": service_url, "health": "live", "provider_identities": safe_payload.get("provider_identities", []),
         "resident_registry_summary": safe_payload.get("api_state", {}).get("residents", safe_payload.get("resident_state", {})), "room": safe_payload.get("room_state", {}),
         "diagnostic_checkpoint_ids": [row.get("checkpoint_id") for row in _diagnostics()],
+        "recent_event_lineage": _events(),
     }
     resident_state = safe_payload.get("resident_state", {})
     room_state = safe_payload.get("room_state", {})

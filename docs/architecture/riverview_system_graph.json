@@ -1,0 +1,410 @@
+{
+  "checkpoints": [
+    "RIV-UI-0009",
+    "RIV-UI-0013",
+    "RIV-UI-0014",
+    "RIV-UI-0015",
+    "RIV-UI-0019",
+    "RIV-UI-0020",
+    "RIV-RES-0001",
+    "RIV-RES-0002",
+    "RIV-REASON-0001",
+    "RIV-REASON-0002",
+    "RIV-DIA-0001",
+    "RIV-DIA-0002",
+    "RIV-GRC-0004",
+    "RIV-NOT-0001",
+    "RIV-MCP-0006"
+  ],
+  "edges": [
+    {
+      "checkpoint": "RIV-UI-0009",
+      "derivation": "derived",
+      "relation": "publishes operator/resident/room events",
+      "source": "operator",
+      "source_ref": "openwebui.py:emit_event",
+      "target": "river"
+    },
+    {
+      "checkpoint": "RIV-RES-0001",
+      "derivation": "derived",
+      "relation": "submits bounded resident requests",
+      "source": "operator",
+      "source_ref": "openwebui.py:/api/chat",
+      "target": "residents"
+    },
+    {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "derived",
+      "relation": "submits room turns",
+      "source": "operator",
+      "source_ref": "openwebui.py:/api/rooms",
+      "target": "room"
+    },
+    {
+      "checkpoint": "RIV-UI-0019",
+      "derivation": "derived",
+      "relation": "requests diagnostic bundle",
+      "source": "operator",
+      "source_ref": "openwebui.py:/snapshot",
+      "target": "snapshot"
+    },
+    {
+      "checkpoint": "RIV-UI-0015",
+      "derivation": "derived",
+      "relation": "receives browser/microphone input",
+      "source": "operator",
+      "source_ref": "openwebui.py:/api/transcribe",
+      "target": "controls"
+    },
+    {
+      "checkpoint": "RIV-RES-0001",
+      "derivation": "derived",
+      "relation": "checks classification and bounded references",
+      "source": "residents",
+      "source_ref": "residents/gateway.py",
+      "target": "undercurrent"
+    },
+    {
+      "checkpoint": "RIV-REASON-0001",
+      "derivation": "derived",
+      "relation": "selects eligible provider",
+      "source": "residents",
+      "source_ref": "reasoning/contract.py",
+      "target": "providers"
+    },
+    {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "derived",
+      "relation": "orchestrates participant sessions",
+      "source": "room",
+      "source_ref": "residents/gateway.py:room_chat",
+      "target": "residents"
+    },
+    {
+      "checkpoint": "RIV-REASON-0002",
+      "derivation": "derived",
+      "relation": "dispatches local reasoning",
+      "source": "providers",
+      "source_ref": "reasoning/provider_registry.py",
+      "target": "ollama"
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "derived",
+      "relation": "wakes CME on durable events",
+      "source": "river",
+      "source_ref": "river/events.py + grace",
+      "target": "grace"
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "derived",
+      "relation": "evaluates ready objective stages",
+      "source": "grace",
+      "source_ref": "grace/objectives.py",
+      "target": "relay"
+    },
+    {
+      "checkpoint": "RIV-REASON-0001",
+      "derivation": "derived",
+      "relation": "dispatches execution work",
+      "source": "relay",
+      "source_ref": "relay/work_orders.py",
+      "target": "providers"
+    },
+    {
+      "checkpoint": "RIV-DIA-0001",
+      "derivation": "derived",
+      "relation": "records event/checkpoint lineage",
+      "source": "river",
+      "source_ref": "river/store.py",
+      "target": "diagnostics"
+    },
+    {
+      "checkpoint": "RIV-NOT-0001",
+      "derivation": "derived",
+      "relation": "routes bounded escalation",
+      "source": "diagnostics",
+      "source_ref": "notifications",
+      "target": "notifications"
+    },
+    {
+      "checkpoint": "RIV-MCP-0006",
+      "derivation": "derived",
+      "relation": "reads bounded Comms/mailbox state",
+      "source": "mcp",
+      "source_ref": "mcp",
+      "target": "river"
+    },
+    {
+      "derivation": "manual",
+      "relation": "addresses Grace and accepts bounded decisions",
+      "source": "steward",
+      "source_ref": "Comms / Steward boundary",
+      "target": "mcp"
+    },
+    {
+      "derivation": "manual",
+      "relation": "promotes explicit engineering seed",
+      "source": "projects",
+      "source_ref": "grace/objective_acceptance.py",
+      "target": "grace"
+    },
+    {
+      "derivation": "manual",
+      "relation": "protects classified state boundary",
+      "source": "undercurrent",
+      "source_ref": "classification contracts",
+      "target": "river"
+    },
+    {
+      "derivation": "manual",
+      "relation": "future spatial projection",
+      "source": "spatial",
+      "source_ref": "spatial prototype (deferred)",
+      "target": "operator"
+    },
+    {
+      "derivation": "derived",
+      "relation": "declares dependency",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "river"
+    },
+    {
+      "derivation": "derived",
+      "relation": "declares dependency",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "reasoning.contract"
+    },
+    {
+      "derivation": "derived",
+      "relation": "declares dependency",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "resident.gateway"
+    },
+    {
+      "checkpoint": "RIV-UI-0013",
+      "derivation": "derived",
+      "relation": "uses checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics"
+    },
+    {
+      "checkpoint": "RIV-UI-0014",
+      "derivation": "derived",
+      "relation": "uses checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics"
+    },
+    {
+      "checkpoint": "RIV-UI-0019",
+      "derivation": "derived",
+      "relation": "uses checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics"
+    },
+    {
+      "checkpoint": "RIV-UI-0020",
+      "derivation": "derived",
+      "relation": "uses checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics"
+    },
+    {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "derived",
+      "relation": "uses checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\operator.json",
+      "target": "diagnostics"
+    },
+    {
+      "derivation": "derived",
+      "relation": "declares dependency",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "river"
+    },
+    {
+      "derivation": "derived",
+      "relation": "declares dependency",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "reasoning.contract"
+    },
+    {
+      "checkpoint": "RIV-REASON-0001",
+      "derivation": "derived",
+      "relation": "uses checkpoint",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "diagnostics"
+    },
+    {
+      "checkpoint": "RIV-REASON-0002",
+      "derivation": "derived",
+      "relation": "uses checkpoint",
+      "source": "riverview.reasoning.ollama",
+      "source_ref": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json",
+      "target": "diagnostics"
+    }
+  ],
+  "generated_from": [
+    "src/riverview/topology/graph.py",
+    "config/modules/*.json",
+    "River event contract",
+    "Cookbook checkpoint registry"
+  ],
+  "manual_annotation_policy": "manual edges are explicit and source-referenced",
+  "nodes": [
+    {
+      "id": "river",
+      "kind": "core",
+      "label": "River event runtime / PostgreSQL",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "grace",
+      "kind": "core",
+      "label": "Grace / CME",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "relay",
+      "kind": "core",
+      "label": "Relay / work orders",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "providers",
+      "kind": "core",
+      "label": "Provider registry / capacity",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "diagnostics",
+      "kind": "core",
+      "label": "Diagnostics / Cookbook",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "notifications",
+      "kind": "core",
+      "label": "Notification contract",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "operator",
+      "kind": "module",
+      "label": "Riverview Operator",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "residents",
+      "kind": "module",
+      "label": "Resident/session gateway",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "room",
+      "kind": "module",
+      "label": "Conference room orchestration",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "snapshot",
+      "kind": "module",
+      "label": "Snapshot export",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "ollama",
+      "kind": "module",
+      "label": "Local Ollama provider",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "mcp",
+      "kind": "module",
+      "label": "MCP / Comms bridge",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "projects",
+      "kind": "module",
+      "label": "Projects / engineering intake",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "undercurrent",
+      "kind": "core",
+      "label": "Undercurrent security broker",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "controls",
+      "kind": "module",
+      "label": "Controls / device adapters",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "spatial",
+      "kind": "module",
+      "label": "Spatial / Quest (deferred)",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "reasoning.contract",
+      "kind": "contract",
+      "label": "Provider-neutral reasoning contract",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "resident.gateway",
+      "kind": "contract",
+      "label": "Resident gateway contract",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "id": "steward",
+      "kind": "external",
+      "label": "Steward",
+      "source": "graph.py:CORE_NODES"
+    },
+    {
+      "contract": "riverview-core-contract-1.0",
+      "id": "riverview.operator",
+      "kind": "declared-module",
+      "label": "Riverview Operator surface",
+      "source": "A:\\Riverview\\repo\\config\\modules\\operator.json"
+    },
+    {
+      "contract": "riverview-core-contract-1.0",
+      "id": "riverview.reasoning.ollama",
+      "kind": "declared-module",
+      "label": "Loopback Ollama reasoning adapter",
+      "source": "A:\\Riverview\\repo\\config\\modules\\reasoning_ollama.json"
+    }
+  ],
+  "schema_version": "riverview-system-graph-1.0",
+  "views": [
+    "context",
+    "events",
+    "services",
+    "failures",
+    "modules",
+    "resident",
+    "room",
+    "engineering",
+    "mcp",
+    "notifications"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "module_id": "riverview.operator",
+  "display_name": "Riverview Operator surface",
+  "module_version": "1.0.0",
+  "required_core_contract": "riverview-core-contract-1.0",
+  "module_type": "ui",
+  "events_consumed": ["diagnostic.checkpoint", "resident.response.completed", "room.turn.completed"],
+  "events_emitted": ["operator.message.submitted", "operator.snapshot.created", "microphone.transcript.completed"],
+  "actions_requested": ["resident.chat", "room.chat", "operator.snapshot"],
+  "projections_read": ["resident.registry", "room.state", "diagnostics.recent"],
+  "capabilities_registered": ["browser.operator", "resident.selection", "snapshot.export"],
+  "routes": ["/", "/session", "/api/chat", "/api/rooms", "/snapshot"],
+  "diagnostics": ["RIV-UI-0013", "RIV-UI-0014", "RIV-UI-0019", "RIV-UI-0020", "RIV-RES-0002"],
+  "storage_owner": "module-runtime",
+  "dependencies": ["river", "reasoning.contract", "resident.gateway"],
+  "authority": ["read:bounded", "return:advisory"],
+  "recovery": "bounded failure, diagnostic checkpoint, retry without authority expansion"
+}

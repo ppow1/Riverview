@@ -14,12 +14,14 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
 from riverview.operator.snapshot import build_snapshot
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.residents.gateway import ResidentConversationGateway
+from riverview.river.events import Classification, RiverEvent
+from riverview.river.store import EventStore
 
 UI_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Riverview Operator</title>
@@ -54,7 +56,7 @@ async function submit(){
 async function localAuth(){const response=await fetch('/session',{method:'POST'}); if(response.ok){$('status').textContent='Authenticated through local Riverview credential handoff';await loadResidents();}else $('status').textContent='Authentication handoff failed';}
 async function loadResidents(){const response=await fetch('/api/residents');if(!response.ok)return;const body=await response.json();for(const resident of body.residents){const option=document.createElement('option');option.value=resident.resident_id;option.textContent=resident.name+' — '+resident.role;$('resident').appendChild(option);}}
 async function createRoom(){const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participants:['RES-000001','RES-000002','RES-000003']})});const body=await response.json();if(!response.ok)throw Error(body.error||'room creation failed');$('room-state').textContent='Room '+body.room_id+' ready; use the selected resident to submit a bounded turn.';window.riverviewRoomId=body.room_id;}
-async function snapshot(){ $('status').textContent='Creating snapshot…'; try { const clone=document.documentElement.cloneNode(true); clone.querySelector('#token')?.setAttribute('value','[REDACTED]'); clone.querySelector('#token')?.removeAttribute('value'); clone.querySelector('#artifact')?.removeAttribute('value'); clone.querySelectorAll('textarea').forEach(x=>x.textContent=x.value); const file=$('artifact').files[0]; const refs=file?['browser-artifact:'+file.name]:[]; let roomState={}; if(window.riverviewRoomId){const room=await fetch('/api/rooms/'+window.riverviewRoomId);if(room.ok)roomState=await room.json();} const health=await fetch('/health'); const residents=await fetch('/api/residents'); const body={current_dom:'<!doctype html>\n'+clone.outerHTML,page_url:location.href,title:document.title,visible_status:$('status').textContent,selected_resident:$('resident').value,active_resident_display:$('resident-state').textContent,composer:$('message').value,result:$('result').textContent,correlation_ids:($('result').textContent.match(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi)||[]),artifact_refs:refs,room_id:window.riverviewRoomId||null,room_state:roomState,resident_state:{selected_resident:$('resident').value,active_display:$('resident-state').textContent,session_ids:residentSessions},api_state:{health:health.ok?await health.json():{status:false},residents:residents.ok?await residents.json():{available:false}},provider_identities:['ollama:qwen3-coder:30b-qwencode-20k']}; const response=await fetch('/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!response.ok)throw Error('snapshot failed'); const blob=await response.blob(); const url=URL.createObjectURL(blob), link=document.createElement('a'); link.href=url; link.download=(response.headers.get('Content-Disposition')||'riverview-snapshot.zip').split('filename="')[1]?.split('"')[0]||'riverview-snapshot.zip'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); $('status').textContent='Snapshot downloaded.'; } catch(error) { $('status').textContent='Snapshot failed — RIV-UI-0019'; $('result').textContent=String(error); } }
+async function snapshot(){ $('status').textContent='Creating snapshot…'; try { const clone=document.documentElement.cloneNode(true); clone.querySelector('#token')?.setAttribute('value','[REDACTED]'); clone.querySelector('#token')?.removeAttribute('value'); clone.querySelector('#artifact')?.removeAttribute('value'); clone.querySelectorAll('textarea').forEach(x=>x.textContent=x.value); const file=$('artifact').files[0]; const refs=file?['browser-artifact:'+file.name]:[]; let roomState={}; if(window.riverviewRoomId){const room=await fetch('/api/rooms/'+window.riverviewRoomId);if(room.ok)roomState=await room.json();} const health=await fetch('/health'); const residents=await fetch('/api/residents'); const body={current_dom:'<!doctype html>'+clone.outerHTML,page_url:location.href,title:document.title,visible_status:$('status').textContent,selected_resident:$('resident').value,active_resident_display:$('resident-state').textContent,composer:$('message').value,result:$('result').textContent,correlation_ids:($('result').textContent.match(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi)||[]),artifact_refs:refs,room_id:window.riverviewRoomId||null,room_state:roomState,resident_state:{selected_resident:$('resident').value,active_display:$('resident-state').textContent,session_ids:residentSessions},api_state:{health:health.ok?await health.json():{status:false},residents:residents.ok?await residents.json():{available:false}},provider_identities:['ollama:qwen3-coder:30b-qwencode-20k']}; const response=await fetch('/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!response.ok)throw Error('snapshot failed'); const blob=await response.blob(); const url=URL.createObjectURL(blob), link=document.createElement('a'); link.href=url; link.download=(response.headers.get('Content-Disposition')||'riverview-snapshot.zip').split('filename="')[1]?.split('"')[0]||'riverview-snapshot.zip'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); $('status').textContent='Snapshot downloaded.'; } catch(error) { $('status').textContent='Snapshot failed — RIV-UI-0019'; $('result').textContent=String(error); } }
 async function mic(){ $('status').textContent='Listening for up to 8 seconds…'; const response=await fetch('/api/transcribe',{method:'POST'}); const body=await response.json(); if(!response.ok) throw Error(body.error||'transcription failed'); $('message').value=body.text; $('status').textContent='Local transcription ready; review before submitting.'; }
 $('local-auth').addEventListener('click',()=>localAuth().catch(error=>{$('status').textContent='Authentication handoff failed';}));
 $('mic').addEventListener('click',()=>mic().catch(error=>{$('status').textContent='Local transcription failed: '+error;}));
@@ -88,6 +90,7 @@ class RiverviewOpenWebUIService:
         self.resident_gateway = resident_gateway or ResidentConversationGateway.from_evidence()
         self.sessions: set[str] = set()
         self.diagnostics = DiagnosticStore()
+        self.events = EventStore()
         service = self
 
         def diagnostic(checkpoint: str, operation: str, failure_class: str, summary: str) -> None:
@@ -100,6 +103,27 @@ class RiverviewOpenWebUIService:
                 ))
             except (OSError, RuntimeError, TypeError, ValueError):
                 pass
+
+        def emit_event(event_type: str, aggregate_type: str, aggregate_id: str, correlation_id: UUID | None = None, payload: dict[str, object] | None = None) -> None:
+            """Publish a bounded workflow fact; never make the UI depend on River availability."""
+            try:
+                aggregate_uuid = UUID(aggregate_id)
+            except (ValueError, AttributeError):
+                aggregate_uuid = uuid4()
+            try:
+                service.events.append(RiverEvent(
+                    event_type=event_type,
+                    aggregate_type=aggregate_type,
+                    aggregate_id=aggregate_uuid,
+                    idempotency_key=f"operator:{event_type}:{aggregate_id}:{correlation_id or uuid4()}",
+                    correlation_id=correlation_id or uuid4(),
+                    classification=Classification.RIVER,
+                    payload=payload or {},
+                ))
+            except (OSError, RuntimeError, TypeError, ValueError):
+                diagnostic("RIV-DIA-0001", "river_event", "event_persistence_failure", f"Bounded event {event_type} could not be persisted.")
+
+        service.emit_event = emit_event
 
         class Handler(BaseHTTPRequestHandler):
             def _send(self, status: HTTPStatus, payload: dict[str, object]) -> None:
@@ -177,6 +201,7 @@ class RiverviewOpenWebUIService:
                     try:
                         from riverview.operator.local_speech import capture_windows_speech
                         result = capture_windows_speech()
+                        emit_event("microphone.transcript.completed", "operator", str(uuid4()), payload={"provider_id": result.provider_id, "retention": result.retention, "audio_retained": False})
                         self._send(HTTPStatus.OK, {"provider_id": result.provider_id, "text": result.text, "retention": result.retention})
                     except (RuntimeError, ValueError):
                         diagnostic("RIV-UI-0015", "microphone_capture", "microphone_worker_failure", "Bounded local microphone capture failed.")
@@ -194,6 +219,7 @@ class RiverviewOpenWebUIService:
                         if not isinstance(payload, dict):
                             raise TypeError("snapshot_object_required")
                         archive, filename = build_snapshot(payload, service_identity=service.config.service_identity, service_url="http://127.0.0.1:18082/", pid=os.getpid())
+                        emit_event("operator.snapshot.created", "operator", str(uuid4()), payload={"filename": filename, "capture_reason": "manual_operator_snapshot"})
                         self._send_zip(archive, filename)
                     except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
                         diagnostic("RIV-UI-0019", "snapshot", "snapshot_generation_failure", f"Bounded snapshot failed: {type(exc).__name__}.")
@@ -208,6 +234,7 @@ class RiverviewOpenWebUIService:
                         payload = json.loads(self.rfile.read(length))
                         participants = tuple(str(item) for item in payload.get("participants", ()))
                         room_id = service.resident_gateway.create_room(participants, classification=str(payload.get("classification", "operational")))
+                        emit_event("room.created", "room", str(room_id), payload={"participant_ids": list(participants), "classification": str(payload.get("classification", "operational"))})
                         self._send(HTTPStatus.OK, service.resident_gateway.room_snapshot(room_id))
                     except (TypeError, ValueError, LookupError, PermissionError):
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "room_request_rejected", "checkpoint": "RIV-RES-0002"})
@@ -221,6 +248,7 @@ class RiverviewOpenWebUIService:
                         length = int(self.headers.get("Content-Length", "0"))
                         payload = json.loads(self.rfile.read(length))
                         turn = service.resident_gateway.add_room_turn(UUID(room_text), speaker=str(payload["speaker"]), text=str(payload["text"]), correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
+                        emit_event("room.turn.submitted", "room", room_text, UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None, {"speaker": str(payload["speaker"]), "classification": "operational"})
                         self._send(HTTPStatus.OK, turn)
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError):
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "room_turn_rejected", "checkpoint": "RIV-RES-0002"})
@@ -235,6 +263,8 @@ class RiverviewOpenWebUIService:
                         payload = json.loads(self.rfile.read(length))
                         model = str(payload.get("model", "qwen3-coder:30b-qwencode-20k"))
                         responses = service.resident_gateway.room_chat(UUID(room_text), str(payload["message"]), provider=lambda request: service.provider(model, request), interface_id=service.config.service_identity, correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
+                        correlation_id = UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None
+                        emit_event("room.turn.completed", "room", room_text, correlation_id, {"participant_count": len(responses), "provider": model, "classification": "operational"})
                         self._send(HTTPStatus.OK, {"responses": responses, "no_authority_expansion": True})
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError, RuntimeError) as exc:
                         diagnostic("RIV-RES-0002", "room_chat", "room_provider_or_membership_failure", f"Bounded room request failed: {type(exc).__name__}.")
@@ -257,6 +287,7 @@ class RiverviewOpenWebUIService:
                         expires_at=__import__("datetime").datetime.now(__import__("datetime").UTC), allowed_authority=("read:bounded", "return:advisory"),
                     )
                     resident_id = str(payload.get("resident_id") or "").strip()
+                    emit_event("resident.message.submitted", "resident", resident_id or "operator", request.correlation_id, {"resident_id": resident_id or None, "classification": request.classification, "interface": service.config.service_identity, "artifact_count": len(request.context_refs)})
                     if resident_id:
                         session, response, resident_metadata = service.resident_gateway.chat(
                             resident_id,
@@ -268,9 +299,11 @@ class RiverviewOpenWebUIService:
                             correlation_id=request.correlation_id,
                         )
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "resident": resident_metadata, "session_id": str(session.session_id), "response": response.as_typed_payload()}
+                        emit_event("resident.response.completed", "resident", resident_id, request.correlation_id, {"session_id": str(session.session_id), "resident_id": resident_id, "provider": str(payload.get("model", "approved")), "classification": request.classification})
                     else:
                         response = service.provider(str(payload.get("model", "approved")), request)
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "response": response.as_typed_payload()}
+                        emit_event("operator.response.completed", "operator", "operator", request.correlation_id, {"provider": str(payload.get("model", "approved")), "classification": request.classification})
                     self._send(HTTPStatus.OK, body)
                 except (AttributeError, KeyError, TypeError, ValueError, RuntimeError) as exc:  # bounded protocol error
                     diagnostic("RIV-RES-0002" if resident_id else "RIV-UI-0009", "resident_chat" if resident_id else "operator_chat", "resident_provider_failure" if resident_id else "bounded_request_failure", f"Bounded operator request failed: {type(exc).__name__}.")

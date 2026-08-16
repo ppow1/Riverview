@@ -118,9 +118,16 @@ class ResidentConversationGateway:
         if session.resident_id != profile.resident_id or session.classification != classification:
             raise PermissionError("RIV-RES-0002: resident session identity or classification mismatch.")
         correlation = correlation_id or uuid4()
+        provider_instruction = (
+            f"You are responding as the named Riverview resident {profile.name}. "
+            f"Your role is {profile.role}. Preserve this resident identity in your response; "
+            "do not identify yourself as the underlying model or provider. "
+            "This is bounded advisory conversation and does not grant operational authority.\n"
+            f"Operator message: {instruction}"
+        )
         request = ReasoningRequest(
             request_id=uuid4(), correlation_id=correlation, request_type="advice",
-            instruction=instruction, context_refs=(profile.canonical_reference, f"character:{profile.resident_id}:{session.character_version}", *tuple(f"continuity:{x['continuity_id']}" for x in self.continuity_store.accepted(profile.resident_id))),
+            instruction=provider_instruction, context_refs=(profile.canonical_reference, f"character:{profile.resident_id}:{session.character_version}", *tuple(f"continuity:{x['continuity_id']}" for x in self.continuity_store.accepted(profile.resident_id))),
             classification=classification, required_output_schema="resident-advice-v1",
             evidence_requirements=("resident-identity", "resident-provenance", "correlation"),
             expires_at=__import__("datetime").datetime.now(__import__("datetime").UTC),

@@ -1,0 +1,53 @@
+flowchart LR
+    river['{node["label"]}']
+    grace['{node["label"]}']
+    relay['{node["label"]}']
+    providers['{node["label"]}']
+    diagnostics['{node["label"]}']
+    notifications['{node["label"]}']
+    operator['{node["label"]}']
+    residents['{node["label"]}']
+    room['{node["label"]}']
+    snapshot['{node["label"]}']
+    ollama['{node["label"]}']
+    mcp['{node["label"]}']
+    projects['{node["label"]}']
+    undercurrent['{node["label"]}']
+    controls['{node["label"]}']
+    spatial['{node["label"]}']
+    reasoning_contract['{node["label"]}']
+    resident_gateway['{node["label"]}']
+    steward['{node["label"]}']
+    riverview_operator['{node["label"]}']
+    riverview_reasoning_ollama['{node["label"]}']
+    operator -->|publishes operator/resident/room events| river
+    operator -->|submits bounded resident requests| residents
+    operator -->|submits room turns| room
+    operator -->|requests diagnostic bundle| snapshot
+    operator -->|receives browser/microphone input| controls
+    residents -->|checks classification and bounded references| undercurrent
+    residents -->|selects eligible provider| providers
+    room -->|orchestrates participant sessions| residents
+    providers -->|dispatches local reasoning| ollama
+    river -->|wakes CME on durable events| grace
+    grace -->|evaluates ready objective stages| relay
+    relay -->|dispatches execution work| providers
+    river -->|records event/checkpoint lineage| diagnostics
+    diagnostics -->|routes bounded escalation| notifications
+    mcp -->|reads bounded Comms/mailbox state| river
+    steward -->|addresses Grace and accepts bounded decisions| mcp
+    projects -->|promotes explicit engineering seed| grace
+    undercurrent -->|protects classified state boundary| river
+    spatial -->|future spatial projection| operator
+    riverview_operator -->|declares dependency| river
+    riverview_operator -->|declares dependency| reasoning_contract
+    riverview_operator -->|declares dependency| resident_gateway
+    riverview_operator -->|uses checkpoint| diagnostics
+    riverview_operator -->|uses checkpoint| diagnostics
+    riverview_operator -->|uses checkpoint| diagnostics
+    riverview_operator -->|uses checkpoint| diagnostics
+    riverview_operator -->|uses checkpoint| diagnostics
+    riverview_reasoning_ollama -->|declares dependency| river
+    riverview_reasoning_ollama -->|declares dependency| reasoning_contract
+    riverview_reasoning_ollama -->|uses checkpoint| diagnostics
+    riverview_reasoning_ollama -->|uses checkpoint| diagnostics

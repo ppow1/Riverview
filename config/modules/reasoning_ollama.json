@@ -1,0 +1,18 @@
+{
+  "module_id": "riverview.reasoning.ollama",
+  "display_name": "Loopback Ollama reasoning adapter",
+  "module_version": "1.0.0",
+  "required_core_contract": "riverview-core-contract-1.0",
+  "module_type": "provider",
+  "events_consumed": ["reasoning.request.submitted"],
+  "events_emitted": ["provider.response.completed", "provider.execution.failed"],
+  "actions_requested": ["reasoning.complete"],
+  "projections_read": ["provider.registry", "classification.policy"],
+  "capabilities_registered": ["reasoning.advice", "reasoning.local-only"],
+  "routes": [],
+  "diagnostics": ["RIV-REASON-0001", "RIV-REASON-0002"],
+  "storage_owner": "core-provider-registry",
+  "dependencies": ["river", "reasoning.contract"],
+  "authority": ["read:bounded", "return:advisory"],
+  "recovery": "bounded provider failure and retry through registry"
+}
