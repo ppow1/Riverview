@@ -41,7 +41,7 @@ async function submit(){
   if(file) refs.push('browser-artifact:'+file.name+':'+await hash(file));
   const correlation=crypto.randomUUID(), request=crypto.randomUUID();
   const residentId=$('resident').value;
-  if(window.riverviewRoomId&&residentId){const roomResponse=await fetch('/api/rooms/'+window.riverviewRoomId+'/turn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({speaker:residentId,text:$('message').value,correlation_id:correlation})});const roomBody=await roomResponse.json();$('status').textContent=roomResponse.ok?'Room turn recorded':'Room turn rejected';$('result').textContent=JSON.stringify({correlation_id:correlation,room_turn:roomBody},null,2);return;}
+  if(window.riverviewRoomId&&residentId){const roomResponse=await fetch('/api/rooms/'+window.riverviewRoomId+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:$('message').value,correlation_id:correlation})});const roomBody=await roomResponse.json();$('status').textContent=roomResponse.ok?'Room responses completed':'Room turn rejected';$('result').textContent=JSON.stringify({correlation_id:correlation,room_responses:roomBody.responses||roomBody},null,2);return;}
   const response=await fetch('/api/chat',{method:'POST',headers:{'Authorization':'Bearer '+$('token').value,'Content-Type':'application/json'},body:JSON.stringify({request_id:request,correlation_id:correlation,message:$('message').value,context_refs:refs,resident_id:residentId,session_id:residentSessions[residentId]||'',classification:'operational',model:'qwen3-coder:30b-qwencode-20k'})});
   const body=await response.json(); $('status').textContent=response.ok?(body.artifact_semantics==='reference_only'?'Completed — artifact attached as reference-only; image content was not inspected.':'Completed'):'Rejected';
   if(response.ok&&residentId&&body.session_id)residentSessions[residentId]=body.session_id;
@@ -179,6 +179,19 @@ class RiverviewOpenWebUIService:
                         self._send(HTTPStatus.OK, turn)
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError):
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "room_turn_rejected", "checkpoint": "RIV-RES-0002"})
+                    return
+                if self.path.startswith("/api/rooms/") and self.path.endswith("/chat"):
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        room_text = self.path.removeprefix("/api/rooms/").removesuffix("/chat").strip("/")
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        responses = service.resident_gateway.room_chat(UUID(room_text), str(payload["message"]), provider=lambda request: service.provider("approved", request), interface_id=service.config.service_identity, correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
+                        self._send(HTTPStatus.OK, {"responses": responses, "no_authority_expansion": True})
+                    except (KeyError, TypeError, ValueError, LookupError, PermissionError, RuntimeError):
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "room_chat_rejected", "checkpoint": "RIV-RES-0002"})
                     return
                 if self.path != "/api/chat" or not self._auth():
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})

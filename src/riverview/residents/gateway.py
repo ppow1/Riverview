@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from riverview.characters import CharacterStore, ContinuityStore
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 
 
@@ -33,18 +34,21 @@ class ResidentSession:
     interface_id: str
     classification: str
     history: list[dict[str, str]] = field(default_factory=list)
+    character_version: str = "v1"
 
 
 class ResidentConversationGateway:
     """Resolve identity and continuity before provider selection or response."""
 
-    def __init__(self, profiles: tuple[ResidentProfile, ...]) -> None:
+    def __init__(self, profiles: tuple[ResidentProfile, ...], *, character_store: CharacterStore | None = None, continuity_store: ContinuityStore | None = None) -> None:
         if not profiles:
             raise ValueError("RIV-RES-0002: resident gateway requires profiles.")
         self._profiles = {profile.resident_id: profile for profile in profiles}
         self._by_name = {profile.name.casefold(): profile for profile in profiles}
         self._sessions: dict[UUID, ResidentSession] = {}
         self._rooms: dict[UUID, dict[str, Any]] = {}
+        self.character_store = character_store or CharacterStore.from_profiles(profiles)
+        self.continuity_store = continuity_store or ContinuityStore()
 
     @classmethod
     def from_evidence(cls, path: Path | None = None) -> ResidentConversationGateway:
@@ -76,6 +80,8 @@ class ResidentConversationGateway:
                 "certainty": p.certainty,
                 "eligible_providers": list(p.eligible_providers),
                 "operational_participant": p.is_grace,
+                "character_version": self.character_store.current(p.resident_id)["version"],
+                "accepted_continuity_count": len(self.continuity_store.accepted(p.resident_id)),
             }
             for p in self._profiles.values()
         )
@@ -90,7 +96,7 @@ class ResidentConversationGateway:
         profile = self.resolve(resident)
         if classification != profile.classification:
             raise PermissionError("RIV-RES-0002: session classification does not match resident boundary.")
-        session = ResidentSession(uuid4(), profile.resident_id, interface_id, classification)
+        session = ResidentSession(uuid4(), profile.resident_id, interface_id, classification, character_version=self.character_store.current(profile.resident_id)["version"])
         self._sessions[session.session_id] = session
         return session
 
@@ -114,7 +120,7 @@ class ResidentConversationGateway:
         correlation = correlation_id or uuid4()
         request = ReasoningRequest(
             request_id=uuid4(), correlation_id=correlation, request_type="advice",
-            instruction=instruction, context_refs=(profile.canonical_reference,),
+            instruction=instruction, context_refs=(profile.canonical_reference, f"character:{profile.resident_id}:{session.character_version}", *tuple(f"continuity:{x['continuity_id']}" for x in self.continuity_store.accepted(profile.resident_id))),
             classification=classification, required_output_schema="resident-advice-v1",
             evidence_requirements=("resident-identity", "resident-provenance", "correlation"),
             expires_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
@@ -134,8 +140,10 @@ class ResidentConversationGateway:
             "history_turns": len(session.history), "grace_addressed": addressed_grace,
             "execution_intent_detected": addressed_grace and explicit_work,
             "execution_requires_seed_promotion": addressed_grace and explicit_work,
-            "role_authority_expanded": False,
+            "role_authority_expanded": False, "character_version": session.character_version,
+            "continuity_refs": [x["continuity_id"] for x in self.continuity_store.accepted(profile.resident_id)],
         }
+        self.continuity_store.record_session(profile.resident_id, str(session.session_id), session.history)
         return session, response, metadata
 
     def create_room(self, participants: tuple[str, ...], *, classification: str = "operational") -> UUID:
@@ -160,3 +168,16 @@ class ResidentConversationGateway:
         turn = {"speaker_id": self.resolve(speaker).resident_id, "text": text, "correlation_id": str(correlation_id or uuid4()), "no_authority_expansion": True}
         room["turns"].append(turn)
         return turn
+
+    def room_chat(self, room_id: UUID, instruction: str, *, provider: Callable[[ReasoningRequest], ReasoningResponse], interface_id: str, correlation_id: UUID | None = None) -> list[dict[str, Any]]:
+        """Run one bounded ordered round; resident turns never recurse or gain authority."""
+        room = self._rooms.get(room_id)
+        if room is None or not instruction.strip():
+            raise ValueError("RIV-RES-0002: room request is bounded and requires an existing room.")
+        correlation = correlation_id or uuid4()
+        results = []
+        for resident_id in room["participants"]:
+            session, response, metadata = self.chat(resident_id, instruction, provider=provider, interface_id=interface_id, classification=room["classification"], correlation_id=correlation)
+            turn = {"speaker_id": resident_id, "speaker_name": metadata["resident_name"], "session_id": str(session.session_id), "character_version": metadata["character_version"], "response": response.as_typed_payload(), "no_authority_expansion": True}
+            room["turns"].append(turn); results.append(turn)
+        return results
