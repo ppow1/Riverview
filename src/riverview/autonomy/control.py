@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -247,6 +248,8 @@ class GraceMomentum:
 class ContinuousMomentumEngine:
     """Run one bounded, event-driven Grace cycle across independent objectives."""
 
+    _MAX_CONTINUATION_CYCLES = 64
+
     def frontier(self, *, limit: int = 16) -> list[dict[str, Any]]:
         if not 1 <= limit <= 64:
             raise ValueError("RIV-GRC-0004: frontier limit is outside the bounded range.")
@@ -267,12 +270,102 @@ class ContinuousMomentumEngine:
         """Evaluate all currently eligible stages once; callers trigger the next cycle from an event."""
         correlation_id = correlation_id or uuid4()
         frontier = self.frontier(limit=limit)
+        return self._evaluate_frontier(frontier, correlation_id=correlation_id)
+
+    def _evaluate_frontier(self, frontier: list[dict[str, Any]], *, correlation_id: UUID) -> dict[str, Any]:
+        """Evaluate one captured frontier without weakening its checkpoint boundary."""
         evaluated: list[dict[str, Any]] = []
         for item in frontier:
+            # The database query enforces this boundary. Keep the check here too so
+            # alternate/test frontier providers cannot turn a checkpoint into work.
+            if item.get("steward_checkpoint", False):
+                continue
             decisions = GraceMomentum().evaluate(item["objective_key"], correlation_id=correlation_id)
             stage = next(entry for entry in decisions if entry["stage_key"] == item["stage_key"])
             evaluated.append({"objective_key": item["objective_key"], "stage_key": item["stage_key"], "decision": stage["decision"], "declared_action": item["declared_action"]})
         return {"correlation_id": str(correlation_id), "frontier_count": len(frontier), "evaluated": evaluated, "bounded": True}
+
+    def cycle_until_quiescent(
+        self,
+        *,
+        limit: int = 16,
+        max_cycles: int = 8,
+        correlation_id: UUID | None = None,
+        redispatch: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
+        """Continue bounded Grace cycles after a provider result.
+
+        A provider result is only one observation.  This method re-queries the
+        authoritative frontier after each cycle and optionally redispatches
+        each still-ready stage through an injected, already-authorized action.
+        The cycle bound and the no-progress return prevent recursion and busy
+        looping when a stage needs evidence or an external decision.
+        """
+        if not 1 <= max_cycles <= 64:
+            raise ValueError("RIV-GRC-0004: cycle bound is outside the bounded range.")
+        correlation = correlation_id or uuid4()
+        cycles: list[dict[str, Any]] = []
+        redispatched = 0
+        stop_reason = "frontier_empty"
+        for _ in range(max_cycles):
+            current = self.frontier(limit=limit)
+            if not current:
+                break
+            result = self.cycle(limit=limit, correlation_id=correlation)
+            cycles.append(result)
+            ready = [item for item in result["evaluated"] if item["decision"] == "ready"]
+            if redispatch is not None:
+                for item in ready:
+                    redispatch(item)
+                    redispatched += 1
+            next_frontier = self.frontier(limit=limit)
+            if not next_frontier:
+                stop_reason = "frontier_empty"
+                break
+            if not ready or next_frontier == current:
+                stop_reason = "no_progress_or_external_boundary"
+                break
+        else:
+            stop_reason = "cycle_bound_reached"
+        return {
+            "correlation_id": str(correlation),
+            "cycles": cycles,
+            "cycle_count": len(cycles),
+            "redispatched": redispatched,
+            "remaining_frontier": self.frontier(limit=limit),
+            "stop_reason": stop_reason,
+            "bounded": True,
+        }
+
+    def continue_until_quiescent(
+        self,
+        *,
+        limit: int = 16,
+        max_cycles: int = 8,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Iteratively evaluate ready snapshots until drained or the cycle bound is met."""
+        if not 1 <= max_cycles <= self._MAX_CONTINUATION_CYCLES:
+            raise ValueError("RIV-GRC-0004: continuation cycle bound is outside the bounded range.")
+
+        correlation_id = correlation_id or uuid4()
+        cycle_results: list[dict[str, Any]] = []
+        remaining_frontier = self.frontier(limit=limit)
+
+        # This is deliberately iterative. Each evaluation may make a different
+        # stage ready, so take a new durable frontier snapshot after every cycle.
+        while remaining_frontier and len(cycle_results) < max_cycles:
+            cycle_results.append(self._evaluate_frontier(remaining_frontier, correlation_id=correlation_id))
+            remaining_frontier = self.frontier(limit=limit)
+
+        return {
+            "correlation_id": str(correlation_id),
+            "cycle_count": len(cycle_results),
+            "cycles": cycle_results,
+            "remaining_frontier": remaining_frontier,
+            "remaining_frontier_count": len(remaining_frontier),
+            "bounded": True,
+        }
 
 
 class CookbookAdvisor:

@@ -18,7 +18,7 @@ class ServiceNode:
 
 
 def validate_topology(nodes: tuple[ServiceNode, ...]) -> tuple[ServiceNode, ...]:
-    """Reject duplicate ports, owners, missing dependencies, and invalid bounds."""
+    """Reject collisions, invalid bounds, missing dependencies, and cycles."""
 
     ids = {node.service_id for node in nodes}
     if len(ids) != len(nodes):
@@ -36,4 +36,24 @@ def validate_topology(nodes: tuple[ServiceNode, ...]) -> tuple[ServiceNode, ...]
             ports[key] = node.service_id
         if any(dependency not in ids for dependency in node.dependencies):
             raise ValueError("RIV-INF-0001: service dependency is not in the topology.")
+
+    dependency_counts: dict[str, int] = {}
+    dependents = {service_id: [] for service_id in ids}
+    for node in nodes:
+        unique_dependencies = set(node.dependencies)
+        dependency_counts[node.service_id] = len(unique_dependencies)
+        for dependency in unique_dependencies:
+            dependents[dependency].append(node.service_id)
+
+    ready = [service_id for service_id, count in dependency_counts.items() if count == 0]
+    validated = 0
+    while ready:
+        service_id = ready.pop()
+        validated += 1
+        for dependent in dependents[service_id]:
+            dependency_counts[dependent] -= 1
+            if dependency_counts[dependent] == 0:
+                ready.append(dependent)
+    if validated != len(nodes):
+        raise ValueError("RIV-INF-0001: service dependency cycle.")
     return nodes
