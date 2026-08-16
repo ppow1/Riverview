@@ -22,5 +22,8 @@ def test_browser_operator_surface_is_real_html_and_artifact_aware() -> None:
         assert "crypto.subtle.digest" in page
         assert "/api/chat" in page
         assert "Use local Riverview credential" in page
+        assert "reference-only" in page
+        assert "Enter an instruction describing what you want Riverview to do with this artifact." in page
+        assert "Capture bounded local microphone transcription" in page
     finally:
         service.stop()

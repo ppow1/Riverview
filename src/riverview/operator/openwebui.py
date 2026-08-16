@@ -20,9 +20,10 @@ from riverview.reasoning import ReasoningRequest, ReasoningResponse
 UI_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Riverview Operator</title>
 <style>body{font:16px sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem}textarea{width:100%;height:8rem}input,button{margin:.4rem 0;padding:.5rem}#result{white-space:pre-wrap;background:#f3f3f3;padding:1rem}</style></head>
-<body><h1>Riverview Operator</h1><p id="status">Use the local credential handoff, then enter text and optionally select a harmless artifact.</p>
+<body><h1>Riverview Operator</h1><p id="status">Use the local credential handoff, then enter an instruction and optionally attach a harmless artifact. Attachments are reference-only unless the selected provider explicitly supports content inspection.</p>
 <button id="local-auth">Use local Riverview credential</button><br>
 <label>Manual bearer fallback <input id="token" type="password" autocomplete="off"></label><br>
+<button id="mic">Capture bounded local microphone transcription</button><br>
 <textarea id="message" placeholder="Enter a bounded operator request"></textarea><br>
 <input id="artifact" type="file"><br><button id="send">Submit</button>
 <pre id="result"></pre>
@@ -30,16 +31,19 @@ UI_HTML = """<!doctype html>
 const $=id=>document.getElementById(id);
 async function hash(file){const bytes=await file.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 async function submit(){
+  if(!$('message').value.trim()){$('status').textContent='Enter an instruction describing what you want Riverview to do with this artifact.';return;}
   $('status').textContent='Submitting bounded request…'; $('result').textContent='';
   const file=$('artifact').files[0]; const refs=[];
   if(file) refs.push('browser-artifact:'+file.name+':'+await hash(file));
   const correlation=crypto.randomUUID(), request=crypto.randomUUID();
   const response=await fetch('/api/chat',{method:'POST',headers:{'Authorization':'Bearer '+$('token').value,'Content-Type':'application/json'},body:JSON.stringify({request_id:request,correlation_id:correlation,message:$('message').value,context_refs:refs,classification:'operational',model:'qwen3-coder:30b-qwencode-20k'})});
-  const body=await response.json(); $('status').textContent=response.ok?'Completed':'Rejected';
-  $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,response:body.response||body.error},null,2);
+  const body=await response.json(); $('status').textContent=response.ok?(body.artifact_semantics==='reference_only'?'Completed — artifact attached as reference-only; image content was not inspected.':'Completed'):'Rejected';
+  $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,artifact_semantics:body.artifact_semantics||'none',response:body.response||body.error},null,2);
 }
 async function localAuth(){const response=await fetch('/session',{method:'POST'}); $('status').textContent=response.ok?'Authenticated through local Riverview credential handoff':'Authentication handoff failed';}
+async function mic(){ $('status').textContent='Listening for up to 8 seconds…'; const response=await fetch('/api/transcribe',{method:'POST'}); const body=await response.json(); if(!response.ok) throw Error(body.error||'transcription failed'); $('message').value=body.text; $('status').textContent='Local transcription ready; review before submitting.'; }
 $('local-auth').addEventListener('click',()=>localAuth().catch(error=>{$('status').textContent='Authentication handoff failed';}));
+$('mic').addEventListener('click',()=>mic().catch(error=>{$('status').textContent='Local transcription failed: '+error;}));
 $('send').addEventListener('click',()=>submit().catch(error=>{$('status').textContent='Failed';$('result').textContent=String(error);}));
 </script></body></html>"""
 
@@ -114,6 +118,17 @@ class RiverviewOpenWebUIService:
                 if self.path == "/session":
                     self._session()
                     return
+                if self.path == "/api/transcribe":
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        from riverview.operator.local_speech import capture_windows_speech
+                        result = capture_windows_speech()
+                        self._send(HTTPStatus.OK, {"provider_id": result.provider_id, "text": result.text, "retention": result.retention})
+                    except (RuntimeError, ValueError):
+                        self._send(HTTPStatus.BAD_GATEWAY, {"error": "local_transcription_unavailable", "checkpoint": "RIV-UI-0015"})
+                    return
                 if self.path != "/api/chat" or not self._auth():
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                     return
@@ -130,7 +145,7 @@ class RiverviewOpenWebUIService:
                         expires_at=__import__("datetime").datetime.now(__import__("datetime").UTC), allowed_authority=("read:bounded", "return:advisory"),
                     )
                     response = service.provider(str(payload.get("model", "approved")), request)
-                    self._send(HTTPStatus.OK, {"service": service.config.service_identity, "context_refs": list(request.context_refs), "response": response.as_typed_payload()})
+                    self._send(HTTPStatus.OK, {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "response": response.as_typed_payload()})
                 except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):  # bounded protocol error
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "bounded_request_rejected", "checkpoint": "RIV-UI-0009"})
 
