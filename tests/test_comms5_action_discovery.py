@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from riverview.mcp.comms5_server import mcp
+from tools.riverview_comms5_manifest import TOOL_SCHEMAS, TOOLS
 
 
 def _walk_schema(value: object) -> list[dict[str, object]]:
@@ -21,8 +22,16 @@ def _walk_schema(value: object) -> list[dict[str, object]]:
 
 def test_comms5_tools_have_chatgpt_discoverable_schemas() -> None:
     tools = mcp._tool_manager.list_tools()
-    assert len(tools) == 15
-    assert {tool.name for tool in tools} >= {"comms5_help", "comms5_seed_lineage", "comms5_cancel_draft", "comms5_supersede_seed"}
+    expected = {
+        "comms5_contract_info", "comms5_help", "comms5_capabilities",
+        "comms5_describe_operation", "comms5_examples", "comms5_submit_steward_seed",
+        "comms5_store_specification", "comms5_seed_status", "comms5_seed_lineage",
+        "comms5_objective_status", "comms5_cme_status", "comms5_recent_steward_submissions",
+        "comms5_confirm_and_promote_seed", "comms5_cancel_draft", "comms5_supersede_seed",
+    }
+    assert {tool.name for tool in tools} == expected
+    assert TOOLS == expected
+    assert set(TOOL_SCHEMAS) == expected
 
     for tool in tools:
         assert re.fullmatch(r"[A-Za-z0-9_.-]+", tool.name)
@@ -41,13 +50,25 @@ def test_comms5_tools_have_chatgpt_discoverable_schemas() -> None:
             assert fragment.get("additionalProperties") is not True
 
 
-def test_mutating_comms5_tools_do_not_expose_opaque_request_objects() -> None:
+def test_mutating_comms5_tools_publish_flat_authoritative_schemas() -> None:
     tools = {tool.name: tool for tool in mcp._tool_manager.list_tools()}
-    for name in (
-        "comms5_submit_steward_seed",
-        "comms5_store_specification",
-        "comms5_confirm_and_promote_seed",
-    ):
+    expected = {
+        "comms5_submit_steward_seed": {"seed_text", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal", "correlation_id", "client_version", "protocol_version", "classification", "causation_id", "specification_id"},
+        "comms5_store_specification": {"content", "summary", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal", "correlation_id", "client_version", "protocol_version", "classification"},
+        "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "authenticated_principal", "client_id", "client_type", "client_name", "client_version", "protocol_version", "correlation_id", "classification"},
+        "comms5_cancel_draft": {"seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal", "client_version", "protocol_version", "correlation_id", "classification"},
+        "comms5_supersede_seed": {"seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal", "client_version", "protocol_version", "correlation_id", "classification"},
+    }
+    required = {
+        "comms5_submit_steward_seed": {"seed_text", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal"},
+        "comms5_store_specification": {"content", "summary", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal"},
+        "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "authenticated_principal"},
+        "comms5_cancel_draft": {"seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal"},
+        "comms5_supersede_seed": {"seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal"},
+    }
+    for name, expected_properties in expected.items():
         properties = tools[name].parameters["properties"]
         assert "request" not in properties
-        assert properties
+        assert set(properties) == expected_properties
+        assert set(tools[name].parameters.get("required", [])) == required[name]
+        assert set(TOOL_SCHEMAS[name]["properties"]) == expected_properties
