@@ -35,3 +35,11 @@ Rules:
 - Do not expose Undercurrent or sensitive data through ordinary River paths.
 - A capability is not complete until its failure behavior is diagnosable and recovery is verifiable.
 - Follow the Engineering Interaction and Delivery Contract for versioned artifacts, complete PowerShell files, self-installation, durable reports, clipboard capture, Cookbook-first diagnostics, bounded scope, staged publication, and evidence terminology.
+
+For governed external-AI ingress and progress queries, first discover the
+separate `Riverview_Comms_5` surface (`python -m riverview.mcp.comms5_server`)
+using `comms5_help`. Use its bounded seed or durable specification-reference
+operations, ask the Steward before gated promotion unless explicit standing
+authorization exists, and use `comms5_seed_lineage` to follow authoritative
+progress. Comms5 client identity is provenance, not authority; never mutate
+PostgreSQL directly or invent objective/work state.

@@ -1,0 +1,12 @@
+{
+  "name": "Riverview Comms5",
+  "contract": "riverview-comms-contract:5.0",
+  "transport": "stdio",
+  "command": "python",
+  "args": ["-m", "riverview.mcp.comms5_server"],
+  "environment": {
+    "PYTHONPATH": "<Riverview repository>/src"
+  },
+  "authority": "bounded governed ingress and read projections",
+  "note": "Connector installation is deployment-specific; this template contains no credentials."
+}

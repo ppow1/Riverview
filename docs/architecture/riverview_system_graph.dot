@@ -51,6 +51,10 @@ digraph riverview {
   "postgres_service" [label="PostgreSQL service"];
   "operator_service" [label="Operator service 127.0.0.1:18082"];
   "spatial_service" [label="Spatial service 192.168.1.88:18443 (deferred/experimental)"];
+  "external_ai_clients" [label="Authorized external AI clients"];
+  "comms4" [label="Riverview Comms4 (legacy versioned surface)"];
+  "comms5" [label="Riverview Comms5 (contract 5.0)"];
+  "specification_store" [label="Durable classified specification references"];
   "flow_event.resident.message.submitted" [label="resident.message.submitted"];
   "flow_event.steward.seed.promoted" [label="steward.seed.promoted"];
   "flow_event.resident.response.completed" [label="resident.response.completed"];
@@ -167,6 +171,14 @@ digraph riverview {
   "ollama" -> "postgres_service" [label="does not own River state"];
   "microphone_worker" -> "operator_service" [label="bounded local worker boundary"];
   "mcp" -> "postgres_service" [label="reads bounded projections"];
+  "external_ai_clients" -> "comms5" [label="discovers and submits governed requests"];
+  "comms5" -> "specification_store" [label="stores bounded classified specification reference"];
+  "comms5" -> "steward" [label="creates draft requiring explicit confirmation"];
+  "comms5" -> "river" [label="publishes specification/ingress lineage events"];
+  "comms5" -> "objective_state" [label="projects authoritative status without owning it"];
+  "comms5" -> "cme_status_projection" [label="reads bounded CME status projection"];
+  "comms4" -> "river" [label="legacy bounded Comms4 reads and seed draft"];
+  "comms5" -> "comms4" [label="versioned migration guidance only"];
   "spatial_service" -> "spatial" [label="configured experimental LAN route"];
   "diagnostics" -> "diagnostic_spool" [label="fallback when persistence unavailable"];
   "operator_runtime" -> "flow_event.resident.message.submitted" [label="EMITS"];

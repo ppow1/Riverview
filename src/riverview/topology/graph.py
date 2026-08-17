@@ -12,6 +12,8 @@ CHECKPOINTS = (
     "RIV-CHAR-0004", "RIV-DIA-0001", "RIV-DIA-0002", "RIV-GRC-0004",
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
     "RIV-ARCH-0001", "RIV-INF-0001", "RIV-SPAT-0004", "RIV-GRC-0008",
+    "RIV-COMMS5-0001", "RIV-COMMS5-0002", "RIV-COMMS5-0007", "RIV-COMMS5-0008",
+    "RIV-COMMS5-0009", "RIV-COMMS5-0010", "RIV-COMMS5-0011",
 )
 
 VIEW_NAMES = {
@@ -49,6 +51,10 @@ CORE_NODES = (
     ("notification_delivery", "Notification delivery", "runtime"), ("notification_ack", "Notification acknowledgement state", "runtime"),
     ("postgres_service", "PostgreSQL service", "service"), ("operator_service", "Operator service 127.0.0.1:18082", "service"),
     ("spatial_service", "Spatial service 192.168.1.88:18443 (deferred/experimental)", "service"),
+    ("external_ai_clients", "Authorized external AI clients", "external"),
+    ("comms4", "Riverview Comms4 (legacy versioned surface)", "module"),
+    ("comms5", "Riverview Comms5 (contract 5.0)", "module"),
+    ("specification_store", "Durable classified specification references", "core"),
 )
 
 def _safe_id(value: str) -> str:
@@ -178,6 +184,14 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("ollama", "postgres_service", "does not own River state", "reasoning/ollama.py", views=services, manual=True)
     add_edge("microphone_worker", "operator_service", "bounded local worker boundary", "operator/local_speech.py", views=services)
     add_edge("mcp", "postgres_service", "reads bounded projections", "mcp/read_model.py", views=services)
+    add_edge("external_ai_clients", "comms5", "discovers and submits governed requests", "mcp/comms5_server.py", views=comms + context, checkpoint="RIV-COMMS5-0001")
+    add_edge("comms5", "specification_store", "stores bounded classified specification reference", "mcp/comms5.py:store_specification", views=comms + context, checkpoint="RIV-COMMS5-0007")
+    add_edge("comms5", "steward", "creates draft requiring explicit confirmation", "mcp/comms5.py:submit_steward_seed", views=comms + engineering, checkpoint="RIV-COMMS5-0009")
+    add_edge("comms5", "river", "publishes specification/ingress lineage events", "mcp/comms5.py", views=comms + event, checkpoint="RIV-COMMS5-0008")
+    add_edge("comms5", "objective_state", "projects authoritative status without owning it", "mcp/comms5.py:objective_status", views=comms + engineering, checkpoint="RIV-COMMS5-0008")
+    add_edge("comms5", "cme_status_projection", "reads bounded CME status projection", "mcp/comms5.py:cme_status", views=comms + context)
+    add_edge("comms4", "river", "legacy bounded Comms4 reads and seed draft", "mcp/server.py", views=comms + context)
+    add_edge("comms5", "comms4", "versioned migration guidance only", "mcp/comms5.py:contract_info", views=modules, manual=True)
     add_edge("spatial_service", "spatial", "configured experimental LAN route", "spatial prototype", views=services)
     add_edge("diagnostics", "diagnostic_spool", "fallback when persistence unavailable", "diagnostics/store.py", views=services + failures)
 
@@ -260,7 +274,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
         "20_operator_contract": {"status": "PASS", "evidence": ["riverview.operator->core_contract", "operator_runtime->resident_gateway_contract"]},
         "21_quest_deferred": {"status": "PASS", "evidence": ["spatial_service", "spatial", "deferred/experimental"]},
     }
-    return {"schema_version": "riverview-system-graph-2.1", "generated_from": ["src/riverview/topology/graph.py", "src/riverview/autonomy/runtime.py", "database/migrations/0024_cme_runtime.sql", "database/migrations/0025_cme_causation_projection.sql", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
+    return {"schema_version": "riverview-system-graph-2.2", "generated_from": ["src/riverview/topology/graph.py", "src/riverview/autonomy/runtime.py", "database/migrations/0024_cme_runtime.sql", "database/migrations/0025_cme_causation_projection.sql", "database/migrations/0026_comms5_governed_surface.sql", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "src/riverview/mcp/comms5.py", "src/riverview/mcp/comms5_server.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
 
 def validate_graph(graph: dict[str, Any]) -> list[str]:
     node_ids = {node["id"] for node in graph.get("nodes", [])}

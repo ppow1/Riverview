@@ -24,6 +24,14 @@ class StewardSeedStore:
         idempotency_key: str,
         causation_id: UUID | None = None,
         classification: str = "river",
+        client_id: str | None = None,
+        client_type: str | None = None,
+        client_name: str | None = None,
+        client_version: str | None = None,
+        protocol_version: str | None = None,
+        authenticated_principal: str | None = None,
+        specification_id: UUID | None = None,
+        specification_version: int | None = None,
     ) -> UUID:
         if not seed_text.strip() or len(seed_text.encode("utf-8")) > MAX_SEED_BYTES:
             raise ValueError("RIV-0085-0001: seed is empty or exceeds its bounded size.")
@@ -32,9 +40,15 @@ class StewardSeedStore:
         seed_id = uuid4()
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
-                """INSERT INTO steward_seed_drafts(seed_id,correlation_id,causation_id,consumer_id,seed_text,classification,status,idempotency_key)
-                   VALUES(%s,%s,%s,%s,%s,%s,'draft',%s) ON CONFLICT(idempotency_key) DO NOTHING""",
-                (seed_id, correlation_id, causation_id, DESIGNATED_CONSUMER, seed_text, classification, idempotency_key),
+                """INSERT INTO steward_seed_drafts(
+                       seed_id,correlation_id,causation_id,consumer_id,seed_text,classification,status,idempotency_key,
+                       client_id,client_type,client_name,client_version,protocol_version,authenticated_principal,
+                       specification_id,specification_version)
+                   VALUES(%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   ON CONFLICT(idempotency_key) DO NOTHING""",
+                (seed_id, correlation_id, causation_id, DESIGNATED_CONSUMER, seed_text, classification, idempotency_key,
+                 client_id, client_type, client_name, client_version, protocol_version, authenticated_principal,
+                 specification_id, specification_version),
             )
             cursor.execute("SELECT seed_id FROM steward_seed_drafts WHERE idempotency_key=%s", (idempotency_key,))
             return cursor.fetchone()[0]

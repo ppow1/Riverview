@@ -21,7 +21,14 @@
     "RIV-ARCH-0001",
     "RIV-INF-0001",
     "RIV-SPAT-0004",
-    "RIV-GRC-0008"
+    "RIV-GRC-0008",
+    "RIV-COMMS5-0001",
+    "RIV-COMMS5-0002",
+    "RIV-COMMS5-0007",
+    "RIV-COMMS5-0008",
+    "RIV-COMMS5-0009",
+    "RIV-COMMS5-0010",
+    "RIV-COMMS5-0011"
   ],
   "edges": [
     {
@@ -1000,6 +1007,106 @@
       ]
     },
     {
+      "checkpoint": "RIV-COMMS5-0001",
+      "derivation": "DERIVED",
+      "relation": "discovers and submits governed requests",
+      "source": "external_ai_clients",
+      "source_ref": "mcp/comms5_server.py",
+      "target": "comms5",
+      "views": [
+        "comms",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0007",
+      "derivation": "DERIVED",
+      "relation": "stores bounded classified specification reference",
+      "source": "comms5",
+      "source_ref": "mcp/comms5.py:store_specification",
+      "target": "specification_store",
+      "views": [
+        "comms",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0009",
+      "derivation": "DERIVED",
+      "relation": "creates draft requiring explicit confirmation",
+      "source": "comms5",
+      "source_ref": "mcp/comms5.py:submit_steward_seed",
+      "target": "steward",
+      "views": [
+        "comms",
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0008",
+      "derivation": "DERIVED",
+      "relation": "publishes specification/ingress lineage events",
+      "source": "comms5",
+      "source_ref": "mcp/comms5.py",
+      "target": "river",
+      "views": [
+        "comms",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0008",
+      "derivation": "DERIVED",
+      "relation": "projects authoritative status without owning it",
+      "source": "comms5",
+      "source_ref": "mcp/comms5.py:objective_status",
+      "target": "objective_state",
+      "views": [
+        "comms",
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "reads bounded CME status projection",
+      "source": "comms5",
+      "source_ref": "mcp/comms5.py:cme_status",
+      "target": "cme_status_projection",
+      "views": [
+        "comms",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "legacy bounded Comms4 reads and seed draft",
+      "source": "comms4",
+      "source_ref": "mcp/server.py",
+      "target": "river",
+      "views": [
+        "comms",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "MANUAL_ARCHITECTURAL_ANNOTATION",
+      "relation": "versioned migration guidance only",
+      "source": "comms5",
+      "source_ref": "mcp/comms5.py:contract_info",
+      "target": "comms4",
+      "views": [
+        "modules",
+        "context"
+      ]
+    },
+    {
       "derivation": "DERIVED",
       "relation": "configured experimental LAN route",
       "source": "spatial_service",
@@ -1960,6 +2067,7 @@
     "src/riverview/autonomy/runtime.py",
     "database/migrations/0024_cme_runtime.sql",
     "database/migrations/0025_cme_causation_projection.sql",
+    "database/migrations/0026_comms5_governed_surface.sql",
     "config/modules/*.json",
     "src/riverview/river/events.py",
     "src/riverview/autonomy/control.py",
@@ -1967,6 +2075,8 @@
     "src/riverview/characters/*.py",
     "src/riverview/mailbox/store.py",
     "src/riverview/notifications.py",
+    "src/riverview/mcp/comms5.py",
+    "src/riverview/mcp/comms5_server.py",
     "Cookbook checkpoint registry"
   ],
   "manifests": [
@@ -2431,6 +2541,34 @@
       "id": "spatial_service",
       "kind": "service",
       "label": "Spatial service 192.168.1.88:18443 (deferred/experimental)",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "external_ai_clients",
+      "kind": "external",
+      "label": "Authorized external AI clients",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "comms4",
+      "kind": "module",
+      "label": "Riverview Comms4 (legacy versioned surface)",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "comms5",
+      "kind": "module",
+      "label": "Riverview Comms5 (contract 5.0)",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "specification_store",
+      "kind": "core",
+      "label": "Durable classified specification references",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },
@@ -2942,7 +3080,7 @@
       "status": "PASS"
     }
   },
-  "schema_version": "riverview-system-graph-2.1",
+  "schema_version": "riverview-system-graph-2.2",
   "views": [
     "character",
     "comms",
