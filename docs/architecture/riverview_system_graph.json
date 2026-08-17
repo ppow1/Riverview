@@ -10,6 +10,7 @@
     "RIV-UI-0022",
     "RIV-UI-0023",
     "RIV-UI-0024",
+    "RIV-UI-0025",
     "RIV-RES-0001",
     "RIV-RES-0002",
     "RIV-REASON-0001",
@@ -82,6 +83,20 @@
       "relation": "archives and restores conversation UI history without changing continuity",
       "source": "operator_runtime",
       "source_ref": "operator/openwebui.py:do_PATCH",
+      "target": "operator_projection",
+      "views": [
+        "context",
+        "resident",
+        "events",
+        "room"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0025",
+      "derivation": "DERIVED",
+      "relation": "executes bounded durable conversation search",
+      "source": "operator_runtime",
+      "source_ref": "operator/projection.py:search",
       "target": "operator_projection",
       "views": [
         "context",

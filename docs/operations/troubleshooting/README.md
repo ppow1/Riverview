@@ -41,6 +41,7 @@ Every checkpoint records:
 - `RIV-UI-0022` — bounded Operator event stream, cursor recovery, and reconnect reconciliation
 - `RIV-UI-0023` — dynamic Mermaid architecture rendering and view replacement
 - `RIV-UI-0024` — Operator UX lifecycle, layout, navigation, archive, and room display reconciliation
+- `RIV-UI-0025` — Operator global rail actions, explicit resident selection, and durable history search
 
 ## Acceptance rule
 

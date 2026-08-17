@@ -68,6 +68,12 @@ $('send').onclick=()=>send();$('message').onkeydown=e=>{if(e.key==='Enter'&&!e.s
 $('context-toggle').onclick=()=>{$('context-pane').classList.toggle('hidden');localStorage.setItem('riverview-context-open',String(!$('context-pane').classList.contains('hidden')));};if(localStorage.getItem('riverview-context-open')==='false')$('context-pane').classList.add('hidden');load().then(startEventStream).catch(()=>{$('subtitle').textContent='BACKEND UNAVAILABLE — inspect diagnostics';});setInterval(loadCme,3000);
 </script><script>
 // Slice-2 lifecycle and cleanup bindings are installed after the base shell bindings.
+function openConversations(){const nav=document.querySelector('[data-view="conversations"]');if(nav)nav.click();$('sidebar').classList.remove('hidden');localStorage.setItem('riverview-sidebar-open','true');}
+async function railRoom(){openConversations();showRoomDialog();}
+async function railNew(){openConversations();const rid=$('resident').value;await createConversation(rid,'');}
+async function residentSelection(event){const rid=event.target.value,c=state.conversations.find(x=>x.id===state.active);if(!rid){event.target.value=c?.resident_id||'';return;}if(!c||!c.resident_id){if(confirm('Start a new '+(names[rid]?.name||'resident')+' conversation?')){openConversations();await createConversation(rid,(names[rid]?.name||'Resident')+' Conversation');}else event.target.value='';return;}if(c.kind==='room'||c.resident_id===rid){event.target.value=c.resident_id||'';return;}const other=names[rid]?.name||'resident';if(!confirm('Add '+other+' to this conversation and create a room? The existing conversation remains separate.')){event.target.value=c.resident_id;return;}const room=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participants:[c.resident_id,rid],title:''})});if(room.ok){const b=await room.json(),next=b.operator_conversation;if(next){openConversations();state.conversations.unshift(next);select(next.id);}}else event.target.value=c.resident_id;}
+async function durableSearch(){const q=$('search').value.trim();if(q.length<2){renderList();return;}const r=await fetch('/api/conversations/search?q='+encodeURIComponent(q)+'&limit=25');if(!r.ok)return;const b=await r.json();$('conversation-list').innerHTML=(b.results||[]).map(x=>`<button class="conversation search-result" data-search-id="${esc(x.id)}" data-message-index="${x.message_index??''}"><span><strong>${esc(x.title)}</strong><small>${esc(x.snippet)} · ${x.occurred_at||'time unavailable'} · ${x.archived?'Archived':'Active'}</small></span></button>`).join('')||'<p class="muted">No durable matches.</p>';document.querySelectorAll('[data-search-id]').forEach(x=>x.onclick=async()=>{openConversations();const id=x.dataset.searchId,rr=await fetch('/api/conversations/'+id+'?archived=true');if(!rr.ok)return;const c=await rr.json();state.conversations=[c,...state.conversations.filter(y=>y.id!==c.id)];select(c.id);const target=document.querySelectorAll('.message')[Number(x.dataset.messageIndex)];if(target)target.scrollIntoView({block:'center'});});}
+document.addEventListener('click',event=>{if(event.target.closest('#room')){event.preventDefault();event.stopImmediatePropagation();railRoom();}else if(event.target.closest('#new')){event.preventDefault();event.stopImmediatePropagation();railNew();}},true);document.addEventListener('change',event=>{if(event.target.id==='resident'){event.stopImmediatePropagation();residentSelection(event);}},true);$('search').addEventListener('input',durableSearch);
 const rvMic=$('mic'),rvMicState=$('mic-state');rvMic.onclick=async()=>{rvMic.dataset.state='listening';rvMic.className='mic-listening';rvMic.setAttribute('aria-label','Microphone listening');rvMicState.textContent='Microphone listening';try{const r=await fetch('/api/transcribe',{method:'POST'});rvMic.dataset.state='transcribing';rvMic.className='mic-transcribing';rvMic.setAttribute('aria-label','Transcribing');rvMicState.textContent='Transcribing';const b=await r.json();if(!r.ok)throw new Error((b.error||'transcription failed')+' · '+(b.checkpoint||'unavailable'));$('message').value=b.text||'';rvMicState.textContent='Transcription complete';await new Promise(resolve=>setTimeout(resolve,800));}catch(error){rvMic.dataset.state='failure';rvMic.className='mic-failure';rvMic.setAttribute('aria-label','Microphone failed');rvMicState.textContent='Microphone failed: '+error.message;}finally{rvMic.dataset.state='idle';rvMic.className='';rvMic.setAttribute('aria-label','Microphone idle');}};
  $('conversation-filter').onchange=async()=>{const r=await fetch('/api/conversations?archived=all');if(r.ok)state.conversations=(await r.json()).conversations;renderList();};$('archive').onclick=async()=>{if(state.active&&confirm('Archive this conversation? Resident continuity is not affected.')){await fetch('/api/conversations/'+state.active,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({archived:true})});await reconcile();}};document.querySelectorAll('[data-view]').forEach(x=>x.addEventListener('click',()=>{if(x.dataset.view==='conversations'){renderList();const c=state.conversations.find(y=>y.id===state.active);if(c)renderMessages(c);}else if(x.dataset.view==='activity'){$('messages').innerHTML='<div class="card"><strong>Activity / Work</strong><p class="muted">Authoritative work projection is not available in this Operator deployment.</p></div>'; }},true));
 </script></body></html>"""
@@ -260,6 +266,14 @@ class RiverviewOpenWebUIService:
                                 pass
                         item["archived"] = bool(include_archived and item.get("archived"))
                     self._send(HTTPStatus.OK, {"conversations": conversations})
+                elif urlsplit(self.path).path == "/api/conversations/search" and self._auth():
+                    query = parse_qs(urlsplit(self.path).query)
+                    term = query.get("q", [""])[0]
+                    try:
+                        limit = int(query.get("limit", ["25"])[0])
+                    except ValueError:
+                        limit = 25
+                    self._send(HTTPStatus.OK, {"query": term, "results": service.projection.search(term, limit=limit)})
                 elif self.path == "/api/architecture" and self._auth():
                     root = __import__("pathlib").Path(__file__).resolve().parents[3] / "docs" / "architecture" / "graph_views"
                     views = []
@@ -277,8 +291,9 @@ class RiverviewOpenWebUIService:
                         self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "notification_projection_unavailable", "checkpoint": "RIV-NOT-0001"})
                 elif self.path.startswith("/api/conversations/") and self._auth():
                     try:
-                        conversation_id = UUID(self.path.rsplit("/", 1)[1])
-                        conversation = service.projection.refresh(conversation_id)
+                        path = urlsplit(self.path)
+                        conversation_id = UUID(path.path.rsplit("/", 1)[1])
+                        conversation = service.projection.refresh(conversation_id, include_archived=parse_qs(path.query).get("archived", [""])[0] == "true")
                         if conversation is None:
                             raise KeyError(conversation_id)
                         self._send(HTTPStatus.OK, conversation)

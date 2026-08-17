@@ -27,6 +27,27 @@ class OperatorProjection:
             rows = cursor.fetchall()
             return [self._conversation(cursor, row) for row in rows]
 
+    def search(self, query: str, *, limit: int = 25, include_archived: bool = True) -> list[dict[str, Any]]:
+        """Search durable conversation/message bodies without loading history into the browser."""
+        term = query.strip()
+        if not term:
+            return []
+        bounded_limit = max(1, min(limit, 100))
+        if not self.available:
+            lowered = term.casefold()
+            return [{"id": str(item["id"]), "title": item["title"], "resident_id": item.get("resident_id", ""), "room_id": item.get("room_id", ""), "kind": item.get("kind", "conversation"), "archived": bool(item.get("archived")), "snippet": message["text"][:240], "message_index": index, "occurred_at": "unavailable"} for item in self.memory.values() if include_archived or not item.get("archived") for index, message in enumerate(item.get("messages", ())) if lowered in message.get("text", "").casefold()][:bounded_limit]
+        with connect() as connection, connection.cursor() as cursor:
+            pattern = f"%{term}%"
+            cursor.execute("""SELECT c.conversation_id,c.title,c.resident_id,c.room_id,c.kind,c.archived_at,m.body,m.occurred_at,m.turn_order
+                             FROM operator_conversations c JOIN LATERAL (
+                               SELECT body,occurred_at FROM operator_messages
+                               WHERE conversation_id=c.conversation_id AND body ILIKE %s
+                               ORDER BY occurred_at DESC LIMIT 1
+                             ) m ON TRUE
+                             WHERE (%s OR c.archived_at IS NULL)
+                             ORDER BY c.updated_at DESC LIMIT %s""", (pattern, include_archived, bounded_limit))
+            return [{"id": str(row[0]), "title": row[1], "resident_id": row[2] or "", "room_id": str(row[3]) if row[3] else "", "kind": row[4], "archived": bool(row[5]), "snippet": row[6][:240], "occurred_at": row[7], "message_index": row[8]} for row in cursor.fetchall()]
+
     def _conversation(self, cursor: Any, row: Any) -> dict[str, Any]:
         conversation_id, resident_id, room_id, kind, title, classification, *archive = row
         cursor.execute("""SELECT role,speaker_id,speaker_name,body,metadata FROM operator_messages
@@ -58,11 +79,11 @@ class OperatorProjection:
                              VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb)""", (uuid4(), conversation_id, order, role, speaker_id, speaker, text, json.dumps(details, default=str)))
             cursor.execute("UPDATE operator_conversations SET updated_at=now() WHERE conversation_id=%s", (conversation_id,))
 
-    def refresh(self, conversation_id: UUID) -> dict[str, Any] | None:
+    def refresh(self, conversation_id: UUID, *, include_archived: bool = False) -> dict[str, Any] | None:
         if not self.available:
             return self.memory.get(conversation_id)
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT conversation_id,resident_id,room_id,kind,title,classification FROM operator_conversations WHERE conversation_id=%s AND archived_at IS NULL", (conversation_id,))
+            cursor.execute("SELECT conversation_id,resident_id,room_id,kind,title,classification,archived_at FROM operator_conversations WHERE conversation_id=%s AND (%s OR archived_at IS NULL)", (conversation_id, include_archived))
             row = cursor.fetchone()
             return self._conversation(cursor, row) if row else None
 
