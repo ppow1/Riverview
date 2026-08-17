@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 CHECKPOINTS = (
-    "RIV-UI-0009", "RIV-UI-0013", "RIV-UI-0014", "RIV-UI-0015", "RIV-UI-0019", "RIV-UI-0020", "RIV-UI-0021", "RIV-UI-0022", "RIV-UI-0023", "RIV-UI-0024", "RIV-UI-0025",
+    "RIV-UI-0009", "RIV-UI-0013", "RIV-UI-0014", "RIV-UI-0015", "RIV-UI-0019", "RIV-UI-0020", "RIV-UI-0021", "RIV-UI-0022", "RIV-UI-0023", "RIV-UI-0024", "RIV-UI-0025", "RIV-UI-0026",
     "RIV-RES-0001", "RIV-RES-0002", "RIV-REASON-0001", "RIV-REASON-0002",
     "RIV-CHAR-0004", "RIV-DIA-0001", "RIV-DIA-0002", "RIV-GRC-0004",
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
@@ -104,6 +104,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("operator_runtime", "operator_projection", "persists UI conversation and room history", "operator/projection.py:OperatorProjection", views=context + resident + room, checkpoint="RIV-UI-0021")
     add_edge("operator_runtime", "operator_projection", "archives and restores conversation UI history without changing continuity", "operator/openwebui.py:do_PATCH", views=context + resident + room, checkpoint="RIV-UI-0024")
     add_edge("operator_runtime", "operator_projection", "executes bounded durable conversation search", "operator/projection.py:search", views=context + resident + room, checkpoint="RIV-UI-0025")
+    add_edge("operator_runtime", "operator_projection", "hydrates selected conversation before center rendering and Snapshot", "operator/openwebui.py:activateConversation", views=context + resident + room, checkpoint="RIV-UI-0026")
     add_edge("operator_projection", "postgres_service", "stores typed conversation/message projection", "database/migrations/0027_operator_projection.sql", views=context + resident + room)
     add_edge("operator_runtime", "undercurrent", "authenticates local session", "operator/openwebui.py:/session", views=context + resident, checkpoint="RIV-UI-0014")
     add_edge("operator_runtime", "snapshot_runtime", "requests current DOM/state snapshot", "operator/openwebui.py:/snapshot", views=context + failures, checkpoint="RIV-UI-0019")
