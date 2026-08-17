@@ -144,7 +144,7 @@ class RiverviewOpenWebUIService:
 
         class Handler(BaseHTTPRequestHandler):
             def _send(self, status: HTTPStatus, payload: dict[str, object]) -> None:
-                body = json.dumps(payload, separators=(",", ":")).encode()
+                body = json.dumps(payload, separators=(",", ":"), default=str).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
