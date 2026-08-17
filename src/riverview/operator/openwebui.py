@@ -321,6 +321,9 @@ class RiverviewOpenWebUIService:
                         room["participant_profiles"] = [{"resident_id": p, "name": service.resident_gateway.resolve(p).name, "role": service.resident_gateway.resolve(p).role} for p in room.get("participants", [])]
                         projection = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
                         if projection:
+                            room["conversation_id"] = projection.get("id", "")
+                            room["title"] = projection.get("title", room.get("title", ""))
+                            room["messages"] = projection.get("messages", [])
                             for key in ("source_conversation_id", "inherited_context_window", "inherited_message_count", "participants_added"):
                                 room[key] = projection.get(key, "" if key != "inherited_message_count" else 0)
                         self._send(HTTPStatus.OK, room)
