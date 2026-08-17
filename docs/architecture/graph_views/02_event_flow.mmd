@@ -20,6 +20,8 @@ flowchart LR
     specification_store["Durable classified specification references"]
     flow_event_resident_message_submitted["resident.message.submitted"]
     flow_event_steward_seed_promoted["steward.seed.promoted"]
+    flow_event_steward_seed_cancelled["steward.seed.cancelled"]
+    flow_event_steward_seed_superseded["steward.seed.superseded"]
     flow_event_resident_response_completed["resident.response.completed"]
     flow_event_room_created["room.created"]
     flow_event_room_turn_completed["room.turn.completed"]
@@ -70,6 +72,10 @@ flowchart LR
     steward -->|EMITS| flow_event_steward_seed_promoted
     flow_event_steward_seed_promoted -->|DURABLE_EVENT| river
     river -->|CONSUMED/EVALUATED| cme_runtime
+    flow_event_steward_seed_cancelled -->|DURABLE_EVENT| river
+    river -->|CONSUMED/EVALUATED| steward
+    flow_event_steward_seed_superseded -->|DURABLE_EVENT| river
+    river -->|CONSUMED/EVALUATED| steward
     flow_event_resident_response_completed -->|DURABLE_EVENT| river
     flow_event_room_created -->|DURABLE_EVENT| river
     flow_event_room_turn_completed -->|DURABLE_EVENT| river

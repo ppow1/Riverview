@@ -11,11 +11,13 @@ def test_comms5_is_self_describing_for_a_fresh_client() -> None:
     assert discovered["contract"]["contract"] == CONTRACT_VERSION
     operations = discovered["capabilities"]["operations"]
     names = {item["name"] for item in operations}
-    required = {"submit_steward_seed", "store_specification", "seed_status", "seed_lineage", "objective_status", "cme_status"}
+    required = {"submit_steward_seed", "store_specification", "seed_status", "seed_lineage", "objective_status", "cme_status", "cancel_draft", "supersede_seed"}
     assert required <= names
     assert discovered["do_not"]
     for operation in names:
         assert service.describe_operation(operation)["authorization"]
+    assert service.describe_operation("cancel_draft")["authorization"] == "STEWARD-GATED_WRITE"
+    assert service.describe_operation("supersede_seed")["authorization"] == "STEWARD-GATED_WRITE"
 
 
 def test_comms5_does_not_treat_client_identity_as_steward_authority() -> None:

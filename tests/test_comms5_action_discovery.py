@@ -21,8 +21,8 @@ def _walk_schema(value: object) -> list[dict[str, object]]:
 
 def test_comms5_tools_have_chatgpt_discoverable_schemas() -> None:
     tools = mcp._tool_manager.list_tools()
-    assert len(tools) == 13
-    assert {tool.name for tool in tools} >= {"comms5_help", "comms5_seed_lineage"}
+    assert len(tools) == 15
+    assert {tool.name for tool in tools} >= {"comms5_help", "comms5_seed_lineage", "comms5_cancel_draft", "comms5_supersede_seed"}
 
     for tool in tools:
         assert re.fullmatch(r"[A-Za-z0-9_.-]+", tool.name)

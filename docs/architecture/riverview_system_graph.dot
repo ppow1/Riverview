@@ -60,6 +60,8 @@ digraph riverview {
   "specification_store" [label="Durable classified specification references"];
   "flow_event.resident.message.submitted" [label="resident.message.submitted"];
   "flow_event.steward.seed.promoted" [label="steward.seed.promoted"];
+  "flow_event.steward.seed.cancelled" [label="steward.seed.cancelled"];
+  "flow_event.steward.seed.superseded" [label="steward.seed.superseded"];
   "flow_event.resident.response.completed" [label="resident.response.completed"];
   "flow_event.room.created" [label="room.created"];
   "flow_event.room.turn.completed" [label="room.turn.completed"];
@@ -182,6 +184,7 @@ digraph riverview {
   "external_ai_clients" -> "comms5" [label="discovers and submits governed requests"];
   "comms5" -> "specification_store" [label="stores bounded classified specification reference"];
   "comms5" -> "steward" [label="creates draft requiring explicit confirmation"];
+  "comms5" -> "river" [label="appends governed draft lifecycle facts"];
   "comms5" -> "river" [label="publishes specification/ingress lineage events"];
   "comms5" -> "objective_state" [label="projects authoritative status without owning it"];
   "comms5" -> "cme_status_projection" [label="reads bounded CME status projection"];
@@ -198,6 +201,12 @@ digraph riverview {
   "steward" -> "flow_event.steward.seed.promoted" [label="EMITS"];
   "flow_event.steward.seed.promoted" -> "river" [label="DURABLE_EVENT"];
   "river" -> "cme_runtime" [label="CONSUMED/EVALUATED"];
+  "comms5" -> "flow_event.steward.seed.cancelled" [label="EMITS"];
+  "flow_event.steward.seed.cancelled" -> "river" [label="DURABLE_EVENT"];
+  "river" -> "steward" [label="CONSUMED/EVALUATED"];
+  "comms5" -> "flow_event.steward.seed.superseded" [label="EMITS"];
+  "flow_event.steward.seed.superseded" -> "river" [label="DURABLE_EVENT"];
+  "river" -> "steward" [label="CONSUMED/EVALUATED"];
   "resident_gateway_runtime" -> "flow_event.resident.response.completed" [label="EMITS"];
   "flow_event.resident.response.completed" -> "river" [label="DURABLE_EVENT"];
   "river" -> "resident_gateway_runtime" [label="CONSUMED/EVALUATED"];

@@ -34,7 +34,10 @@
     "RIV-COMMS5-0010",
     "RIV-COMMS5-0011",
     "RIV-COMMS5-0012",
-    "RIV-COMMS5-0013"
+    "RIV-COMMS5-0013",
+    "RIV-COMMS5-0014",
+    "RIV-COMMS5-0015",
+    "RIV-COMMS5-0016"
   ],
   "edges": [
     {
@@ -1093,6 +1096,19 @@
       ]
     },
     {
+      "checkpoint": "RIV-COMMS5-0014",
+      "derivation": "DERIVED",
+      "relation": "appends governed draft lifecycle facts",
+      "source": "comms5",
+      "source_ref": "mcp/comms5.py:cancel_draft/supersede_seed",
+      "target": "river",
+      "views": [
+        "comms",
+        "events",
+        "context"
+      ]
+    },
+    {
       "checkpoint": "RIV-COMMS5-0008",
       "derivation": "DERIVED",
       "relation": "publishes specification/ingress lineage events",
@@ -1279,6 +1295,70 @@
       "views": [
         "events",
         "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "comms5",
+      "source_ref": "grace/seeds.py:cancel_draft",
+      "target": "flow_event.steward.seed.cancelled",
+      "views": [
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.steward.seed.cancelled",
+      "source_ref": "grace/seeds.py:cancel_draft",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "grace/seeds.py:cancel_draft",
+      "target": "steward",
+      "views": [
+        "events",
+        "comms"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "comms5",
+      "source_ref": "grace/seeds.py:supersede_seed",
+      "target": "flow_event.steward.seed.superseded",
+      "views": [
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.steward.seed.superseded",
+      "source_ref": "grace/seeds.py:supersede_seed",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "grace/seeds.py:supersede_seed",
+      "target": "steward",
+      "views": [
+        "events",
+        "comms"
       ]
     },
     {
@@ -2194,6 +2274,8 @@
     "database/migrations/0025_cme_causation_projection.sql",
     "database/migrations/0026_comms5_governed_surface.sql",
     "database/migrations/0027_operator_projection.sql",
+    "database/migrations/0028_comms5_seed_lifecycle.sql",
+    "database/migrations/0029_comms5_promotion_idempotency.sql",
     "config/modules/*.json",
     "src/riverview/river/events.py",
     "src/riverview/autonomy/control.py",
@@ -2203,6 +2285,7 @@
     "src/riverview/notifications.py",
     "src/riverview/mcp/comms5.py",
     "src/riverview/mcp/comms5_server.py",
+    "src/riverview/grace/seeds.py",
     "Cookbook checkpoint registry"
   ],
   "manifests": [
@@ -2740,6 +2823,26 @@
       "source": "grace/seeds.py:confirm_and_promote",
       "views": [
         "engineering",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.steward.seed.cancelled",
+      "kind": "event",
+      "label": "steward.seed.cancelled",
+      "source": "grace/seeds.py:cancel_draft",
+      "views": [
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.steward.seed.superseded",
+      "kind": "event",
+      "label": "steward.seed.superseded",
+      "source": "grace/seeds.py:supersede_seed",
+      "views": [
+        "comms",
         "events"
       ]
     },

@@ -13,7 +13,7 @@ CHECKPOINTS = (
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
     "RIV-ARCH-0001", "RIV-INF-0001", "RIV-SPAT-0004", "RIV-GRC-0008",
     "RIV-COMMS5-0001", "RIV-COMMS5-0002", "RIV-COMMS5-0007", "RIV-COMMS5-0008",
-    "RIV-COMMS5-0009", "RIV-COMMS5-0010", "RIV-COMMS5-0011", "RIV-COMMS5-0012", "RIV-COMMS5-0013",
+    "RIV-COMMS5-0009", "RIV-COMMS5-0010", "RIV-COMMS5-0011", "RIV-COMMS5-0012", "RIV-COMMS5-0013", "RIV-COMMS5-0014", "RIV-COMMS5-0015", "RIV-COMMS5-0016",
 )
 
 VIEW_NAMES = {
@@ -193,6 +193,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("external_ai_clients", "comms5", "discovers and submits governed requests", "mcp/comms5_server.py", views=comms + context, checkpoint="RIV-COMMS5-0001")
     add_edge("comms5", "specification_store", "stores bounded classified specification reference", "mcp/comms5.py:store_specification", views=comms + context, checkpoint="RIV-COMMS5-0007")
     add_edge("comms5", "steward", "creates draft requiring explicit confirmation", "mcp/comms5.py:submit_steward_seed", views=comms + engineering, checkpoint="RIV-COMMS5-0009")
+    add_edge("comms5", "river", "appends governed draft lifecycle facts", "mcp/comms5.py:cancel_draft/supersede_seed", views=comms + event, checkpoint="RIV-COMMS5-0014")
     add_edge("comms5", "river", "publishes specification/ingress lineage events", "mcp/comms5.py", views=comms + event, checkpoint="RIV-COMMS5-0008")
     add_edge("comms5", "objective_state", "projects authoritative status without owning it", "mcp/comms5.py:objective_status", views=comms + engineering, checkpoint="RIV-COMMS5-0008")
     add_edge("comms5", "cme_status_projection", "reads bounded CME status projection", "mcp/comms5.py:cme_status", views=comms + context)
@@ -207,6 +208,8 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     event_specs = (
         ("resident.message.submitted", "operator_runtime", "resident_gateway_runtime", "operator/openwebui.py:emit_event", ("resident", "events")),
         ("steward.seed.promoted", "steward", "cme_runtime", "grace/seeds.py:confirm_and_promote", ("engineering", "events")),
+        ("steward.seed.cancelled", "comms5", "steward", "grace/seeds.py:cancel_draft", ("comms", "events")),
+        ("steward.seed.superseded", "comms5", "steward", "grace/seeds.py:supersede_seed", ("comms", "events")),
         ("resident.response.completed", "resident_gateway_runtime", "resident_gateway_runtime", "operator/openwebui.py:emit_event", ("resident", "events")),
         ("room.created", "room_runtime", "room_runtime", "operator/openwebui.py:emit_event", ("room", "events")),
         ("room.turn.completed", "room_runtime", "room_runtime", "operator/openwebui.py:emit_event", ("room", "events")),
@@ -283,7 +286,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
         "20_operator_contract": {"status": "PASS", "evidence": ["riverview.operator->core_contract", "operator_runtime->resident_gateway_contract"]},
         "21_quest_deferred": {"status": "PASS", "evidence": ["spatial_service", "spatial", "deferred/experimental"]},
     }
-    return {"schema_version": "riverview-system-graph-2.3", "generated_from": ["src/riverview/topology/graph.py", "src/riverview/autonomy/runtime.py", "database/migrations/0024_cme_runtime.sql", "database/migrations/0025_cme_causation_projection.sql", "database/migrations/0026_comms5_governed_surface.sql", "database/migrations/0027_operator_projection.sql", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "src/riverview/mcp/comms5.py", "src/riverview/mcp/comms5_server.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
+    return {"schema_version": "riverview-system-graph-2.3", "generated_from": ["src/riverview/topology/graph.py", "src/riverview/autonomy/runtime.py", "database/migrations/0024_cme_runtime.sql", "database/migrations/0025_cme_causation_projection.sql", "database/migrations/0026_comms5_governed_surface.sql", "database/migrations/0027_operator_projection.sql", "database/migrations/0028_comms5_seed_lifecycle.sql", "database/migrations/0029_comms5_promotion_idempotency.sql", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "src/riverview/mcp/comms5.py", "src/riverview/mcp/comms5_server.py", "src/riverview/grace/seeds.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
 
 def validate_graph(graph: dict[str, Any]) -> list[str]:
     node_ids = {node["id"] for node in graph.get("nodes", [])}

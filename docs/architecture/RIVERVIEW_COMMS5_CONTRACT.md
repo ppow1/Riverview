@@ -9,14 +9,17 @@ It does not replace Comms4 and does not own a workflow state machine. Client
 identity is provenance only. `submit_steward_seed` creates a draft, and
 `store_specification` creates a durable classified reference; neither promotes
 work. Promotion requires explicit authenticated Steward authorization and uses
-the canonical `StewardSeedStore.confirm_and_promote` path.
+the canonical `StewardSeedStore.confirm_and_promote` path. `cancel_draft` and
+`supersede_seed` are also Steward-gated, append-only draft transitions owned by
+`StewardSeedStore`; they never cancel or replace an active objective.
 
 The machine-readable `comms5_help` response is the discovery authority. It
 publishes operation schemas, bounds, classifications, authorization classes,
 examples, stable errors, idempotency rules, and explicit do-not guidance.
 `seed_status`, `seed_lineage`, `objective_status`, and `comms5_cme_status`
 return bounded metadata only. Large specification content, credentials, and
-protected payloads are never returned by these projections.
+protected payloads are never returned by these projections. Lifecycle history
+is projected from the append-only seed lifecycle ledger.
 
 The repository includes a connector template at
 `config/riverview-comms5.example.json`. External connector installation is a
