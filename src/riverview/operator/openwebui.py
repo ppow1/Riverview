@@ -10,18 +10,20 @@ import json
 import os
 import secrets
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
 from riverview.autonomy.runtime import CMEStatusStore
 from riverview.database import connect
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
-from riverview.operator.snapshot import build_snapshot
 from riverview.operator.projection import OperatorProjection
+from riverview.operator.snapshot import build_snapshot
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.residents.gateway import ResidentConversationGateway
 from riverview.river.events import Classification, RiverEvent
@@ -39,7 +41,7 @@ html[data-theme="dark"]{filter:invert(.92) hue-rotate(180deg)}
 <main class="main"><div class="workspace-head"><h1 id="title">General Riverview Operator</h1><p id="subtitle">Persistent operational context · event-driven activity remains visible while you work elsewhere.</p></div><section class="messages" id="messages"><div class="card muted">Select a conversation or create one to begin. Riverview will keep its history and reconcile activity from the authoritative service.</div></section><div class="composer"><select id="resident" aria-label="Resident"><option value="">General Riverview Operator</option></select><button id="mic" title="Bounded local microphone" aria-label="Capture bounded local microphone transcription">🎙</button><textarea id="message" placeholder="Write to the active conversation…" aria-label="Message"></textarea><div id="attachment-state" class="muted"></div><input id="artifact" type="file" hidden><button id="attach" title="Attach reference" aria-label="Attach reference">📎</button><button id="audio" title="Audio responses for this conversation" aria-label="Toggle audio responses">🔇</button><button class="send" id="send">Send</button></div></main>
 <aside class="context"><h2>Context</h2><div class="card"><strong id="context-title">Operational HUD</strong><p class="muted">Click a status indicator for authoritative detail. Technical envelopes stay behind Details.</p></div><div class="card"><strong>Resident</strong><p id="resident-state" class="muted">General Riverview Operator</p></div><div class="card"><strong>Attachments</strong><p class="muted">Selected files remain references; protected content is not exposed automatically.</p></div></aside></div>
 <footer></footer></div>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script><script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script><script>
 const $=id=>document.getElementById(id), state={conversations:[],active:null,audio:{},sessions:{}};
 const names={};
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -47,6 +49,8 @@ function renderList(){const q=$('search').value.toLowerCase();$('conversation-li
 function renderMessages(c){$('title').textContent=c.resident_id?(c.title+' · '+(c.resident_name||names[c.resident_id]?.name||'Resident')):c.title;$('subtitle').textContent=(c.resident_name||names[c.resident_id]?.name||'General Riverview Operator')+' · persistent conversation · '+c.id;$('messages').innerHTML=(c.messages||[]).map((m,i)=>`<article class="message ${m.role==='steward'?'steward':''}"><div class="who">${esc(m.speaker|| (m.role==='steward'?'Steward':c.resident_name||'Riverview'))}</div><div class="body">${esc(m.text)}</div><div class="actions"><button aria-label="Copy message" title="Copy message" onclick="copyMessage(${i})">⧉</button><button aria-label="Message details" title="Message details" onclick="details(${i})">ⓘ</button></div></article>`).join('')||'<div class="card muted">No messages yet. This workspace remains available for future activity.</div>';$('messages').scrollTop=$('messages').scrollHeight;}
 function select(id){state.active=id;const c=state.conversations.find(x=>x.id===id);if(!c)return;c.unread=false;state.audio[id]=localStorage.getItem('riverview-audio-'+id)==='true';$('audio').textContent=state.audio[id]?'🔊':'🔇';if(c.resident_id)$('resident').value=c.resident_id;else $('resident').value='';renderList();renderMessages(c);}
 async function load(){const auth=await fetch('/session',{method:'POST'});if(!auth.ok){$('subtitle').textContent='AUTHENTICATION FAILURE — local session could not be established';return;}const [r,cs]=await Promise.all([fetch('/api/residents'),fetch('/api/conversations')]);if(r.ok){(await r.json()).residents.forEach(x=>{names[x.resident_id]=x;$('resident').insertAdjacentHTML('beforeend',`<option value="${esc(x.resident_id)}">${esc(x.name)} — ${esc(x.role)}</option>`);});}if(cs.ok)state.conversations=(await cs.json()).conversations; if(!state.conversations.length) await createConversation('', 'General Riverview Operator');select(state.conversations[0].id);loadCme();}
+async function reconcile(){const r=await fetch('/api/conversations',{cache:'no-store'});if(!r.ok)return;const active=state.active;state.conversations=(await r.json()).conversations;renderList();if(active&&state.conversations.some(c=>c.id===active))select(active);}
+function startEventStream(){if(!window.EventSource)return;const stream=new EventSource('/api/events?after='+(state.cursor||0));stream.onmessage=event=>{state.cursor=Number(event.lastEventId||state.cursor||0);reconcile();};stream.onerror=()=>{stream.close();setTimeout(startEventStream,1500);};}
 async function createConversation(resident,title,roomId){const r=await fetch('/api/conversations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resident_id:resident,title:title||((names[resident]||{}).name||'General Riverview Operator'),room_id:roomId||''})});if(r.ok){const c=await r.json();state.conversations.unshift(c);select(c.id);}}
 async function hash(file){const bytes=await file.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function speakResponse(text){if(state.audio[state.active]&&window.speechSynthesis){window.speechSynthesis.cancel();window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));}}
@@ -59,7 +63,7 @@ async function showNotifications(){const r=await fetch('/api/notifications');if(
 function showRoomDialog(){const d=document.createElement('dialog');d.open=true;d.innerHTML='<form method="dialog" style="padding:18px"><h3>Create Room</h3><p class="muted">Choose participants. A room is a persistent conversation.</p><div>'+[...$('resident').options].filter(x=>x.value).map(x=>`<label style="display:block;padding:5px"><input type="checkbox" value="${esc(x.value)}"> ${esc(x.textContent)}</label>`).join('')+'</div><input id="room-name" placeholder="Room name (optional)" style="margin:10px 0;padding:8px"><br><button value="cancel">Cancel</button> <button id="room-create" value="default">Create</button></form>';document.body.append(d);d.querySelector('#room-create').onclick=async e=>{e.preventDefault();const participants=[...d.querySelectorAll('input[type=checkbox]:checked')].map(x=>x.value);if(!participants.length)return;const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participants,title:d.querySelector('#room-name').value})});if(r.ok){const room=await r.json();await createConversation('',d.querySelector('#room-name').value||('Room · '+participants.map(x=>names[x]?.name).join(' · ')));}d.remove();};}
 async function loadCme(){const r=await fetch('/api/cme/status',{cache:'no-store'});const b=await r.json();const x=$('cme');x.className=(r.ok?'healthy ':'danger ');x.title=r.ok?JSON.stringify(b):'CME unavailable';}
 $('send').onclick=()=>send();$('message').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};$('new').onclick=()=>createConversation($('resident').value,'');$('resident').onchange=()=>{const rid=$('resident').value,c=state.conversations.find(x=>x.id===state.active);if(rid&&(!c||c.resident_id!==rid))createConversation(rid,(names[rid]?.name||'Resident')+' Conversation');};$('room').onclick=showRoomDialog;$('menu').onclick=()=>{const open=$('sidebar').classList.toggle('hidden');localStorage.setItem('riverview-sidebar-open',String(!open));};$('search').oninput=renderList;$('mic').onclick=async()=>{const r=await fetch('/api/transcribe',{method:'POST'});if(r.ok)$('message').value=(await r.json()).text;};$('attach').onclick=()=>$('artifact').click();$('artifact').onchange=()=>{const f=$('artifact').files[0];$('attachment-state').innerHTML=f?`<span title="Pending reference">📎 ${esc(f.name)} <button id="remove-attachment" type="button" aria-label="Remove attachment">×</button></span>`:'';if(f)$('remove-attachment').onclick=()=>{$('artifact').value='';$('attachment-state').textContent='';};};$('audio').onclick=()=>{if(state.active){state.audio[state.active]=!state.audio[state.active];localStorage.setItem('riverview-audio-'+state.active,String(state.audio[state.active]));$('audio').textContent=state.audio[state.active]?'🔊':'🔇';}};$('snapshot').onclick=async()=>{const r=await fetch('/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_dom:'<!doctype html>'+document.documentElement.outerHTML,page_url:location.href,title:document.title,visible_status:'operator_v1',selected_resident:$('resident').value,composer:$('message').value,correlation_ids:[],artifact_refs:[],resident_state:{active_conversation:state.active,conversations:state.conversations.map(c=>({id:c.id,title:c.title,resident_id:c.resident_id}))},room_state:state.conversations.find(c=>c.id===state.active&&c.kind==='room')||{},api_state:{theme:document.documentElement.dataset.theme,route:location.pathname}})});if(r.ok){const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='riverview-snapshot.zip';a.click();}};$('cme').onclick=()=>location.href='/cme';document.querySelectorAll('[data-view]').forEach(x=>x.onclick=()=>{document.querySelectorAll('[data-view]').forEach(y=>y.classList.remove('active'));x.classList.add('active');if(x.dataset.view==='architecture')showArchitecture();else if(x.dataset.view==='settings')showSettings();else if(x.dataset.view==='notifications')showNotifications();else $('context-title').textContent=x.textContent;});document.documentElement.dataset.theme=localStorage.getItem('riverview-theme')||'system';if(localStorage.getItem('riverview-sidebar-open')==='false')$('sidebar').classList.add('hidden');
-load().catch(()=>{$('subtitle').textContent='BACKEND UNAVAILABLE — inspect diagnostics';});setInterval(loadCme,3000);
+load().then(startEventStream).catch(()=>{$('subtitle').textContent='BACKEND UNAVAILABLE — inspect diagnostics';});setInterval(loadCme,3000);
 </script></body></html>"""
 
 
@@ -211,6 +215,31 @@ class RiverviewOpenWebUIService:
                         self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cme_status_unavailable", "checkpoint": "RIV-GRC-0008"})
                 elif self.path == "/api/cme/status":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                elif urlsplit(self.path).path == "/api/events" and self._auth():
+                    try:
+                        query = parse_qs(urlsplit(self.path).query)
+                        cursor = int(query.get("after", ["0"])[0])
+                        self.send_response(HTTPStatus.OK)
+                        self.send_header("Content-Type", "text/event-stream")
+                        self.send_header("Cache-Control", "no-cache")
+                        self.send_header("Connection", "keep-alive")
+                        self.end_headers()
+                        deadline = time.monotonic() + 25
+                        while time.monotonic() < deadline:
+                            rows = CMEStatusStore().event_rows(cursor, limit=64)
+                            if rows:
+                                for row in rows:
+                                    cursor = int(row["sequence_id"])
+                                    self.wfile.write(f"id: {cursor}\ndata: {json.dumps(row, default=str)}\n\n".encode())
+                                self.wfile.flush()
+                            else:
+                                self.wfile.write(b": heartbeat\n\n")
+                                self.wfile.flush()
+                            time.sleep(1)
+                    except (BrokenPipeError, ConnectionResetError, RuntimeError, OSError, TypeError, ValueError):
+                        return
+                elif urlsplit(self.path).path == "/api/events":
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif self.path == "/api/conversations" and self._auth():
                     self._send(HTTPStatus.OK, {"conversations": service.projection.list()})
                 elif self.path == "/api/architecture" and self._auth():
@@ -258,7 +287,7 @@ class RiverviewOpenWebUIService:
                         from riverview.operator.local_speech import capture_windows_speech
                         result = capture_windows_speech()
                         emit_event("microphone.transcript.completed", "operator", str(uuid4()), payload={"provider_id": result.provider_id, "retention": result.retention, "audio_retained": False})
-                        self._send(HTTPStatus.OK, {"provider_id": result.provider_id, "text": result.text, "retention": result.retention})
+                        self._send(HTTPStatus.OK, {"provider_id": result.provider_id, "text": result.text, "retention": result.retention, "culture": result.culture, "confidence": result.confidence})
                     except (RuntimeError, ValueError):
                         diagnostic("RIV-UI-0015", "microphone_capture", "microphone_worker_failure", "Bounded local microphone capture failed.")
                         self._send(HTTPStatus.BAD_GATEWAY, {"error": "local_transcription_unavailable", "checkpoint": "RIV-UI-0015"})

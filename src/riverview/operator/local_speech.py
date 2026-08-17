@@ -14,6 +14,8 @@ class LocalSpeechResult:
     text: str
     retention: str
     duration_seconds: int
+    culture: str = "en-US"
+    confidence: float | None = None
 
 
 def capture_windows_speech(*, duration_seconds: int = 8) -> LocalSpeechResult:
@@ -22,7 +24,7 @@ def capture_windows_speech(*, duration_seconds: int = 8) -> LocalSpeechResult:
     script = Path(__file__).parents[3] / "tools" / "powershell" / "operator" / "Invoke-RiverviewLocalTranscription.ps1"
     try:
         completed = subprocess.run(
-            ["powershell", "-NoProfile", "-File", str(script), "-DurationSeconds", str(duration_seconds)],
+            ["powershell", "-NoProfile", "-File", str(script), "-DurationSeconds", str(duration_seconds), "-Culture", "en-US"],
             capture_output=True,
             text=True,
             timeout=duration_seconds + 10,
@@ -34,5 +36,5 @@ def capture_windows_speech(*, duration_seconds: int = 8) -> LocalSpeechResult:
     if not isinstance(payload, dict) or not payload.get("text"):
         raise RuntimeError("RIV-UI-0015: local transcription returned no text.")
     return LocalSpeechResult(
-        str(payload["provider_id"]), str(payload["text"]), str(payload["retention"]), int(payload["duration_seconds"])
+        str(payload["provider_id"]), str(payload["text"]), str(payload["retention"]), int(payload["duration_seconds"]), str(payload.get("culture", "en-US")), float(payload["confidence"]) if payload.get("confidence") is not None else None
     )

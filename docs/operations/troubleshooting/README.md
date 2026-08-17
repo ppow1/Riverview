@@ -38,6 +38,8 @@ Every checkpoint records:
 - `RIV-UI-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â read-only Steward status and operator surfaces
 
 - `RIV-UI-0021` — durable Operator conversation/room projection and restart reconciliation
+- `RIV-UI-0022` — bounded Operator event stream, cursor recovery, and reconnect reconciliation
+- `RIV-UI-0023` — dynamic Mermaid architecture rendering and view replacement
 
 ## Acceptance rule
 
