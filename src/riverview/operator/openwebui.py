@@ -309,6 +309,10 @@ class RiverviewOpenWebUIService:
                         length = int(self.headers.get("Content-Length", "0"))
                         payload = json.loads(self.rfile.read(length))
                         turn = service.resident_gateway.add_room_turn(UUID(room_text), speaker=str(payload["speaker"]), text=str(payload["text"]), correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
+                        for room_conversation in service.projection.list():
+                            if room_conversation.get("room_id") == room_text:
+                                service.projection.append(UUID(str(room_conversation["id"])), role="resident", text=str(payload["text"]), speaker_id=turn["speaker_id"], speaker=str(payload["speaker"]), details=turn)
+                                break
                         emit_event("room.turn.submitted", "room", room_text, UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None, {"speaker": str(payload["speaker"]), "classification": "operational"})
                         self._send(HTTPStatus.OK, turn)
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError):
