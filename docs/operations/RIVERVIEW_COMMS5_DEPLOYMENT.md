@@ -14,10 +14,17 @@ The Comms5 route is configured separately as:
 It proxies to `127.0.0.1:11826`, uses separate service-held bearer variables,
 and does not alter the existing Comms4 `/mcp` route.
 
-At the time of this revision, the repository and local loopback service are
-ready, but the authorized Caddy host could not be reached from the deployment
-environment. The public route therefore remains deployment-required until an
-authorized operator installs and validates
-`config/riverview-comms5-ingress.Caddyfile.example` on the existing Caddy host.
-Do not tell a client that the public URL is live until authenticated external
-MCP initialization and `tools/list` pass.
+The corrected reverse tunnel is:
+
+`VPS 127.0.0.1:11826 -> Windows 127.0.0.1:11826`
+
+It is launched by `tools/powershell/mcp/Start-RiverviewComms5ReverseTunnel.ps1`
+with the documented `root@64.227.21.54` SSH boundary and keepalive options.
+The Caddy route rewrites `/comms5/mcp` to the loopback backend `/mcp` before
+proxying; without that rewrite the authenticated public route returns backend
+404.
+
+The route has now been installed and validated on the authorized Caddy host.
+Authenticated external MCP initialization, notification handling, tool
+enumeration, and `comms5_help` invocation pass. Comms4 remains on its original
+`/mcp` route.

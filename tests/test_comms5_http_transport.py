@@ -22,6 +22,7 @@ def test_comms5_deployment_template_separates_stdio_and_external() -> None:
 def test_comms5_proxy_template_does_not_change_comms4_route() -> None:
     template = Path("config/riverview-comms5-ingress.Caddyfile.example").read_text(encoding="utf-8")
     assert "path /comms5/mcp" in template
+    assert "uri replace /comms5/mcp /mcp" in template
     assert "127.0.0.1:11826" in template
     assert "RIVERVIEW_COMMS5_CLIENT_SECRET" in template
-    assert "/mcp" not in template.replace("/comms5/mcp", "")
+    assert "path /mcp" not in template

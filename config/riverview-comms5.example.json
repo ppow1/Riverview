@@ -9,7 +9,7 @@
     "transport": "streamable-http",
     "loopback_endpoint": "http://127.0.0.1:11826/mcp",
     "public_endpoint": "https://riverview-comms.ionoge.com/comms5/mcp",
-    "deployment_state": "requires approved Caddy host deployment"
+    "deployment_state": "live_verified"
   },
   "environment": {
     "PYTHONPATH": "<Riverview repository>/src"

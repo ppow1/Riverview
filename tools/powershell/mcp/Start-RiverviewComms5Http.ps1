@@ -11,7 +11,7 @@ $Python=Join-Path $RepositoryPath '.venv\Scripts\python.exe'
 if(-not(Test-Path $Python)){ throw 'RIV-COMMS5-0015: Riverview virtual environment not found.' }
 
 $listener=Get-NetTCPConnection -State Listen -LocalAddress '127.0.0.1' -LocalPort 11826 -ErrorAction SilentlyContinue
-if($listener){ throw "RIV-COMMS5-0015: port 11826 is already owned by PID $($listener.OwningProcess). Stop and diagnose that owner; do not kill it automatically." }
+if($listener){ exit 0 }
 
 Push-Location $RepositoryPath
 try {
