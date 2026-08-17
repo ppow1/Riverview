@@ -40,7 +40,7 @@ class OperatorProjection:
             pattern = f"%{term}%"
             cursor.execute("""SELECT c.conversation_id,c.title,c.resident_id,c.room_id,c.kind,c.archived_at,m.body,m.occurred_at,m.turn_order
                              FROM operator_conversations c JOIN LATERAL (
-                               SELECT body,occurred_at FROM operator_messages
+                               SELECT body,occurred_at,turn_order FROM operator_messages
                                WHERE conversation_id=c.conversation_id AND body ILIKE %s
                                ORDER BY occurred_at DESC LIMIT 1
                              ) m ON TRUE
