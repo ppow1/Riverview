@@ -43,6 +43,7 @@ Every checkpoint records:
 - `RIV-UI-0024` — Operator UX lifecycle, layout, navigation, archive, and room display reconciliation
 - `RIV-UI-0025` — Operator global rail actions, explicit resident selection, and durable history search
 - `RIV-UI-0026` — Operator cold conversation activation, durable hydration, and selection/reconciliation races
+- `RIV-UI-0027` — Operator room formation, participant addition, room persistence, and bounded context transfer
 
 ## Acceptance rule
 

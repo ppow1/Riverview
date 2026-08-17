@@ -12,6 +12,7 @@
     "RIV-UI-0024",
     "RIV-UI-0025",
     "RIV-UI-0026",
+    "RIV-UI-0027",
     "RIV-RES-0001",
     "RIV-RES-0002",
     "RIV-REASON-0001",
@@ -112,6 +113,20 @@
       "relation": "hydrates selected conversation before center rendering and Snapshot",
       "source": "operator_runtime",
       "source_ref": "operator/openwebui.py:activateConversation",
+      "target": "operator_projection",
+      "views": [
+        "context",
+        "resident",
+        "events",
+        "room"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0027",
+      "derivation": "DERIVED",
+      "relation": "derives rooms with bounded inherited context and participant lineage",
+      "source": "operator_runtime",
+      "source_ref": "operator/openwebui.py:/api/rooms",
       "target": "operator_projection",
       "views": [
         "context",
@@ -2306,6 +2321,7 @@
     "database/migrations/0027_operator_projection.sql",
     "database/migrations/0028_comms5_seed_lifecycle.sql",
     "database/migrations/0029_comms5_promotion_idempotency.sql",
+    "database/migrations/0030_operator_room_lineage.sql",
     "config/modules/*.json",
     "src/riverview/river/events.py",
     "src/riverview/autonomy/control.py",

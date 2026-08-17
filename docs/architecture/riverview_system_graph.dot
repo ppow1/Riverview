@@ -103,6 +103,7 @@ digraph riverview {
   "operator_runtime" -> "operator_projection" [label="archives and restores conversation UI history without changing continuity"];
   "operator_runtime" -> "operator_projection" [label="executes bounded durable conversation search"];
   "operator_runtime" -> "operator_projection" [label="hydrates selected conversation before center rendering and Snapshot"];
+  "operator_runtime" -> "operator_projection" [label="derives rooms with bounded inherited context and participant lineage"];
   "operator_projection" -> "postgres_service" [label="stores typed conversation/message projection"];
   "operator_runtime" -> "undercurrent" [label="authenticates local session"];
   "operator_runtime" -> "snapshot_runtime" [label="requests current DOM/state snapshot"];
