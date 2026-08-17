@@ -24,8 +24,10 @@ from psycopg import Error as PostgresError
 from riverview.autonomy.runtime import CMEStatusStore
 from riverview.database import connect
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
+from riverview.operator.activity import ActivityProjection
 from riverview.operator.projection import OperatorProjection
 from riverview.operator.snapshot import build_snapshot
+from riverview.operator.ui import UI_HTML as CLEAN_UI_HTML
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.residents.gateway import ResidentConversationGateway
 from riverview.river.events import Classification, RiverEvent
@@ -121,6 +123,7 @@ class RiverviewOpenWebUIService:
         # The projection owns UI history only; resident continuity/canon remains
         # exclusively in the resident/character mechanisms.
         self.projection = OperatorProjection()
+        self.activity = ActivityProjection()
         self.conversations: dict[UUID, dict[str, object]] = {}
         for existing in self.projection.list():
             if existing.get("kind") == "room" and existing.get("room_id"):
@@ -212,7 +215,7 @@ class RiverviewOpenWebUIService:
 
             def do_GET(self) -> None:
                 if self.path == "/":
-                    self._send_html(UI_HTML)
+                    self._send_html(CLEAN_UI_HTML)
                 elif self.path == "/cme":
                     self._send_html("""<!doctype html><html data-theme='system'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>CME status</title><style>:root{font:16px system-ui;color:#17212b;background:#f5f7fa;--panel:#fff;--border:#dbe2ea}body{max-width:760px;margin:3rem auto;padding:0 1rem}body,pre{background:var(--panel)}pre{white-space:pre-wrap;border:1px solid var(--border);border-radius:10px;padding:1rem}a{display:inline-block;margin-bottom:1rem}html[data-theme='dark']{color-scheme:dark;--panel:#182231;--border:#344257;color:#e8edf5;background:#111722}summary{cursor:pointer}</style><a href='/'>← Back to Operator</a><h1>Continuous Momentum Engine</h1><p>Authoritative operational status.</p><section id='human'>Loading…</section><details><summary>Raw / Advanced</summary><pre id='status'></pre></details><script>document.documentElement.dataset.theme=localStorage.getItem('riverview-theme')||'system';async function load(){const r=await fetch('/api/cme/status',{cache:'no-store'});const b=await r.json();document.getElementById('human').innerHTML='<strong>'+((b.heartbeat_health||'UNAVAILABLE')+' · '+(b.effective_state||'UNAVAILABLE'))+'</strong><p>Heartbeat age: '+(b.heartbeat_age_seconds??'unavailable')+'s</p><p>Last event: '+(b.last_event_type||'unavailable')+'</p><p>Waiting: '+(b.waiting_reason||'none')+'</p>';document.getElementById('status').textContent=JSON.stringify(b,null,2)}load();setInterval(load,3000);</script></html>""")
                 elif self.path == "/spatial":
@@ -268,6 +271,17 @@ class RiverviewOpenWebUIService:
                         return
                 elif urlsplit(self.path).path == "/api/events":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                elif urlsplit(self.path).path == "/api/activity" and self._auth():
+                    try:
+                        query = parse_qs(urlsplit(self.path).query)
+                        after = int(query.get("after", ["0"])[0])
+                        limit = int(query.get("limit", ["50"])[0])
+                        category = str(query.get("category", [""])[0]).strip().lower()
+                        if category not in {"", "all", "comms", "grace", "cme", "objectives", "work", "notifications", "river"}:
+                            raise ValueError("activity_category_invalid")
+                        self._send(HTTPStatus.OK, service.activity.list(after=after, limit=limit, category="" if category == "all" else category))
+                    except (PostgresError, RuntimeError, TypeError, ValueError):
+                        self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "activity_projection_unavailable", "checkpoint": "RIV-UI-0028"})
                 elif urlsplit(self.path).path == "/api/conversations" and self._auth():
                     query = parse_qs(urlsplit(self.path).query)
                     include_archived = query.get("archived", ["active"])[0] in {"all", "true", "archived"}
@@ -566,6 +580,17 @@ class RiverviewOpenWebUIService:
                     length = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(length))
                     current = service.projection.refresh(conversation_id) or {}
+                    if "resident_id" in payload:
+                        resident_id = str(payload.get("resident_id") or "").strip()
+                        if not resident_id or current.get("kind") == "room" or current.get("resident_id"):
+                            raise ValueError("initial resident assignment is only valid for an unassigned conversation")
+                        profile = next((item for item in service.resident_gateway.residents() if item["resident_id"] == resident_id), None)
+                        if profile is None:
+                            raise ValueError("resident is not admitted")
+                        assigned = service.projection.assign_resident(conversation_id, resident_id, str(payload.get("title") or f"{profile['name']} Conversation"))
+                        if assigned is None:
+                            raise ValueError("conversation resident assignment was not accepted")
+                        current = assigned
                     if "title" in payload:
                         current["title"] = str(payload["title"]).strip()[:160] or current["title"]
                         if service.projection.available:

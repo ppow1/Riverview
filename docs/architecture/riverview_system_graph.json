@@ -13,6 +13,7 @@
     "RIV-UI-0025",
     "RIV-UI-0026",
     "RIV-UI-0027",
+    "RIV-UI-0028",
     "RIV-RES-0001",
     "RIV-RES-0002",
     "RIV-REASON-0001",
@@ -133,6 +134,36 @@
         "resident",
         "events",
         "room"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0028",
+      "derivation": "DERIVED",
+      "relation": "projects bounded meaningful activity by River cursor/category",
+      "source": "river",
+      "source_ref": "operator/activity.py:ActivityProjection",
+      "target": "activity_projection",
+      "views": [
+        "context",
+        "engineering",
+        "events",
+        "comms",
+        "notifications"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0028",
+      "derivation": "DERIVED",
+      "relation": "serves Activity read workspace without owning workflow state",
+      "source": "activity_projection",
+      "source_ref": "operator/openwebui.py:/api/activity",
+      "target": "operator_runtime",
+      "views": [
+        "context",
+        "engineering",
+        "events",
+        "comms",
+        "notifications"
       ]
     },
     {
@@ -2744,6 +2775,13 @@
       "id": "character_canon",
       "kind": "core",
       "label": "Versioned accepted character canon",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "activity_projection",
+      "kind": "runtime",
+      "label": "Authoritative River activity projection",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },

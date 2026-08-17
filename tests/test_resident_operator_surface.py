@@ -93,7 +93,7 @@ def test_neutral_new_and_derived_room_execution_preserve_source_and_context() ->
             html = response.read().decode()
         assert "New Conversation" in html
         assert "No previous context (from this point forward)" in html
-        assert "neutralComposerStyle" in html
-        assert "$('mic-state').className='sr-only'" in html
+        assert "const validViews=new Set" in html
+        assert "function renderApp()" in html
     finally:
         service.stop()

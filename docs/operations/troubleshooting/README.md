@@ -44,6 +44,7 @@ Every checkpoint records:
 - `RIV-UI-0025` — Operator global rail actions, explicit resident selection, and durable history search
 - `RIV-UI-0026` — Operator cold conversation activation, durable hydration, and selection/reconciliation races
 - `RIV-UI-0027` — Operator room formation, participant addition, room persistence, and bounded context transfer
+- `RIV-UI-0028` — Operator authoritative activity projection and mutually exclusive primary views
 
 ## Acceptance rule
 

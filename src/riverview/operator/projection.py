@@ -103,3 +103,20 @@ class OperatorProjection:
                 return None
             cursor.execute("SELECT conversation_id,resident_id,room_id,kind,title,classification,archived_at,source_conversation_id,inherited_context_window,inherited_message_count,participants_added FROM operator_conversations WHERE conversation_id=%s", (conversation_id,))
             return self._conversation(cursor, cursor.fetchone())
+
+    def assign_resident(self, conversation_id: UUID, resident_id: str, title: str) -> dict[str, Any] | None:
+        """Assign the initial resident exactly once on a neutral conversation."""
+        if not resident_id.strip():
+            return self.refresh(conversation_id)
+        if not self.available:
+            item = self.memory.get(conversation_id)
+            if item is None or item.get("resident_id"):
+                return None
+            item["resident_id"] = resident_id
+            item["title"] = title[:160]
+            return item
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("UPDATE operator_conversations SET resident_id=%s,title=%s,updated_at=now() WHERE conversation_id=%s AND resident_id IS NULL AND kind='conversation'", (resident_id, title[:160], conversation_id))
+            if cursor.rowcount != 1:
+                return None
+        return self.refresh(conversation_id)
