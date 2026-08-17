@@ -40,6 +40,7 @@ Every checkpoint records:
 - `RIV-UI-0021` — durable Operator conversation/room projection and restart reconciliation
 - `RIV-UI-0022` — bounded Operator event stream, cursor recovery, and reconnect reconciliation
 - `RIV-UI-0023` — dynamic Mermaid architecture rendering and view replacement
+- `RIV-UI-0024` — Operator UX lifecycle, layout, navigation, archive, and room display reconciliation
 
 ## Acceptance rule
 

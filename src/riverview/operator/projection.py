@@ -18,21 +18,21 @@ class OperatorProjection:
         except (RuntimeError, OSError, ValueError):
             self.available = False
 
-    def list(self) -> list[dict[str, Any]]:
+    def list(self, *, include_archived: bool = False) -> list[dict[str, Any]]:
         if not self.available:
             return list(self.memory.values())
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("""SELECT conversation_id,resident_id,room_id,kind,title,classification FROM operator_conversations
-                             WHERE archived_at IS NULL ORDER BY updated_at DESC""")
+            cursor.execute("""SELECT conversation_id,resident_id,room_id,kind,title,classification,archived_at FROM operator_conversations
+                             WHERE (%s OR archived_at IS NULL) ORDER BY updated_at DESC""", (include_archived,))
             rows = cursor.fetchall()
             return [self._conversation(cursor, row) for row in rows]
 
     def _conversation(self, cursor: Any, row: Any) -> dict[str, Any]:
-        conversation_id, resident_id, room_id, kind, title, classification = row
+        conversation_id, resident_id, room_id, kind, title, classification, *archive = row
         cursor.execute("""SELECT role,speaker_id,speaker_name,body,metadata FROM operator_messages
                          WHERE conversation_id=%s ORDER BY turn_order""", (conversation_id,))
         messages = [{"role": r[0], "speaker_id": r[1], "speaker": r[2], "text": r[3], "details": r[4]} for r in cursor.fetchall()]
-        return {"id": str(conversation_id), "resident_id": resident_id or "", "resident_name": "", "room_id": str(room_id) if room_id else "", "kind": kind, "title": title, "classification": classification, "messages": messages, "preview": messages[-1]["text"][:180] if messages else "", "unread": False}
+        return {"id": str(conversation_id), "resident_id": resident_id or "", "resident_name": "", "room_id": str(room_id) if room_id else "", "kind": kind, "title": title, "classification": classification, "messages": messages, "preview": messages[-1]["text"][:180] if messages else "", "unread": False, "archived": bool(archive and archive[0])}
 
     def create(self, *, resident_id: str, title: str, kind: str = "conversation", room_id: UUID | None = None, classification: str = "operational") -> dict[str, Any]:
         conversation_id = uuid4()
@@ -65,3 +65,19 @@ class OperatorProjection:
             cursor.execute("SELECT conversation_id,resident_id,room_id,kind,title,classification FROM operator_conversations WHERE conversation_id=%s AND archived_at IS NULL", (conversation_id,))
             row = cursor.fetchone()
             return self._conversation(cursor, row) if row else None
+
+    def set_archived(self, conversation_id: UUID, archived: bool) -> dict[str, Any] | None:
+        if not self.available:
+            item = self.memory.get(conversation_id)
+            if item is not None:
+                item["archived"] = archived
+            return item
+        with connect() as connection, connection.cursor() as cursor:
+            if archived:
+                cursor.execute("UPDATE operator_conversations SET archived_at=now(),updated_at=now() WHERE conversation_id=%s", (conversation_id,))
+            else:
+                cursor.execute("UPDATE operator_conversations SET archived_at=NULL,updated_at=now() WHERE conversation_id=%s", (conversation_id,))
+            if cursor.rowcount == 0:
+                return None
+            cursor.execute("SELECT conversation_id,resident_id,room_id,kind,title,classification,archived_at FROM operator_conversations WHERE conversation_id=%s", (conversation_id,))
+            return self._conversation(cursor, cursor.fetchone())
