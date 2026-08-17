@@ -19,6 +19,8 @@ from threading import Thread
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
+from psycopg import Error as PostgresError
+
 from riverview.autonomy.runtime import CMEStatusStore
 from riverview.database import connect
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
@@ -273,7 +275,13 @@ class RiverviewOpenWebUIService:
                         limit = int(query.get("limit", ["25"])[0])
                     except ValueError:
                         limit = 25
-                    self._send(HTTPStatus.OK, {"query": term, "results": service.projection.search(term, limit=limit)})
+                    try:
+                        results = service.projection.search(term, limit=limit)
+                    except (PostgresError, RuntimeError, OSError, TypeError, ValueError) as exc:
+                        diagnostic("RIV-UI-0025", "conversation_search", "durable_search_failure", f"Bounded durable search failed: {type(exc).__name__}.")
+                        self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "conversation_search_unavailable", "checkpoint": "RIV-UI-0025"})
+                    else:
+                        self._send(HTTPStatus.OK, {"query": term, "results": results})
                 elif self.path == "/api/architecture" and self._auth():
                     root = __import__("pathlib").Path(__file__).resolve().parents[3] / "docs" / "architecture" / "graph_views"
                     views = []
