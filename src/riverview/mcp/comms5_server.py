@@ -11,7 +11,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from riverview.mcp.comms5 import Comms5Service
+from riverview.mcp.comms5 import CONTRACT_VERSION, Comms5Service
 
 SERVER_NAME = "Riverview Comms5"
 mcp = FastMCP(SERVER_NAME)
@@ -20,6 +20,11 @@ service = Comms5Service()
 
 def _safe(value: Any) -> Any:
     return json.loads(json.dumps(value, default=str))
+
+
+def _request(**values: Any) -> dict[str, Any]:
+    """Build the backend request without exposing an opaque MCP object schema."""
+    return {key: value for key, value in values.items() if value not in (None, "")}
 
 
 @mcp.tool()
@@ -53,15 +58,53 @@ def comms5_examples() -> Any:
 
 
 @mcp.tool()
-def comms5_submit_steward_seed(request: dict[str, Any]) -> Any:
+def comms5_submit_steward_seed(
+    seed_text: str,
+    idempotency_key: str,
+    client_id: str,
+    client_type: str,
+    client_name: str,
+    authenticated_principal: str,
+    correlation_id: str = "",
+    client_version: str = "",
+    protocol_version: str = CONTRACT_VERSION,
+    classification: str = "river",
+    causation_id: str = "",
+    specification_id: str = "",
+) -> Any:
     """Submit a bounded draft; this never promotes or creates work."""
-    return _safe(service.submit_steward_seed(request))
+    return _safe(service.submit_steward_seed(_request(
+        seed_text=seed_text, idempotency_key=idempotency_key, client_id=client_id,
+        client_type=client_type, client_name=client_name,
+        authenticated_principal=authenticated_principal, correlation_id=correlation_id,
+        client_version=client_version, protocol_version=protocol_version,
+        classification=classification, causation_id=causation_id,
+        specification_id=specification_id,
+    )))
 
 
 @mcp.tool()
-def comms5_store_specification(request: dict[str, Any]) -> Any:
+def comms5_store_specification(
+    content: str,
+    summary: str,
+    idempotency_key: str,
+    client_id: str,
+    client_type: str,
+    client_name: str,
+    authenticated_principal: str,
+    correlation_id: str = "",
+    client_version: str = "",
+    protocol_version: str = CONTRACT_VERSION,
+    classification: str = "river",
+) -> Any:
     """Store a bounded large specification as an authoritative reference."""
-    return _safe(service.store_specification(request))
+    return _safe(service.store_specification(_request(
+        content=content, summary=summary, idempotency_key=idempotency_key,
+        client_id=client_id, client_type=client_type, client_name=client_name,
+        authenticated_principal=authenticated_principal, correlation_id=correlation_id,
+        client_version=client_version, protocol_version=protocol_version,
+        classification=classification,
+    )))
 
 
 @mcp.tool()
@@ -95,9 +138,19 @@ def comms5_recent_steward_submissions(limit: int = 20) -> Any:
 
 
 @mcp.tool()
-def comms5_confirm_and_promote_seed(request: dict[str, Any]) -> Any:
+def comms5_confirm_and_promote_seed(
+    seed_id: str,
+    idempotency_key: str,
+    explicit_steward_confirmation: bool,
+    authenticated_principal: str,
+) -> Any:
     """Promote only with explicit Steward authorization through the canonical store."""
-    return _safe(service.confirm_and_promote_seed(request))
+    return _safe(service.confirm_and_promote_seed({
+        "seed_id": seed_id,
+        "idempotency_key": idempotency_key,
+        "explicit_steward_confirmation": explicit_steward_confirmation,
+        "authenticated_principal": authenticated_principal,
+    }))
 
 
 def main() -> None:
