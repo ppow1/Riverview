@@ -1,9 +1,16 @@
 {
   "name": "Riverview Comms5",
   "contract": "riverview-comms-contract:5.0",
-  "transport": "stdio",
-  "command": "python",
-  "args": ["-m", "riverview.mcp.comms5_server"],
+  "local_stdio": {
+    "command": "python",
+    "args": ["-m", "riverview.mcp.comms5_server"]
+  },
+  "external_transport": {
+    "transport": "streamable-http",
+    "loopback_endpoint": "http://127.0.0.1:11826/mcp",
+    "public_endpoint": "https://riverview-comms.ionoge.com/comms5/mcp",
+    "deployment_state": "requires approved Caddy host deployment"
+  },
   "environment": {
     "PYTHONPATH": "<Riverview repository>/src"
   },

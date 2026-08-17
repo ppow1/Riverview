@@ -28,7 +28,8 @@
     "RIV-COMMS5-0008",
     "RIV-COMMS5-0009",
     "RIV-COMMS5-0010",
-    "RIV-COMMS5-0011"
+    "RIV-COMMS5-0011",
+    "RIV-COMMS5-0012"
   ],
   "edges": [
     {
@@ -1080,6 +1081,47 @@
       "views": [
         "comms",
         "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "hosts versioned MCP tools",
+      "source": "comms5_http_service",
+      "source_ref": "mcp/comms5_http_server.py",
+      "target": "comms5",
+      "views": [
+        "services",
+        "context",
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0012",
+      "derivation": "DERIVED",
+      "relation": "authenticated HTTPS reverse proxy to loopback",
+      "source": "comms5_external_route",
+      "source_ref": "config/riverview-comms5-ingress.Caddyfile.example",
+      "target": "comms5_http_service",
+      "views": [
+        "services",
+        "context",
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0012",
+      "derivation": "DERIVED",
+      "relation": "connects through approved public MCP URL",
+      "source": "external_ai_clients",
+      "source_ref": "config/riverview-comms5.example.json",
+      "target": "comms5_external_route",
+      "views": [
+        "comms",
+        "events",
+        "services",
         "context"
       ]
     },
@@ -2541,6 +2583,20 @@
       "id": "spatial_service",
       "kind": "service",
       "label": "Spatial service 192.168.1.88:18443 (deferred/experimental)",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "comms5_http_service",
+      "kind": "service",
+      "label": "Comms5 loopback Streamable HTTP 127.0.0.1:11826",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "comms5_external_route",
+      "kind": "service",
+      "label": "Approved Caddy route /comms5/mcp (deployment boundary)",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },
