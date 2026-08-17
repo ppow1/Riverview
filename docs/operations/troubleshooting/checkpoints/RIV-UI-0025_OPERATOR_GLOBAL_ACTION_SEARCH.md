@@ -13,4 +13,8 @@ create an unrelated conversation.
 
 Recovery verification covers New/Room actions from every route, confirmed room
 creation, explicit resident-to-room conversion, archived and active search,
-direct history hydration, and matching-message navigation.
+direct history hydration, and matching-message navigation. `+ New` must create
+an independent neutral conversation state; it must not copy the previously
+active resident. Selecting a resident from that neutral state starts the
+selected resident conversation, while selecting a different resident from an
+established conversation requires explicit add-participant confirmation.

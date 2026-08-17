@@ -8,7 +8,9 @@ participant, or a room turn is not persisted.
 Verify the modal boundary, admitted participant IDs, room projection, room chat
 endpoint, provider/session initialization, and durable message append. Derived
 rooms must record source conversation lineage and an explicit bounded context
-window. Never copy rendered HTML or resident continuity into an unrelated room.
+window. The selected inherited messages must be visible in the hydrated room
+transcript and must be distinguished from post-formation turns. Never copy
+rendered HTML or resident continuity into an unrelated room.
 
 Recovery verification covers visible `showModal()` room creation, canonical
 activation, room participant presentation, a persisted room turn after refresh,
