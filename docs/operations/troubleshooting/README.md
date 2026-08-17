@@ -37,6 +37,8 @@ Every checkpoint records:
 - `RIV-SEC-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â classification and Undercurrent boundaries
 - `RIV-UI-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â read-only Steward status and operator surfaces
 
+- `RIV-UI-0021` — durable Operator conversation/room projection and restart reconciliation
+
 ## Acceptance rule
 
 No capability is operationally complete until a new AI conversation can identify the checkpoint, distinguish modeled failures, perform the smallest safe repair, and verify recovery from repository guidance and captured evidence.

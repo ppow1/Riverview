@@ -31,7 +31,9 @@ flowchart LR
     route__["/"]
     route__session["/session"]
     route__api_chat["/api/chat"]
+    route__api_conversations["/api/conversations"]
     route__api_rooms["/api/rooms"]
+    route__api_architecture["/api/architecture"]
     route__snapshot["/snapshot"]
     riverview_reasoning_ollama["Loopback Ollama reasoning adapter"]
     event_reasoning_request_submitted["reasoning.request.submitted"]
@@ -54,10 +56,13 @@ flowchart LR
     riverview_operator -->|protected by checkpoint| diagnostics
     riverview_operator -->|protected by checkpoint| diagnostics
     riverview_operator -->|protected by checkpoint| diagnostics
+    riverview_operator -->|protected by checkpoint| diagnostics
     riverview_operator -->|exposes route| route__
     riverview_operator -->|exposes route| route__session
     riverview_operator -->|exposes route| route__api_chat
+    riverview_operator -->|exposes route| route__api_conversations
     riverview_operator -->|exposes route| route__api_rooms
+    riverview_operator -->|exposes route| route__api_architecture
     riverview_operator -->|exposes route| route__snapshot
     riverview_reasoning_ollama -->|declares dependency| river
     event_reasoning_request_submitted -->|consumed by| riverview_reasoning_ollama

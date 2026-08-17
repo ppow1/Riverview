@@ -40,6 +40,7 @@ digraph riverview {
   "projects" [label="Project intake / repository"];
   "character_designer" [label="Character Designer workflow"];
   "session_history" [label="Session history"];
+  "operator_projection" [label="Durable Operator conversation/room projection"];
   "accepted_continuity" [label="Accepted durable continuity"];
   "character_canon" [label="Versioned accepted character canon"];
   "room_context" [label="Bounded shared room context"];
@@ -86,7 +87,9 @@ digraph riverview {
   "route./" [label="/"];
   "route./session" [label="/session"];
   "route./api/chat" [label="/api/chat"];
+  "route./api/conversations" [label="/api/conversations"];
   "route./api/rooms" [label="/api/rooms"];
+  "route./api/architecture" [label="/api/architecture"];
   "route./snapshot" [label="/snapshot"];
   "riverview.reasoning.ollama" [label="Loopback Ollama reasoning adapter"];
   "event.reasoning.request.submitted" [label="reasoning.request.submitted"];
@@ -94,6 +97,8 @@ digraph riverview {
   "event.provider.execution.failed" [label="provider.execution.failed"];
   "operator_module" -> "operator_runtime" [label="IMPLEMENTS"];
   "operator_runtime" -> "operator_contract" [label="exposes"];
+  "operator_runtime" -> "operator_projection" [label="persists UI conversation and room history"];
+  "operator_projection" -> "postgres_service" [label="stores typed conversation/message projection"];
   "operator_runtime" -> "undercurrent" [label="authenticates local session"];
   "operator_runtime" -> "snapshot_runtime" [label="requests current DOM/state snapshot"];
   "operator_runtime" -> "resident_gateway_contract" [label="USES"];
@@ -255,10 +260,13 @@ digraph riverview {
   "riverview.operator" -> "diagnostics" [label="protected by checkpoint"];
   "riverview.operator" -> "diagnostics" [label="protected by checkpoint"];
   "riverview.operator" -> "diagnostics" [label="protected by checkpoint"];
+  "riverview.operator" -> "diagnostics" [label="protected by checkpoint"];
   "riverview.operator" -> "route./" [label="exposes route"];
   "riverview.operator" -> "route./session" [label="exposes route"];
   "riverview.operator" -> "route./api/chat" [label="exposes route"];
+  "riverview.operator" -> "route./api/conversations" [label="exposes route"];
   "riverview.operator" -> "route./api/rooms" [label="exposes route"];
+  "riverview.operator" -> "route./api/architecture" [label="exposes route"];
   "riverview.operator" -> "route./snapshot" [label="exposes route"];
   "riverview.reasoning.ollama" -> "ollama" [label="DECLARES/IMPLEMENTS runtime component"];
   "riverview.reasoning.ollama" -> "core_contract" [label="requires core contract"];

@@ -6,6 +6,7 @@
     "RIV-UI-0015",
     "RIV-UI-0019",
     "RIV-UI-0020",
+    "RIV-UI-0021",
     "RIV-RES-0001",
     "RIV-RES-0002",
     "RIV-REASON-0001",
@@ -52,6 +53,33 @@
       "views": [
         "modules",
         "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0021",
+      "derivation": "DERIVED",
+      "relation": "persists UI conversation and room history",
+      "source": "operator_runtime",
+      "source_ref": "operator/projection.py:OperatorProjection",
+      "target": "operator_projection",
+      "views": [
+        "context",
+        "resident",
+        "events",
+        "room"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "stores typed conversation/message projection",
+      "source": "operator_projection",
+      "source_ref": "database/migrations/0027_operator_projection.sql",
+      "target": "postgres_service",
+      "views": [
+        "context",
+        "resident",
+        "events",
+        "room"
       ]
     },
     {
@@ -1925,6 +1953,19 @@
       ]
     },
     {
+      "checkpoint": "RIV-UI-0021",
+      "derivation": "DERIVED",
+      "relation": "protected by checkpoint",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
+      "target": "diagnostics",
+      "views": [
+        "modules",
+        "context",
+        "failures"
+      ]
+    },
+    {
       "checkpoint": "RIV-RES-0002",
       "derivation": "DERIVED",
       "relation": "protected by checkpoint",
@@ -1978,7 +2019,31 @@
       "relation": "exposes route",
       "source": "riverview.operator",
       "source_ref": "config/modules/operator.json",
+      "target": "route./api/conversations",
+      "views": [
+        "modules",
+        "context",
+        "services"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "exposes route",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
       "target": "route./api/rooms",
+      "views": [
+        "modules",
+        "context",
+        "services"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "exposes route",
+      "source": "riverview.operator",
+      "source_ref": "config/modules/operator.json",
+      "target": "route./api/architecture",
       "views": [
         "modules",
         "context",
@@ -2110,6 +2175,7 @@
     "database/migrations/0024_cme_runtime.sql",
     "database/migrations/0025_cme_causation_projection.sql",
     "database/migrations/0026_comms5_governed_surface.sql",
+    "database/migrations/0027_operator_projection.sql",
     "config/modules/*.json",
     "src/riverview/river/events.py",
     "src/riverview/autonomy/control.py",
@@ -2147,6 +2213,7 @@
         "RIV-UI-0014",
         "RIV-UI-0019",
         "RIV-UI-0020",
+        "RIV-UI-0021",
         "RIV-RES-0002"
       ],
       "display_name": "Riverview Operator surface",
@@ -2172,6 +2239,7 @@
       "projections_read": [
         "resident.registry",
         "room.state",
+        "operator.conversations",
         "diagnostics.recent"
       ],
       "recovery": "bounded failure, diagnostic checkpoint, retry without authority expansion",
@@ -2180,10 +2248,12 @@
         "/",
         "/session",
         "/api/chat",
+        "/api/conversations",
         "/api/rooms",
+        "/api/architecture",
         "/snapshot"
       ],
-      "storage_owner": "module-runtime"
+      "storage_owner": "postgresql.operator_projection"
     },
     {
       "actions_requested": [
@@ -2506,6 +2576,13 @@
       "id": "session_history",
       "kind": "runtime",
       "label": "Session history",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "operator_projection",
+      "kind": "runtime",
+      "label": "Durable Operator conversation/room projection",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },
@@ -2932,9 +3009,31 @@
       ]
     },
     {
+      "id": "route./api/conversations",
+      "kind": "route",
+      "label": "/api/conversations",
+      "source": "config/modules/operator.json",
+      "views": [
+        "modules",
+        "context",
+        "services"
+      ]
+    },
+    {
       "id": "route./api/rooms",
       "kind": "route",
       "label": "/api/rooms",
+      "source": "config/modules/operator.json",
+      "views": [
+        "modules",
+        "context",
+        "services"
+      ]
+    },
+    {
+      "id": "route./api/architecture",
+      "kind": "route",
+      "label": "/api/architecture",
       "source": "config/modules/operator.json",
       "views": [
         "modules",
@@ -3136,7 +3235,7 @@
       "status": "PASS"
     }
   },
-  "schema_version": "riverview-system-graph-2.2",
+  "schema_version": "riverview-system-graph-2.3",
   "views": [
     "character",
     "comms",

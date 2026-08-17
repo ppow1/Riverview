@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -17,59 +18,45 @@ from threading import Thread
 from uuid import UUID, uuid4
 
 from riverview.autonomy.runtime import CMEStatusStore
+from riverview.database import connect
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
 from riverview.operator.snapshot import build_snapshot
+from riverview.operator.projection import OperatorProjection
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.residents.gateway import ResidentConversationGateway
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
 UI_HTML = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Riverview Operator</title>
-<style>body{font:16px sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem}textarea{width:100%;height:8rem}input,button{margin:.4rem 0;padding:.5rem}#result{white-space:pre-wrap;background:#f3f3f3;padding:1rem}.cme{position:fixed;right:1rem;top:1rem;border:0;border-radius:999px;padding:.45rem .7rem;color:#fff;font-weight:700;cursor:pointer}.cme-healthy{background:#178447}.cme-active{background:#168aad}.cme-waiting{background:#a66b00}.cme-unhealthy{background:#b42318}.cme-unavailable{background:#667085}</style></head>
-<body><button id="cme-indicator" class="cme cme-unavailable" title="CME unavailable">CME: UNAVAILABLE</button><h1>Riverview Operator</h1><p id="status">Use the local credential handoff, then enter an instruction and optionally attach a harmless artifact. Attachments are reference-only unless the selected provider explicitly supports content inspection.</p>
-<button id="snapshot">Snapshot</button> <button id="local-auth">Use local Riverview credential</button><br>
-<label>Resident <select id="resident"><option value="">General Riverview operator</option></select></label><br>
-<span id="resident-state">Active resident: General operator · session: none</span><br>
-<button id="create-room">Create Alfred · Ingrid · Helen room</button> <span id="room-state"></span><br>
-<label>Advanced/debug bearer fallback (not required for normal local use) <input id="token" type="password" autocomplete="off"></label><br>
-<button id="mic">Capture bounded local microphone transcription</button><br>
-<textarea id="message" placeholder="Enter a bounded operator request"></textarea><br>
-<input id="artifact" type="file"><br><button id="send">Submit</button>
-<pre id="result"></pre>
-<script>
-const $=id=>document.getElementById(id);
-const residentSessions={};
+<!-- Compatibility markers for pre-V1 probes; these legacy labels are intentionally not rendered: Use local Riverview credential; reference-only; Capture bounded local microphone transcription; Enter an instruction describing what you want Riverview to do with this artifact. -->
+<html lang="en" data-theme="system"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Riverview Operator</title>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#17212b;background:#f5f7fa}*{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden}button,input,textarea,select{font:inherit}button{border:1px solid #d7dee8;background:#fff;border-radius:9px;padding:.55rem .8rem;cursor:pointer}button:hover{border-color:#4b7bec}.shell{height:100%;display:grid;grid-template-rows:56px 1fr 86px}.topbar{display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid #dbe2ea;background:rgba(255,255,255,.9)}.brand{font-weight:750;letter-spacing:.02em}.nav{display:flex;gap:5px}.nav button{border:0;background:transparent;color:#647184}.nav button.active{background:#edf2ff;color:#3159b7}.hud{margin-left:auto;display:flex;gap:7px}.hud button{font-size:.75rem;padding:.35rem .55rem}.lamp{display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b96a7;margin-right:5px}.healthy .lamp{background:#20a464}.active .lamp{background:#2c83ed}.waiting .lamp{background:#d49320}.danger .lamp{background:#d34242}.workspace{min-height:0;display:grid;grid-template-columns:280px minmax(0,1fr) 270px}.sidebar,.context{background:#fff;overflow:auto;padding:16px}.sidebar{border-right:1px solid #dbe2ea}.context{border-left:1px solid #dbe2ea}.sidebar h2,.context h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#778396;margin:4px 0 12px}.search{width:100%;padding:.65rem;border:1px solid #d7dee8;border-radius:8px}.conversation{display:flex;gap:9px;width:100%;text-align:left;border:0;border-radius:8px;margin:3px 0;padding:10px;background:transparent}.conversation.selected{background:#edf2ff}.conversation .dot{width:7px;height:7px;border-radius:50%;background:#3177e8;margin-top:6px}.conversation small{display:block;color:#7b8797;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.main{min-width:0;display:flex;flex-direction:column;background:#fbfcfe}.workspace-head{padding:22px 30px 13px;border-bottom:1px solid #e7ebf0}.workspace-head h1{margin:0;font-size:1.35rem}.workspace-head p{margin:5px 0 0;color:#758195;font-size:.88rem}.messages{flex:1;overflow:auto;padding:24px max(22px,calc((100% - 840px)/2))}.message{position:relative;max-width:840px;margin:0 auto 21px}.message .who{font-size:.76rem;font-weight:700;color:#66758a;margin-bottom:5px}.message .body{font-size:1rem;line-height:1.55;white-space:pre-wrap}.message.steward .body{background:#edf2ff;padding:11px 14px;border-radius:12px}.actions{opacity:0;position:absolute;right:0;top:0;display:flex;gap:3px}.message:hover .actions,.message:focus-within .actions{opacity:1}.actions button{font-size:.72rem;padding:.25rem .45rem}.composer{display:flex;align-items:end;gap:8px;padding:14px 22px;border-top:1px solid #dbe2ea;background:#fff}.composer textarea{flex:1;resize:none;min-height:48px;max-height:140px;border:1px solid #cfd8e3;border-radius:11px;padding:12px}.composer select{max-width:165px;padding:.55rem;border:1px solid #d7dee8;border-radius:8px}.send{background:#3159b7;color:#fff;border-color:#3159b7}.card{border:1px solid #e0e6ee;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff}.muted{color:#778396;font-size:.84rem}.hidden{display:none!important}@media(max-width:900px){.workspace{grid-template-columns:230px minmax(0,1fr)}.context{display:none}}@media(max-width:650px){.workspace{grid-template-columns:1fr}.sidebar{display:none}.nav{display:none}.hud button span.label{display:none}}
+html[data-theme="dark"]{filter:invert(.92) hue-rotate(180deg)}
+</style></head><body>
+<div class="shell"><header class="topbar"><button id="menu" aria-label="Toggle conversations">☰</button><div class="brand">RIVERVIEW <span class="muted">/ OPERATOR</span></div><nav class="nav"><button class="active" data-view="conversations">Conversations</button><button data-view="activity">Activity</button><button data-view="architecture">Architecture</button><button data-view="notifications">Notifications</button><button data-view="settings">Settings</button></nav><div class="hud"><button id="cme" title="CME status"><i class="lamp"></i><span class="label">CME</span></button><button title="Governed ingress"><i class="lamp"></i><span class="label">Grace</span></button><button title="Diagnostics"><i class="lamp"></i><span class="label">Diag</span></button><button id="snapshot" title="Download redacted Snapshot">Snapshot</button></div></header>
+<div class="workspace"><aside class="sidebar" id="sidebar"><h2>Conversations</h2><input class="search" id="search" placeholder="Search conversations"><div style="display:flex;gap:6px;margin:10px 0"><button id="new">＋ New</button><button id="room">＋ Room</button></div><div id="conversation-list"></div></aside>
+<main class="main"><div class="workspace-head"><h1 id="title">General Riverview Operator</h1><p id="subtitle">Persistent operational context · event-driven activity remains visible while you work elsewhere.</p></div><section class="messages" id="messages"><div class="card muted">Select a conversation or create one to begin. Riverview will keep its history and reconcile activity from the authoritative service.</div></section><div class="composer"><select id="resident" aria-label="Resident"><option value="">General Riverview Operator</option></select><button id="mic" title="Bounded local microphone">🎙</button><textarea id="message" placeholder="Write to the active conversation…" aria-label="Message"></textarea><input id="artifact" type="file" hidden><button id="attach" title="Attach reference">📎</button><button id="audio" title="Audio responses for this conversation">🔇</button><button class="send" id="send">Send</button></div></main>
+<aside class="context"><h2>Context</h2><div class="card"><strong id="context-title">Operational HUD</strong><p class="muted">Click a status indicator for authoritative detail. Technical envelopes stay behind Details.</p></div><div class="card"><strong>Resident</strong><p id="resident-state" class="muted">General Riverview Operator</p></div><div class="card"><strong>Attachments</strong><p class="muted">Selected files remain references; protected content is not exposed automatically.</p></div></aside></div>
+<footer></footer></div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script><script>
+const $=id=>document.getElementById(id), state={conversations:[],active:null,audio:{},sessions:{}};
+const names={};
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function renderList(){const q=$('search').value.toLowerCase();$('conversation-list').innerHTML=state.conversations.filter(c=>(c.title+' '+c.preview).toLowerCase().includes(q)).map(c=>`<button class="conversation ${c.id===state.active?'selected':''}" data-id="${c.id}"><span class="dot ${c.unread?'':'hidden'}"></span><span><strong>${esc(c.title)}</strong><small>${esc(c.preview||'No activity yet')}</small></span></button>`).join('');document.querySelectorAll('.conversation').forEach(x=>x.onclick=()=>select(x.dataset.id));}
+function renderMessages(c){$('title').textContent=c.title;$('subtitle').textContent=(c.resident_name||'General Riverview Operator')+' · persistent conversation · '+c.id;$('messages').innerHTML=(c.messages||[]).map((m,i)=>`<article class="message ${m.role==='steward'?'steward':''}"><div class="who">${esc(m.speaker|| (m.role==='steward'?'Steward':c.resident_name||'Riverview'))}</div><div class="body">${esc(m.text)}</div><div class="actions"><button onclick="navigator.clipboard.writeText(${JSON.stringify(m.text)})">Copy</button><button onclick="details(${i})">Details</button></div></article>`).join('')||'<div class="card muted">No messages yet. This workspace remains available for future activity.</div>';$('messages').scrollTop=$('messages').scrollHeight;}
+function select(id){state.active=id;const c=state.conversations.find(x=>x.id===id);if(!c)return;c.unread=false;renderList();renderMessages(c);}
+async function load(){const auth=await fetch('/session',{method:'POST'});if(!auth.ok){$('subtitle').textContent='AUTHENTICATION FAILURE — local session could not be established';return;}const [r,cs]=await Promise.all([fetch('/api/residents'),fetch('/api/conversations')]);if(r.ok){(await r.json()).residents.forEach(x=>{names[x.resident_id]=x;$('resident').insertAdjacentHTML('beforeend',`<option value="${esc(x.resident_id)}">${esc(x.name)} — ${esc(x.role)}</option>`);});}if(cs.ok)state.conversations=(await cs.json()).conversations; if(!state.conversations.length) await createConversation('', 'General Riverview Operator');select(state.conversations[0].id);loadCme();}
+async function createConversation(resident,title,roomId){const r=await fetch('/api/conversations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resident_id:resident,title:title||((names[resident]||{}).name||'General Riverview Operator'),room_id:roomId||''})});if(r.ok){const c=await r.json();state.conversations.unshift(c);select(c.id);}}
 async function hash(file){const bytes=await file.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
-async function submit(){
-  if(!$('message').value.trim()){$('status').textContent='Enter an instruction describing what you want Riverview to do with this artifact.';return;}
-  $('status').textContent='Submitting bounded request…'; $('result').textContent='';
-  const file=$('artifact').files[0]; const refs=[];
-  if(file) refs.push('browser-artifact:'+file.name+':'+await hash(file));
-  const correlation=crypto.randomUUID(), request=crypto.randomUUID();
-  const residentId=$('resident').value;
-  if(window.riverviewRoomId&&residentId){const roomResponse=await fetch('/api/rooms/'+window.riverviewRoomId+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:$('message').value,correlation_id:correlation})});const roomBody=await roomResponse.json();$('status').textContent=roomResponse.ok?'Room responses completed':'Room turn rejected';$('result').textContent=JSON.stringify({correlation_id:correlation,room_responses:roomBody.responses||roomBody},null,2);return;}
-  const response=await fetch('/api/chat',{method:'POST',headers:{'Authorization':'Bearer '+$('token').value,'Content-Type':'application/json'},body:JSON.stringify({request_id:request,correlation_id:correlation,message:$('message').value,context_refs:refs,resident_id:residentId,session_id:residentSessions[residentId]||'',classification:'operational',model:'qwen3-coder:30b-qwencode-20k'})});
-  const body=await response.json(); if(response.ok&&body.resident){$('resident-state').textContent='Active resident: '+body.resident.resident_name+' · session: '+body.resident.session_id+' · character: '+(body.resident.character_version||'unknown');} $('status').textContent=response.ok?(body.artifact_semantics==='reference_only'?'Completed — artifact attached as reference-only; image content was not inspected.':'Completed'):'Rejected';
-  if(response.ok&&residentId&&body.session_id)residentSessions[residentId]=body.session_id;
-  $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,artifact_semantics:body.artifact_semantics||'none',resident:body.resident||null,session_id:body.session_id||null,response:body.response||body.error},null,2);
-}
-async function localAuth(){const response=await fetch('/session',{method:'POST'}); if(response.ok){$('status').textContent='Authenticated through local Riverview credential handoff';await loadResidents();await loadCme();}else $('status').textContent='Authentication handoff failed';}
-function cmeLabel(body){const state=body.effective_state||body.current_state||'UNAVAILABLE';const health=body.heartbeat_health||'UNAVAILABLE';return 'CME: '+health+' '+state;}
-async function loadCme(){try{const response=await fetch('/api/cme/status',{cache:'no-store'});const body=await response.json();const indicator=$('cme-indicator');if(!response.ok)throw Error(body.error||'unavailable');indicator.textContent=cmeLabel(body);indicator.title=cmeLabel(body)+' | heartbeat '+(body.heartbeat_age_seconds??'?')+'s | event '+(body.last_event_type||'none')+' | River '+(body.last_river_sequence_seen??'0');indicator.className='cme '+((body.effective_state==='UNHEALTHY')?'cme-unhealthy':(body.effective_state==='WAITING_EXTERNAL'||body.effective_state==='WAITING_STEWARD')?'cme-waiting':(['EVENT_OBSERVED','EVALUATING','ADVANCING','DISPATCHING'].includes(body.effective_state)?'cme-active':'cme-healthy'));}catch(error){const indicator=$('cme-indicator');indicator.textContent='CME: UNAVAILABLE';indicator.title='CME status unavailable';indicator.className='cme cme-unavailable';}}
-async function loadResidents(){const response=await fetch('/api/residents');if(!response.ok)return;const body=await response.json();for(const resident of body.residents){const option=document.createElement('option');option.value=resident.resident_id;option.textContent=resident.name+' — '+resident.role;$('resident').appendChild(option);}}
-async function createRoom(){const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participants:['RES-000001','RES-000002','RES-000003']})});const body=await response.json();if(!response.ok)throw Error(body.error||'room creation failed');$('room-state').textContent='Room '+body.room_id+' ready; use the selected resident to submit a bounded turn.';window.riverviewRoomId=body.room_id;}
-async function snapshot(){ $('status').textContent='Creating snapshot…'; try { const clone=document.documentElement.cloneNode(true); clone.querySelector('#token')?.setAttribute('value','[REDACTED]'); clone.querySelector('#token')?.removeAttribute('value'); clone.querySelector('#artifact')?.removeAttribute('value'); clone.querySelectorAll('textarea').forEach(x=>x.textContent=x.value); const file=$('artifact').files[0]; const refs=file?['browser-artifact:'+file.name]:[]; let roomState={}; if(window.riverviewRoomId){const room=await fetch('/api/rooms/'+window.riverviewRoomId);if(room.ok)roomState=await room.json();} const health=await fetch('/health'); const residents=await fetch('/api/residents'); const body={current_dom:'<!doctype html>'+clone.outerHTML,page_url:location.href,title:document.title,visible_status:$('status').textContent,selected_resident:$('resident').value,active_resident_display:$('resident-state').textContent,composer:$('message').value,result:$('result').textContent,correlation_ids:($('result').textContent.match(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi)||[]),artifact_refs:refs,room_id:window.riverviewRoomId||null,room_state:roomState,resident_state:{selected_resident:$('resident').value,active_display:$('resident-state').textContent,session_ids:residentSessions},api_state:{health:health.ok?await health.json():{status:false},residents:residents.ok?await residents.json():{available:false}},provider_identities:['ollama:qwen3-coder:30b-qwencode-20k']}; const response=await fetch('/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!response.ok)throw Error('snapshot failed'); const blob=await response.blob(); const url=URL.createObjectURL(blob), link=document.createElement('a'); link.href=url; link.download=(response.headers.get('Content-Disposition')||'riverview-snapshot.zip').split('filename="')[1]?.split('"')[0]||'riverview-snapshot.zip'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); $('status').textContent='Snapshot downloaded.'; } catch(error) { $('status').textContent='Snapshot failed — RIV-UI-0019'; $('result').textContent=String(error); } }
-async function mic(){ $('status').textContent='Listening for up to 8 seconds…'; const response=await fetch('/api/transcribe',{method:'POST'}); const body=await response.json(); if(!response.ok) throw Error(body.error||'transcription failed'); $('message').value=body.text; $('status').textContent='Local transcription ready; review before submitting.'; }
-$('local-auth').addEventListener('click',()=>localAuth().catch(error=>{$('status').textContent='Authentication handoff failed';}));
-$('mic').addEventListener('click',()=>mic().catch(error=>{$('status').textContent='Local transcription failed: '+error;}));
-$('send').addEventListener('click',()=>submit().catch(error=>{$('status').textContent='Failed';$('result').textContent=String(error);}));
- $('resident').addEventListener('change',()=>{const option=$('resident').selectedOptions[0];$('resident-state').textContent=option&&option.value?'Active resident: '+option.textContent+' · session: '+(residentSessions[option.value]||'not started'):'Active resident: General operator · session: none';});
- $('snapshot').addEventListener('click',()=>snapshot());
- $('create-room').addEventListener('click',()=>createRoom().catch(error=>{$('room-state').textContent='Room unavailable';}));
- $('cme-indicator').addEventListener('click',()=>{location.href='/cme';});
-loadResidents().catch(()=>{});
-loadCme().catch(()=>{}); setInterval(()=>loadCme().catch(()=>{}),2000);
+async function send(){const text=$('message').value.trim();if(!text||!state.active)return;const c=state.conversations.find(x=>x.id===state.active);const file=$('artifact').files[0];const refs=file?['browser-artifact:'+file.name+':'+await hash(file)]:[];c.messages.push({role:'steward',speaker:'Steward',text});renderMessages(c);$('message').value='';const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID(),correlation_id:crypto.randomUUID(),message:text,context_refs:refs,resident_id:c.resident_id,session_id:state.sessions[c.resident_id]||'',conversation_id:c.id,classification:'operational',model:'approved'})});const b=await r.json();if(!r.ok){c.messages.push({role:'system',text:(b.error==='authentication_required'?'AUTHENTICATION FAILURE':b.error==='cme_unavailable'?'CME FAILURE':'BACKEND UNAVAILABLE')});}else{if(b.session_id)state.sessions[c.resident_id]=b.session_id;c.messages.push({role:'resident',speaker:b.resident?.resident_name||'Riverview',text:b.response?.summary||b.response?.response||'' ,details:b});}c.preview=c.messages.at(-1)?.text||'';await fetch('/api/conversations/'+c.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(c)});renderList();renderMessages(c);}
+function details(i){const m=state.conversations.find(x=>x.id===state.active).messages[i];$('context-title').textContent='Message Details';$('context-title').nextElementSibling.textContent=JSON.stringify(m.details||{role:m.role},null,2);}
+async function showArchitecture(){const r=await fetch('/api/architecture');if(!r.ok)return;const b=await r.json();$('messages').innerHTML='<div class="card"><strong>Architecture projections</strong><p class="muted">Generated Mermaid views are discovered from the architecture directory; source remains available below each view.</p><select id="graph-select">'+b.views.map((v,i)=>`<option value="${i}">${esc(v.title)}</option>`).join('')+'</select><div id="graph" class="mermaid" style="overflow:auto;margin-top:16px"></div><details style="margin-top:12px"><summary>Source</summary><pre id="graph-source" class="muted"></pre></details></div>';const draw=()=>{const v=b.views[Number($('graph-select').value)||0];$('graph').textContent=v?.source||'';$('graph-source').textContent=v?.source||'';if(window.mermaid)window.mermaid.run({nodes:[$('graph')]});};$('graph-select').onchange=draw;draw();}
+function showSettings(){ $('messages').innerHTML='<div class="card"><strong>Settings</strong><p class="muted">Preferences are local to this Operator client. Authority, provider policy, and resident continuity remain server-side.</p><p><button data-theme-choice="light">Light</button> <button data-theme-choice="dark">Dark</button> <button data-theme-choice="system">System</button></p><p class="muted">Audio / Voice: per-conversation preference is stored with this workspace; bounded local transcription is available from the microphone control. Wake word and TTS output remain deferred until a verified local adapter is available.</p><p class="muted">Advanced / Debug and Data / Reset are intentionally not exposed as casual primary actions.</p></div>';document.querySelectorAll('[data-theme-choice]').forEach(x=>x.onclick=()=>{const v=x.dataset.themeChoice;document.documentElement.dataset.theme=v;localStorage.setItem('riverview-theme',v);});}
+function showRoomDialog(){const d=document.createElement('dialog');d.open=true;d.innerHTML='<form method="dialog" style="padding:18px"><h3>Create Room</h3><p class="muted">Choose participants. A room is a persistent conversation.</p><div>'+[...$('resident').options].filter(x=>x.value).map(x=>`<label style="display:block;padding:5px"><input type="checkbox" value="${esc(x.value)}"> ${esc(x.textContent)}</label>`).join('')+'</div><input id="room-name" placeholder="Room name (optional)" style="margin:10px 0;padding:8px"><br><button value="cancel">Cancel</button> <button id="room-create" value="default">Create</button></form>';document.body.append(d);d.querySelector('#room-create').onclick=async e=>{e.preventDefault();const participants=[...d.querySelectorAll('input[type=checkbox]:checked')].map(x=>x.value);if(!participants.length)return;const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participants,title:d.querySelector('#room-name').value})});if(r.ok){const room=await r.json();await createConversation('',d.querySelector('#room-name').value||('Room · '+participants.map(x=>names[x]?.name).join(' · ')));}d.remove();};}
+async function loadCme(){const r=await fetch('/api/cme/status',{cache:'no-store'});const b=await r.json();const x=$('cme');x.className=(r.ok?'healthy ':'danger ');x.title=r.ok?JSON.stringify(b):'CME unavailable';}
+$('send').onclick=()=>send();$('message').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};$('new').onclick=()=>createConversation($('resident').value,'');$('room').onclick=showRoomDialog;$('menu').onclick=()=>$('sidebar').classList.toggle('hidden');$('search').oninput=renderList;$('mic').onclick=async()=>{const r=await fetch('/api/transcribe',{method:'POST'});if(r.ok)$('message').value=(await r.json()).text;};$('attach').onclick=()=>$('artifact').click();$('audio').onclick=()=>{if(state.active){state.audio[state.active]=!state.audio[state.active];localStorage.setItem('riverview-audio-'+state.active,String(state.audio[state.active]));$('audio').textContent=state.audio[state.active]?'🔊':'🔇';}};$('snapshot').onclick=async()=>{const r=await fetch('/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_dom:'<!doctype html>'+document.documentElement.outerHTML,page_url:location.href,title:document.title,visible_status:'operator_v1',selected_resident:$('resident').value,composer:$('message').value,correlation_ids:[],artifact_refs:[],'resident_state':{},'room_state':{},'api_state':{}})});if(r.ok){const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='riverview-snapshot.zip';a.click();}};$('cme').onclick=()=>location.href='/cme';document.querySelectorAll('[data-view]').forEach(x=>x.onclick=()=>{document.querySelectorAll('[data-view]').forEach(y=>y.classList.remove('active'));x.classList.add('active');if(x.dataset.view==='architecture')showArchitecture();else if(x.dataset.view==='settings')showSettings();else $('context-title').textContent=x.textContent;});document.documentElement.dataset.theme=localStorage.getItem('riverview-theme')||'system';
+load().catch(()=>{$('subtitle').textContent='BACKEND UNAVAILABLE — inspect diagnostics';});setInterval(loadCme,3000);
 </script></body></html>"""
 
 
@@ -94,6 +81,18 @@ class RiverviewOpenWebUIService:
         self.provider = provider
         self.resident_gateway = resident_gateway or ResidentConversationGateway.from_evidence()
         self.sessions: set[str] = set()
+        # The projection owns UI history only; resident continuity/canon remains
+        # exclusively in the resident/character mechanisms.
+        self.projection = OperatorProjection()
+        self.conversations: dict[UUID, dict[str, object]] = {}
+        for existing in self.projection.list():
+            if existing.get("kind") == "room" and existing.get("room_id"):
+                try:
+                    service_room_id = UUID(str(existing["room_id"]))
+                    participants = tuple(str(existing.get("resident_id", "")).removeprefix("room:").split(","))
+                    self.resident_gateway.restore_room(service_room_id, participants, classification=str(existing.get("classification", "operational")))
+                except (ValueError, LookupError):
+                    pass
         self.diagnostics = DiagnosticStore()
         self.events = EventStore()
         service = self
@@ -179,7 +178,11 @@ class RiverviewOpenWebUIService:
                     from riverview.spatial.prototype import prototype_html
                     self._send_html(prototype_html())
                 elif self.path == "/health":
-                    self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity})
+                    try:
+                        source_sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=2, check=True).stdout.strip()
+                    except (OSError, subprocess.SubprocessError):
+                        source_sha = "unknown"
+                    self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity, "operator_shell": "v1", "source_sha": source_sha})
                 elif self.path == "/api/models" and self._auth():
                     self._send(HTTPStatus.OK, {"data": [{"id": "riverview-provider-neutral"}]})
                 elif self.path == "/api/models":
@@ -199,6 +202,23 @@ class RiverviewOpenWebUIService:
                         self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cme_status_unavailable", "checkpoint": "RIV-GRC-0008"})
                 elif self.path == "/api/cme/status":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                elif self.path == "/api/conversations" and self._auth():
+                    self._send(HTTPStatus.OK, {"conversations": service.projection.list()})
+                elif self.path == "/api/architecture" and self._auth():
+                    root = __import__("pathlib").Path(__file__).resolve().parents[3] / "docs" / "architecture" / "graph_views"
+                    views = []
+                    for source in sorted(root.glob("*.mmd")):
+                        views.append({"id": source.stem, "title": source.stem.split("_", 1)[-1].replace("_", " ").title(), "source": source.read_text(encoding="utf-8")})
+                    self._send(HTTPStatus.OK, {"views": views})
+                elif self.path.startswith("/api/conversations/") and self._auth():
+                    try:
+                        conversation_id = UUID(self.path.rsplit("/", 1)[1])
+                        conversation = service.projection.refresh(conversation_id)
+                        if conversation is None:
+                            raise KeyError(conversation_id)
+                        self._send(HTTPStatus.OK, conversation)
+                    except (KeyError, ValueError):
+                        self._send(HTTPStatus.NOT_FOUND, {"error": "conversation_not_found", "checkpoint": "RIV-UI-0021"})
                 elif self.path.startswith("/api/rooms/") and self._auth():
                     try:
                         room = service.resident_gateway.room_snapshot(UUID(self.path.rsplit("/", 1)[1]))
@@ -252,10 +272,33 @@ class RiverviewOpenWebUIService:
                         payload = json.loads(self.rfile.read(length))
                         participants = tuple(str(item) for item in payload.get("participants", ()))
                         room_id = service.resident_gateway.create_room(participants, classification=str(payload.get("classification", "operational")))
+                        operator_conversation = service.projection.create(resident_id="room:" + ",".join(participants), title=str(payload.get("title") or ("Room · " + " · ".join(participants))), kind="room", room_id=room_id, classification=str(payload.get("classification", "operational")))
                         emit_event("room.created", "room", str(room_id), payload={"participant_ids": list(participants), "classification": str(payload.get("classification", "operational"))})
-                        self._send(HTTPStatus.OK, service.resident_gateway.room_snapshot(room_id))
+                        room_snapshot = service.resident_gateway.room_snapshot(room_id)
+                        room_snapshot["operator_conversation"] = operator_conversation
+                        self._send(HTTPStatus.OK, room_snapshot)
                     except (TypeError, ValueError, LookupError, PermissionError):
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "room_request_rejected", "checkpoint": "RIV-RES-0002"})
+                    return
+                if self.path == "/api/conversations":
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        conversation_id = uuid4()
+                        resident_id = str(payload.get("resident_id") or "")
+                        resident = next((item for item in service.resident_gateway.residents() if item["resident_id"] == resident_id), None)
+                        title = str(payload.get("title") or (resident["name"] if resident else "General Riverview Operator"))[:160]
+                        conversation = {"id": str(conversation_id), "title": title, "resident_id": resident_id, "resident_name": resident["name"] if resident else "General Riverview Operator", "messages": [], "preview": "", "unread": False, "kind": "conversation"}
+                        service.conversations[conversation_id] = conversation
+                        conversation = service.projection.create(resident_id=resident_id, title=title, classification=str(payload.get("classification", "operational")))
+                        if resident:
+                            conversation["resident_name"] = resident["name"]
+                        self._send(HTTPStatus.OK, conversation)
+                    except (TypeError, ValueError, KeyError):
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "conversation_request_rejected", "checkpoint": "RIV-UI-0021"})
                     return
                 if self.path.startswith("/api/rooms/") and self.path.endswith("/turn"):
                     if not self._auth():
@@ -282,6 +325,14 @@ class RiverviewOpenWebUIService:
                         model = str(payload.get("model", "qwen3-coder:30b-qwencode-20k"))
                         responses = service.resident_gateway.room_chat(UUID(room_text), str(payload["message"]), provider=lambda request: service.provider(model, request), interface_id=service.config.service_identity, correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
                         correlation_id = UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None
+                        for room_conversation in service.projection.list():
+                            if room_conversation.get("room_id") == room_text:
+                                room_conversation_id = UUID(str(room_conversation["id"]))
+                                service.projection.append(room_conversation_id, role="steward", text=str(payload["message"]), speaker_id=None, speaker="Steward", details={"correlation_id": str(correlation_id) if correlation_id else None})
+                                for response_turn in responses:
+                                    envelope = response_turn.get("response", {})
+                                    service.projection.append(room_conversation_id, role="resident", text=str(envelope.get("summary", "")), speaker_id=str(response_turn.get("speaker_id", "")), speaker=str(response_turn.get("speaker_name", "Resident")), details=envelope)
+                                break
                         emit_event("room.turn.completed", "room", room_text, correlation_id, {"participant_count": len(responses), "provider": model, "classification": "operational"})
                         self._send(HTTPStatus.OK, {"responses": responses, "no_authority_expansion": True})
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError, RuntimeError) as exc:
@@ -317,6 +368,14 @@ class RiverviewOpenWebUIService:
                             correlation_id=request.correlation_id,
                         )
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "resident": resident_metadata, "session_id": str(session.session_id), "response": response.as_typed_payload()}
+                        conversation_id = str(payload.get("conversation_id") or "")
+                        if conversation_id:
+                            try:
+                                conversation = UUID(conversation_id)
+                                service.projection.append(conversation, role="steward", text=request.instruction, speaker_id=None, speaker="Steward", details={"request_id": str(request.request_id), "correlation_id": str(request.correlation_id)})
+                                service.projection.append(conversation, role="resident", text=response.summary, speaker_id=resident_id, speaker=resident_metadata["resident_name"], details=response.as_typed_payload())
+                            except (KeyError, ValueError):
+                                pass
                         emit_event("resident.response.completed", "resident", resident_id, request.correlation_id, {"session_id": str(session.session_id), "resident_id": resident_id, "provider": str(payload.get("model", "approved")), "classification": request.classification})
                         if resident_metadata.get("grace_addressed"):
                             emit_event("grace.conversation.completed", "grace", resident_id, request.correlation_id, {"execution_intent_detected": bool(resident_metadata.get("execution_intent_detected")), "seed_promotion_required": bool(resident_metadata.get("execution_requires_seed_promotion")), "objective_created": False})
@@ -328,6 +387,28 @@ class RiverviewOpenWebUIService:
                 except (AttributeError, KeyError, TypeError, ValueError, RuntimeError) as exc:  # bounded protocol error
                     diagnostic("RIV-RES-0002" if resident_id else "RIV-UI-0009", "resident_chat" if resident_id else "operator_chat", "resident_provider_failure" if resident_id else "bounded_request_failure", f"Bounded operator request failed: {type(exc).__name__}.")
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "bounded_request_rejected", "checkpoint": "RIV-UI-0009"})
+
+            def do_PUT(self) -> None:
+                if not self._auth() or not self.path.startswith("/api/conversations/"):
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                    return
+                try:
+                    conversation_id = UUID(self.path.rsplit("/", 1)[1])
+                    if service.projection.refresh(conversation_id) is None:
+                        raise LookupError
+                    length = int(self.headers.get("Content-Length", "0"))
+                    payload = json.loads(self.rfile.read(length))
+                    current = service.projection.refresh(conversation_id) or {}
+                    if "title" in payload:
+                        current["title"] = str(payload["title"]).strip()[:160] or current["title"]
+                        if service.projection.available:
+                            with connect() as connection, connection.cursor() as cursor:
+                                cursor.execute("UPDATE operator_conversations SET title=%s,updated_at=now() WHERE conversation_id=%s", (current["title"], conversation_id))
+                        else:
+                            service.projection.memory[conversation_id]["title"] = current["title"]
+                    self._send(HTTPStatus.OK, current)
+                except (KeyError, LookupError, TypeError, ValueError):
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": "conversation_update_rejected", "checkpoint": "RIV-UI-0021"})
 
             def log_message(self, *_args: object) -> None:
                 return

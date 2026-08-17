@@ -66,7 +66,7 @@ class ResidentConversationGateway:
             )
             for row in payload["records"]
         ]
-        profiles.append(ResidentProfile("grace", "Grace", "bounded operational intake", "riverview://grace", "riverview://grace", is_grace=True))
+        profiles.append(ResidentProfile("grace", "Grace", "Director of Operations", "riverview://grace", "riverview://grace", is_grace=True))
         return cls(tuple(profiles))
 
     def residents(self) -> tuple[dict[str, Any], ...]:
@@ -159,6 +159,14 @@ class ResidentConversationGateway:
             raise ValueError("RIV-RES-0002: room participants must be unique.")
         room_id = uuid4()
         self._rooms[room_id] = {"room_id": room_id, "participants": tuple(p.resident_id for p in resolved), "classification": classification, "turns": []}
+        return room_id
+
+    def restore_room(self, room_id: UUID, participants: tuple[str, ...], *, classification: str = "operational", turns: list[dict[str, Any]] | None = None) -> UUID:
+        """Rehydrate a durable room projection without changing continuity authority."""
+        resolved = [self.resolve(item) for item in participants]
+        if len({p.resident_id for p in resolved}) != len(resolved):
+            raise ValueError("RIV-RES-0002: room participants must be unique.")
+        self._rooms[room_id] = {"room_id": room_id, "participants": tuple(p.resident_id for p in resolved), "classification": classification, "turns": list(turns or [])}
         return room_id
 
     def room_snapshot(self, room_id: UUID) -> dict[str, Any]:

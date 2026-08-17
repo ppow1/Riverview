@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 CHECKPOINTS = (
-    "RIV-UI-0009", "RIV-UI-0013", "RIV-UI-0014", "RIV-UI-0015", "RIV-UI-0019", "RIV-UI-0020",
+    "RIV-UI-0009", "RIV-UI-0013", "RIV-UI-0014", "RIV-UI-0015", "RIV-UI-0019", "RIV-UI-0020", "RIV-UI-0021",
     "RIV-RES-0001", "RIV-RES-0002", "RIV-REASON-0001", "RIV-REASON-0002",
     "RIV-CHAR-0004", "RIV-DIA-0001", "RIV-DIA-0002", "RIV-GRC-0004",
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
@@ -45,6 +45,7 @@ CORE_NODES = (
     ("microphone_worker", "PowerShell/System.Speech worker", "runtime"), ("artifact_reference", "Reference-only artifact intake", "runtime"),
     ("spatial", "LAN WebXR / Quest prototype", "deferred"), ("projects", "Project intake / repository", "module"),
     ("character_designer", "Character Designer workflow", "module"), ("session_history", "Session history", "runtime"),
+    ("operator_projection", "Durable Operator conversation/room projection", "runtime"),
     ("accepted_continuity", "Accepted durable continuity", "runtime"), ("character_canon", "Versioned accepted character canon", "core"),
     ("room_context", "Bounded shared room context", "runtime"), ("resident_expression", "Resident expression boundary", "contract"),
     ("provider_failure", "Provider failure/recovery seam", "failure"), ("diagnostic_spool", "Diagnostic fallback/spool", "runtime"),
@@ -100,6 +101,8 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
 
     add_edge("operator_module", "operator_runtime", "IMPLEMENTS", "config/modules/operator.json", views=modules + context)
     add_edge("operator_runtime", "operator_contract", "exposes", "openwebui.py:UI_HTML", views=modules + context)
+    add_edge("operator_runtime", "operator_projection", "persists UI conversation and room history", "operator/projection.py:OperatorProjection", views=context + resident + room, checkpoint="RIV-UI-0021")
+    add_edge("operator_projection", "postgres_service", "stores typed conversation/message projection", "database/migrations/0027_operator_projection.sql", views=context + resident + room)
     add_edge("operator_runtime", "undercurrent", "authenticates local session", "operator/openwebui.py:/session", views=context + resident, checkpoint="RIV-UI-0014")
     add_edge("operator_runtime", "snapshot_runtime", "requests current DOM/state snapshot", "operator/openwebui.py:/snapshot", views=context + failures, checkpoint="RIV-UI-0019")
     add_edge("operator_runtime", "resident_gateway_contract", "USES", "openwebui.py:/api/chat", views=modules + resident, checkpoint="RIV-RES-0001")
@@ -279,7 +282,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
         "20_operator_contract": {"status": "PASS", "evidence": ["riverview.operator->core_contract", "operator_runtime->resident_gateway_contract"]},
         "21_quest_deferred": {"status": "PASS", "evidence": ["spatial_service", "spatial", "deferred/experimental"]},
     }
-    return {"schema_version": "riverview-system-graph-2.2", "generated_from": ["src/riverview/topology/graph.py", "src/riverview/autonomy/runtime.py", "database/migrations/0024_cme_runtime.sql", "database/migrations/0025_cme_causation_projection.sql", "database/migrations/0026_comms5_governed_surface.sql", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "src/riverview/mcp/comms5.py", "src/riverview/mcp/comms5_server.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
+    return {"schema_version": "riverview-system-graph-2.3", "generated_from": ["src/riverview/topology/graph.py", "src/riverview/autonomy/runtime.py", "database/migrations/0024_cme_runtime.sql", "database/migrations/0025_cme_causation_projection.sql", "database/migrations/0026_comms5_governed_surface.sql", "database/migrations/0027_operator_projection.sql", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "src/riverview/mcp/comms5.py", "src/riverview/mcp/comms5_server.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
 
 def validate_graph(graph: dict[str, Any]) -> list[str]:
     node_ids = {node["id"] for node in graph.get("nodes", [])}
