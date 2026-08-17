@@ -19,6 +19,14 @@ Confirm from Comms5 diagnostics that no promotion request arrived. This is a
 client pre-execution classification boundary, not a Riverview authorization
 denial.
 
+If the connector reports that the app was disabled after invocation, inspect
+the approved public-boundary logs as a second probe. A request forwarded to the
+Comms5 upstream followed by `aborting with incomplete response` / `context
+canceled`, while the seed remains `draft` with no lifecycle event or objective,
+means the connector abandoned the MCP response before canonical promotion was
+committed. The forwarded request proves transport reachability, but does not
+prove that `StewardSeedStore.confirm_and_promote` completed.
+
 ## Smallest repair
 
 Publish non-destructive, idempotent, closed-world MCP hints and explain that the
@@ -32,6 +40,11 @@ Inspect the local FastMCP registry and public `tools/list`, restart the approved
 Comms5 service, and have Pat retry promotion of the existing draft. A successful
 transport call must still pass the canonical promotion store; no Codex test may
 promote a seed.
+
+For a connector-disable incident, first query `seed_status` read-only. If the
+seed is still `draft`, reconnect or refresh the existing app and retry the same
+promotion request with the same idempotency key. Do not infer promotion from a
+connector error, and do not create a replacement key.
 
 ## Do not
 
