@@ -120,7 +120,7 @@ OPERATIONS: dict[str, dict[str, Any]] = {
     "objective_status": {"authorization": "READ_ONLY", "required": ["objective_id"], "description": "Return bounded objective, stages, CME, work, and checkpoint state."},
     "cme_status": {"authorization": "READ_ONLY", "required": [], "description": "Return the authoritative CME runtime projection."},
     "recent_steward_submissions": {"authorization": "READ_ONLY", "required": [], "description": "Rediscover recent bounded governed submissions."},
-    "confirm_and_promote_seed": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "explicit_steward_confirmation", "idempotency_key"], "description": "Use the canonical Steward promotion mechanism; AI identity is not authority. Cancelled and superseded seeds are ineligible."},
+    "confirm_and_promote_seed": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "explicit_steward_confirmation", "idempotency_key", "client context"], "description": "Record explicit Steward confirmation for one existing draft through the canonical store; this creates no execution authority, cancels no work, and cannot promote cancelled or superseded seeds."},
     "cancel_draft": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client context"], "description": "Append-only cancellation of a draft; it never cancels an objective or work order."},
     "supersede_seed": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client context"], "description": "Append an old-draft-to-new-draft replacement relation; active objectives cannot be superseded."},
 }
@@ -310,7 +310,11 @@ class Comms5Service:
     def confirm_and_promote_seed(self, request: dict[str, Any]) -> dict[str, Any]:
         if not str(request.get("idempotency_key", "")).strip():
             raise Comms5Error("RIV-COMMS5-0003", "idempotency_key is required for promotion retry safety", "confirm_and_promote_seed", retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0009")
-        if request.get("authenticated_principal") != "steward" or request.get("explicit_steward_confirmation") is not True:
+        try:
+            context = ClientContext.from_request(request)
+        except Comms5Error as exc:
+            raise Comms5Error(exc.code, exc.reason, "confirm_and_promote_seed", retry_safe=False, steward_action_required=True, checkpoint=exc.checkpoint) from exc
+        if context.authenticated_principal != "steward" or request.get("explicit_steward_confirmation") is not True:
             raise Comms5Error("RIV-COMMS5-0009", "explicit Steward authorization is required; client identity is not authority", "confirm_and_promote_seed", retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0009")
         try: seed_id = UUID(str(request["seed_id"]))
         except (KeyError, ValueError) as exc: raise Comms5Error("RIV-COMMS5-0006", "seed_id is invalid", "confirm_and_promote_seed", retry_safe=False) from exc
@@ -319,4 +323,4 @@ class Comms5Service:
         except SeedLifecycleError as exc:
             detail = f"; objective_id={exc.objective_id}" if exc.objective_id else ""
             raise Comms5Error(exc.code, exc.reason + detail, "confirm_and_promote_seed", retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0014") from exc
-        return {"seed_id": str(seed_id), "objective_id": str(objective_id), "status": "promoted", "canonical_store": "StewardSeedStore.confirm_and_promote"}
+        return {"seed_id": str(seed_id), "objective_id": str(objective_id), "status": "promoted", "canonical_store": "StewardSeedStore.confirm_and_promote", "correlation_id": str(context.correlation_id), "client_id": context.client_id}

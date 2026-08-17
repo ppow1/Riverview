@@ -10,12 +10,19 @@ import json
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from riverview.mcp.comms5 import CONTRACT_VERSION, Comms5Error, Comms5Service
 
 SERVER_NAME = "Riverview Comms5"
 mcp = FastMCP(SERVER_NAME)
 service = Comms5Service()
+_GOVERNED_MUTATION_HINTS = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False,
+)
 
 
 def _safe(value: Any) -> Any:
@@ -65,7 +72,7 @@ def comms5_examples() -> Any:
     return _safe(service.examples())
 
 
-@mcp.tool()
+@mcp.tool(title="Submit bounded draft", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_submit_steward_seed(
     seed_text: str,
     idempotency_key: str,
@@ -91,7 +98,7 @@ def comms5_submit_steward_seed(
     ))
 
 
-@mcp.tool()
+@mcp.tool(title="Store bounded specification reference", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_store_specification(
     content: str,
     summary: str,
@@ -145,21 +152,27 @@ def comms5_recent_steward_submissions(limit: int = 20) -> Any:
     return _safe(service.recent_steward_submissions(limit))
 
 
-@mcp.tool()
+@mcp.tool(title="Confirm Steward-approved draft", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_confirm_and_promote_seed(
     seed_id: str,
     idempotency_key: str,
     explicit_steward_confirmation: bool,
     authenticated_principal: str,
-    client_id: str = "",
-    client_type: str = "",
-    client_name: str = "",
+    client_id: str,
+    client_type: str,
+    client_name: str,
     client_version: str = "",
     protocol_version: str = CONTRACT_VERSION,
     correlation_id: str = "",
     classification: str = "river",
 ) -> Any:
-    """Promote only with explicit Steward authorization through the canonical store."""
+    """Record explicit Steward confirmation for one existing draft.
+
+    This bounded transition creates only the canonical objective record. It
+    does not execute work, cancel work, supersede an active objective, or grant
+    client authority. The server requires authenticated Steward authority and
+    explicit confirmation.
+    """
     return _invoke(service.confirm_and_promote_seed, {
         "seed_id": seed_id,
         "idempotency_key": idempotency_key,
@@ -175,7 +188,7 @@ def comms5_confirm_and_promote_seed(
     })
 
 
-@mcp.tool()
+@mcp.tool(title="Cancel draft with Steward confirmation", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_cancel_draft(
     seed_id: str,
     reason: str,
@@ -201,7 +214,7 @@ def comms5_cancel_draft(
     ))
 
 
-@mcp.tool()
+@mcp.tool(title="Supersede draft with Steward confirmation", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_supersede_seed(
     seed_id: str,
     replacement_seed_id: str,
