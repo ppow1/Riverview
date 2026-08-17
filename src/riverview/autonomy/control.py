@@ -248,26 +248,29 @@ class GraceMomentum:
 class ContinuousMomentumEngine:
     """Run one bounded, event-driven Grace cycle across independent objectives."""
 
-    def frontier(self, *, limit: int = 16) -> list[dict[str, Any]]:
+    def enqueue_declared_action(self, objective_key: str, stage_key: str, *, requested_by: str = "grace") -> dict[str, Any]:
+        """Delegate approved work formation to Grace's authority boundary."""
+        return GraceMomentum().enqueue_declared_action(objective_key, stage_key, requested_by=requested_by)
+
+    def frontier(self, *, limit: int = 16, priority_objective_id: UUID | None = None) -> list[dict[str, Any]]:
         if not 1 <= limit <= 64:
             raise ValueError("RIV-GRC-0004: frontier limit is outside the bounded range.")
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute(
-                """SELECT o.objective_id,o.objective_key,o.correlation_id,s.stage_id,s.stage_key,
+            order_clause = "CASE WHEN o.objective_id=%s THEN 0 ELSE 1 END, o.created_at,s.sort_order" if priority_objective_id else "o.created_at,s.sort_order"
+            query = f"""SELECT o.objective_id,o.objective_key,o.correlation_id,s.stage_id,s.stage_key,
                           s.readiness,s.status,s.declared_action,s.steward_checkpoint
                    FROM objectives o JOIN objective_stages s ON s.objective_id=o.objective_id
                    WHERE o.status IN ('ready','active') AND s.status<>'completed'
                      AND s.readiness='ready' AND s.steward_checkpoint=false
-                   ORDER BY o.created_at,s.sort_order LIMIT %s""",
-                (limit,),
-            )
+                   ORDER BY {order_clause} LIMIT %s"""
+            cursor.execute(query, (priority_objective_id, limit) if priority_objective_id else (limit,))
             names = [item.name for item in cursor.description]
             return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
 
-    def cycle(self, *, limit: int = 16, correlation_id: UUID | None = None) -> dict[str, Any]:
+    def cycle(self, *, limit: int = 16, correlation_id: UUID | None = None, priority_objective_id: UUID | None = None) -> dict[str, Any]:
         """Evaluate all currently eligible stages once; callers trigger the next cycle from an event."""
         correlation_id = correlation_id or uuid4()
-        frontier = self.frontier(limit=limit)
+        frontier = self.frontier(limit=limit, priority_objective_id=priority_objective_id)
         return self._evaluate_frontier(frontier, correlation_id=correlation_id)
 
     def _evaluate_frontier(self, frontier: list[dict[str, Any]], *, correlation_id: UUID) -> dict[str, Any]:
@@ -290,6 +293,7 @@ class ContinuousMomentumEngine:
         max_cycles: int = 8,
         correlation_id: UUID | None = None,
         redispatch: Callable[[dict[str, Any]], None] | None = None,
+        priority_objective_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Continue bounded Grace cycles after a provider result.
 
@@ -306,10 +310,10 @@ class ContinuousMomentumEngine:
         redispatched = 0
         stop_reason = "frontier_empty"
         for _ in range(max_cycles):
-            current = self.frontier(limit=limit)
+            current = self.frontier(limit=limit, priority_objective_id=priority_objective_id)
             if not current:
                 break
-            result = self.cycle(limit=limit, correlation_id=correlation)
+            result = self.cycle(limit=limit, correlation_id=correlation, priority_objective_id=priority_objective_id)
             cycles.append(result)
             eligible = {
                 (item["objective_key"], item["stage_key"])
@@ -331,7 +335,7 @@ class ContinuousMomentumEngine:
                     if isinstance(item.get("declared_action"), dict):
                         self.enqueue_declared_action(item["objective_key"], item["stage_key"])
                         redispatched += 1
-            next_frontier = self.frontier(limit=limit)
+            next_frontier = self.frontier(limit=limit, priority_objective_id=priority_objective_id)
             if not next_frontier:
                 stop_reason = "frontier_empty"
                 break
@@ -345,7 +349,7 @@ class ContinuousMomentumEngine:
             "cycles": cycles,
             "cycle_count": len(cycles),
             "redispatched": redispatched,
-            "remaining_frontier": self.frontier(limit=limit),
+            "remaining_frontier": self.frontier(limit=limit, priority_objective_id=priority_objective_id),
             "stop_reason": stop_reason,
             "bounded": True,
         }

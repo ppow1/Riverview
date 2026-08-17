@@ -20,7 +20,8 @@
     "RIV-MCP-0006",
     "RIV-ARCH-0001",
     "RIV-INF-0001",
-    "RIV-SPAT-0004"
+    "RIV-SPAT-0004",
+    "RIV-GRC-0008"
   ],
   "edges": [
     {
@@ -142,6 +143,63 @@
       "target": "river",
       "views": [
         "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0008",
+      "derivation": "DERIVED",
+      "relation": "durable notification and cursor replay",
+      "source": "river",
+      "source_ref": "database/migrations/0024_cme_runtime.sql",
+      "target": "cme_runtime",
+      "views": [
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0008",
+      "derivation": "DERIVED",
+      "relation": "wakes and evaluates affected authoritative state",
+      "source": "cme_runtime",
+      "source_ref": "autonomy/runtime.py:ContinuousMomentumRuntime",
+      "target": "grace",
+      "views": [
+        "engineering",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "heartbeats and projects activity",
+      "source": "cme_runtime",
+      "source_ref": "autonomy/runtime.py:CMEStatusStore",
+      "target": "cme_status_projection",
+      "views": [
+        "context",
+        "services"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "authoritative runtime status",
+      "source": "cme_status_projection",
+      "source_ref": "operator/openwebui.py:/api/cme/status",
+      "target": "cme_indicator",
+      "views": [
+        "context",
+        "services"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "global trust surface and bounded drill-down",
+      "source": "cme_indicator",
+      "source_ref": "operator/openwebui.py:UI_HTML",
+      "target": "operator_runtime",
+      "views": [
         "context"
       ]
     },
@@ -999,6 +1057,38 @@
     {
       "derivation": "DERIVED",
       "relation": "EMITS",
+      "source": "steward",
+      "source_ref": "grace/seeds.py:confirm_and_promote",
+      "target": "flow_event.steward.seed.promoted",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.steward.seed.promoted",
+      "source_ref": "grace/seeds.py:confirm_and_promote",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "grace/seeds.py:confirm_and_promote",
+      "target": "cme_runtime",
+      "views": [
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
       "source": "resident_gateway_runtime",
       "source_ref": "operator/openwebui.py:emit_event",
       "target": "flow_event.resident.response.completed",
@@ -1313,6 +1403,70 @@
       "source": "river",
       "source_ref": "autonomy/control.py:CodexCliAdapter",
       "target": "verification",
+      "views": [
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "relay",
+      "source_ref": "relay/store.py:RelayStore.enqueue",
+      "target": "flow_event.work.order.queued",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.work.order.queued",
+      "source_ref": "relay/store.py:RelayStore.enqueue",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "relay/store.py:RelayStore.enqueue",
+      "target": "cme_runtime",
+      "views": [
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "relay",
+      "source_ref": "relay/store.py:RelayStore.complete",
+      "target": "flow_event.work.order.completed",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.work.order.completed",
+      "source_ref": "relay/store.py:RelayStore.complete",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "relay/store.py:RelayStore.complete",
+      "target": "cme_runtime",
       "views": [
         "events",
         "engineering"
@@ -1803,6 +1957,9 @@
   ],
   "generated_from": [
     "src/riverview/topology/graph.py",
+    "src/riverview/autonomy/runtime.py",
+    "database/migrations/0024_cme_runtime.sql",
+    "database/migrations/0025_cme_causation_projection.sql",
     "config/modules/*.json",
     "src/riverview/river/events.py",
     "src/riverview/autonomy/control.py",
@@ -1935,9 +2092,30 @@
       "views": []
     },
     {
+      "id": "cme_runtime",
+      "kind": "core",
+      "label": "Persistent CME River consumer/runtime",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "cme_status_projection",
+      "kind": "core",
+      "label": "CME heartbeat/status projection",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "cme_indicator",
+      "kind": "runtime",
+      "label": "Operator CME trust indicator",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
       "id": "grace",
       "kind": "core",
-      "label": "Grace / CME",
+      "label": "Grace / CME evaluation",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },
@@ -2267,6 +2445,16 @@
       ]
     },
     {
+      "id": "flow_event.steward.seed.promoted",
+      "kind": "event",
+      "label": "steward.seed.promoted",
+      "source": "grace/seeds.py:confirm_and_promote",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
       "id": "flow_event.resident.response.completed",
       "kind": "event",
       "label": "resident.response.completed",
@@ -2362,6 +2550,26 @@
       "kind": "event",
       "label": "codex.execution.completed",
       "source": "autonomy/control.py:CodexCliAdapter",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.work.order.queued",
+      "kind": "event",
+      "label": "work.order.queued",
+      "source": "relay/store.py:RelayStore.enqueue",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.work.order.completed",
+      "kind": "event",
+      "label": "work.order.completed",
+      "source": "relay/store.py:RelayStore.complete",
       "views": [
         "engineering",
         "events"
@@ -2661,8 +2869,8 @@
     },
     "1_wake_grace": {
       "evidence": [
-        "river->grace",
-        "RIV-GRC-0004"
+        "river->cme_runtime->grace",
+        "RIV-GRC-0008"
       ],
       "status": "PASS"
     },
@@ -2689,7 +2897,7 @@
     },
     "3_completion_return": {
       "evidence": [
-        "verification->river->grace"
+        "verification->river->cme_runtime->grace"
       ],
       "status": "PASS"
     },
@@ -2734,7 +2942,7 @@
       "status": "PASS"
     }
   },
-  "schema_version": "riverview-system-graph-2.0",
+  "schema_version": "riverview-system-graph-2.1",
   "views": [
     "character",
     "comms",

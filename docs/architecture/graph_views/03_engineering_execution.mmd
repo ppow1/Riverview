@@ -1,7 +1,9 @@
 flowchart LR
     steward["Steward"]
     river["River event runtime / PostgreSQL"]
-    grace["Grace / CME"]
+    cme_runtime["Persistent CME River consumer/runtime"]
+    cme_status_projection["CME heartbeat/status projection"]
+    grace["Grace / CME evaluation"]
     objective_state["Objective and stage state"]
     relay["Relay / work-order lifecycle"]
     execution_envelope["Execution envelope"]
@@ -14,10 +16,14 @@ flowchart LR
     mailbox["PostgreSQL mailbox"]
     chatgpt["ChatGPT reasoning participant"]
     character_canon["Versioned accepted character canon"]
+    flow_event_steward_seed_promoted["steward.seed.promoted"]
     flow_event_objective_stage_ready["objective.stage.ready"]
     flow_event_provider_execution_completed["provider.execution.completed"]
     flow_event_provider_execution_failed["provider.execution.failed"]
     flow_event_codex_execution_completed["codex.execution.completed"]
+    flow_event_work_order_queued["work.order.queued"]
+    flow_event_work_order_completed["work.order.completed"]
+    cme_runtime -->|wakes and evaluates affected authoritative state| grace
     grace -->|evaluates readiness/checkpoints| objective_state
     objective_state -->|records objective/stage events| river
     river -->|wakes reevaluation| grace
@@ -30,6 +36,8 @@ flowchart LR
     grace -->|redispatches ready work or escalates| relay
     grace -->|records no-ready/capacity/quiescence decision| diagnostics
     providers -->|provider completion is not global quiescence| grace
+    steward -->|EMITS| flow_event_steward_seed_promoted
+    river -->|CONSUMED/EVALUATED| cme_runtime
     grace -->|EMITS| flow_event_objective_stage_ready
     river -->|CONSUMED/EVALUATED| relay
     providers -->|EMITS| flow_event_provider_execution_completed
@@ -37,3 +45,7 @@ flowchart LR
     providers -->|EMITS| flow_event_provider_execution_failed
     river -->|CONSUMED/EVALUATED| diagnostics
     river -->|CONSUMED/EVALUATED| verification
+    relay -->|EMITS| flow_event_work_order_queued
+    river -->|CONSUMED/EVALUATED| cme_runtime
+    relay -->|EMITS| flow_event_work_order_completed
+    river -->|CONSUMED/EVALUATED| cme_runtime

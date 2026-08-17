@@ -10,10 +10,13 @@ from .control import (
     LaneRegistry,
     ResultReconciler,
 )
+from .runtime import CMEStatusStore, ContinuousMomentumRuntime
 
 __all__ = [
+    "CMEStatusStore",
     "CapabilityRegistry",
     "CodexCliAdapter",
+    "ContinuousMomentumRuntime",
     "CookbookAdvisor",
     "ExecutionEnvelope",
     "ExecutionResult",

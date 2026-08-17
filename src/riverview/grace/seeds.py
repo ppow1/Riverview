@@ -6,6 +6,8 @@ from uuid import UUID, uuid4
 
 from riverview.database import connect
 from riverview.grace.objectives import ObjectiveStore, StageSpec
+from riverview.river.events import Classification, RiverEvent
+from riverview.river.store import EventStore
 
 DESIGNATED_CONSUMER = "chatgpt:riverview_001"
 MAX_SEED_BYTES = 8_000
@@ -65,4 +67,10 @@ class StewardSeedStore:
         )
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("UPDATE steward_seed_drafts SET status='promoted',objective_id=%s,promoted_at=now() WHERE seed_id=%s", (objective_id, seed_id))
+        EventStore().append(RiverEvent(
+            event_type="steward.seed.promoted", aggregate_type="objective", aggregate_id=objective_id,
+            correlation_id=row[0], causation_id=seed_id,
+            idempotency_key=f"steward.seed.promoted:{seed_id}", classification=Classification.RIVER,
+            payload={"seed_id": str(seed_id), "objective_id": str(objective_id), "status": "promoted"},
+        ))
         return objective_id

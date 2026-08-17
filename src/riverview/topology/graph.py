@@ -11,7 +11,7 @@ CHECKPOINTS = (
     "RIV-RES-0001", "RIV-RES-0002", "RIV-REASON-0001", "RIV-REASON-0002",
     "RIV-CHAR-0004", "RIV-DIA-0001", "RIV-DIA-0002", "RIV-GRC-0004",
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
-    "RIV-ARCH-0001", "RIV-INF-0001", "RIV-SPAT-0004",
+    "RIV-ARCH-0001", "RIV-INF-0001", "RIV-SPAT-0004", "RIV-GRC-0008",
 )
 
 VIEW_NAMES = {
@@ -23,7 +23,9 @@ VIEW_NAMES = {
 
 CORE_NODES = (
     ("steward", "Steward", "external"), ("river", "River event runtime / PostgreSQL", "core"),
-    ("grace", "Grace / CME", "core"), ("objective_state", "Objective and stage state", "core"),
+    ("cme_runtime", "Persistent CME River consumer/runtime", "core"), ("cme_status_projection", "CME heartbeat/status projection", "core"),
+    ("cme_indicator", "Operator CME trust indicator", "runtime"),
+    ("grace", "Grace / CME evaluation", "core"), ("objective_state", "Objective and stage state", "core"),
     ("relay", "Relay / work-order lifecycle", "core"), ("execution_envelope", "Execution envelope", "core"),
     ("providers", "Provider registry / capacity", "core"), ("core_contract", "Riverview core contract 1.0", "contract"),
     ("reasoning_contract", "Provider-neutral reasoning contract", "contract"),
@@ -98,6 +100,11 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("resident_gateway_runtime", "continuity_runtime", "retrieves bounded continuity", "residents/gateway.py:chat", views=resident + character, checkpoint="RIV-CHAR-0004")
     add_edge("operator_runtime", "operator_module", "owned by", "config/modules/operator.json", views=modules)
     add_edge("operator_runtime", "river", "publishes bounded workflow events", "operator/openwebui.py:emit_event", views=event + context, checkpoint="RIV-UI-0009")
+    add_edge("river", "cme_runtime", "durable notification and cursor replay", "database/migrations/0024_cme_runtime.sql", views=event + context, checkpoint="RIV-GRC-0008")
+    add_edge("cme_runtime", "grace", "wakes and evaluates affected authoritative state", "autonomy/runtime.py:ContinuousMomentumRuntime", views=engineering + event, checkpoint="RIV-GRC-0008")
+    add_edge("cme_runtime", "cme_status_projection", "heartbeats and projects activity", "autonomy/runtime.py:CMEStatusStore", views=context + services)
+    add_edge("cme_status_projection", "cme_indicator", "authoritative runtime status", "operator/openwebui.py:/api/cme/status", views=context + services)
+    add_edge("cme_indicator", "operator_runtime", "global trust surface and bounded drill-down", "operator/openwebui.py:UI_HTML", views=context)
 
     add_edge("steward", "projects", "submits accepted engineering seed", "grace/objective_acceptance.py", views=engineering + context)
     add_edge("projects", "grace", "objective intake", "autonomy/control.py:GraceMomentum", views=engineering + event, checkpoint="RIV-GRC-0004")
@@ -176,6 +183,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
 
     event_specs = (
         ("resident.message.submitted", "operator_runtime", "resident_gateway_runtime", "operator/openwebui.py:emit_event", ("resident", "events")),
+        ("steward.seed.promoted", "steward", "cme_runtime", "grace/seeds.py:confirm_and_promote", ("engineering", "events")),
         ("resident.response.completed", "resident_gateway_runtime", "resident_gateway_runtime", "operator/openwebui.py:emit_event", ("resident", "events")),
         ("room.created", "room_runtime", "room_runtime", "operator/openwebui.py:emit_event", ("room", "events")),
         ("room.turn.completed", "room_runtime", "room_runtime", "operator/openwebui.py:emit_event", ("room", "events")),
@@ -186,6 +194,8 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
         ("provider.execution.completed", "providers", "verification", "autonomy/control.py:execution_results", ("engineering", "events")),
         ("provider.execution.failed", "providers", "diagnostics", "autonomy/control.py:CodexCliAdapter", ("engineering", "events", "failures")),
         ("codex.execution.completed", "codex", "verification", "autonomy/control.py:CodexCliAdapter", ("engineering", "events")),
+        ("work.order.queued", "relay", "cme_runtime", "relay/store.py:RelayStore.enqueue", ("engineering", "events")),
+        ("work.order.completed", "relay", "cme_runtime", "relay/store.py:RelayStore.complete", ("engineering", "events")),
         ("diagnostic.checkpoint.fired", "diagnostics", "notifications", "diagnostics/store.py", ("failures", "events")),
         ("notification.queued", "notifications", "notification_delivery", "notifications.py:NotificationStore.emit", ("notifications", "events")),
     )
@@ -228,9 +238,9 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
             add_edge(module_id, route_id, "exposes route", source_path, views=modules + services)
 
     questions = {
-        "1_wake_grace": {"status": "PASS", "evidence": ["river->grace", "RIV-GRC-0004"]},
+        "1_wake_grace": {"status": "PASS", "evidence": ["river->cme_runtime->grace", "RIV-GRC-0008"]},
         "2_trigger_execution": {"status": "PASS", "evidence": ["grace->relay->execution_envelope"]},
-        "3_completion_return": {"status": "PASS", "evidence": ["verification->river->grace"]},
+        "3_completion_return": {"status": "PASS", "evidence": ["verification->river->cme_runtime->grace"]},
         "4_not_quiescence": {"status": "PASS", "evidence": ["providers->grace", "provider completion is not global quiescence"]},
         "5_postgresql": {"status": "PASS", "evidence": ["river", "postgres_service", "mcp->postgres_service"]},
         "6_helen_to_model": {"status": "PASS", "evidence": ["operator_runtime->resident_gateway_runtime->providers->ollama"]},
@@ -250,7 +260,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
         "20_operator_contract": {"status": "PASS", "evidence": ["riverview.operator->core_contract", "operator_runtime->resident_gateway_contract"]},
         "21_quest_deferred": {"status": "PASS", "evidence": ["spatial_service", "spatial", "deferred/experimental"]},
     }
-    return {"schema_version": "riverview-system-graph-2.0", "generated_from": ["src/riverview/topology/graph.py", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
+    return {"schema_version": "riverview-system-graph-2.1", "generated_from": ["src/riverview/topology/graph.py", "src/riverview/autonomy/runtime.py", "database/migrations/0024_cme_runtime.sql", "database/migrations/0025_cme_causation_projection.sql", "config/modules/*.json", "src/riverview/river/events.py", "src/riverview/autonomy/control.py", "src/riverview/residents/gateway.py", "src/riverview/characters/*.py", "src/riverview/mailbox/store.py", "src/riverview/notifications.py", "Cookbook checkpoint registry"], "views": sorted(set(VIEW_NAMES.values())), "nodes": nodes, "edges": edges, "checkpoints": list(CHECKPOINTS), "manifests": manifests, "questions": questions, "manual_annotation_policy": "Manual edges are explicit, source-referenced, and never hidden in generated projections."}
 
 def validate_graph(graph: dict[str, Any]) -> list[str]:
     node_ids = {node["id"] for node in graph.get("nodes", [])}

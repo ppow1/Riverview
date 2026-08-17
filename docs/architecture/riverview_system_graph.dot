@@ -2,7 +2,10 @@ digraph riverview {
   rankdir=LR;
   "steward" [label="Steward"];
   "river" [label="River event runtime / PostgreSQL"];
-  "grace" [label="Grace / CME"];
+  "cme_runtime" [label="Persistent CME River consumer/runtime"];
+  "cme_status_projection" [label="CME heartbeat/status projection"];
+  "cme_indicator" [label="Operator CME trust indicator"];
+  "grace" [label="Grace / CME evaluation"];
   "objective_state" [label="Objective and stage state"];
   "relay" [label="Relay / work-order lifecycle"];
   "execution_envelope" [label="Execution envelope"];
@@ -49,6 +52,7 @@ digraph riverview {
   "operator_service" [label="Operator service 127.0.0.1:18082"];
   "spatial_service" [label="Spatial service 192.168.1.88:18443 (deferred/experimental)"];
   "flow_event.resident.message.submitted" [label="resident.message.submitted"];
+  "flow_event.steward.seed.promoted" [label="steward.seed.promoted"];
   "flow_event.resident.response.completed" [label="resident.response.completed"];
   "flow_event.room.created" [label="room.created"];
   "flow_event.room.turn.completed" [label="room.turn.completed"];
@@ -59,6 +63,8 @@ digraph riverview {
   "flow_event.provider.execution.completed" [label="provider.execution.completed"];
   "flow_event.provider.execution.failed" [label="provider.execution.failed"];
   "flow_event.codex.execution.completed" [label="codex.execution.completed"];
+  "flow_event.work.order.queued" [label="work.order.queued"];
+  "flow_event.work.order.completed" [label="work.order.completed"];
   "flow_event.diagnostic.checkpoint.fired" [label="diagnostic.checkpoint.fired"];
   "flow_event.notification.queued" [label="notification.queued"];
   "riverview.operator" [label="Riverview Operator surface"];
@@ -90,6 +96,11 @@ digraph riverview {
   "resident_gateway_runtime" -> "continuity_runtime" [label="retrieves bounded continuity"];
   "operator_runtime" -> "operator_module" [label="owned by"];
   "operator_runtime" -> "river" [label="publishes bounded workflow events"];
+  "river" -> "cme_runtime" [label="durable notification and cursor replay"];
+  "cme_runtime" -> "grace" [label="wakes and evaluates affected authoritative state"];
+  "cme_runtime" -> "cme_status_projection" [label="heartbeats and projects activity"];
+  "cme_status_projection" -> "cme_indicator" [label="authoritative runtime status"];
+  "cme_indicator" -> "operator_runtime" [label="global trust surface and bounded drill-down"];
   "steward" -> "projects" [label="submits accepted engineering seed"];
   "projects" -> "grace" [label="objective intake"];
   "grace" -> "objective_state" [label="evaluates readiness/checkpoints"];
@@ -161,6 +172,9 @@ digraph riverview {
   "operator_runtime" -> "flow_event.resident.message.submitted" [label="EMITS"];
   "flow_event.resident.message.submitted" -> "river" [label="DURABLE_EVENT"];
   "river" -> "resident_gateway_runtime" [label="CONSUMED/EVALUATED"];
+  "steward" -> "flow_event.steward.seed.promoted" [label="EMITS"];
+  "flow_event.steward.seed.promoted" -> "river" [label="DURABLE_EVENT"];
+  "river" -> "cme_runtime" [label="CONSUMED/EVALUATED"];
   "resident_gateway_runtime" -> "flow_event.resident.response.completed" [label="EMITS"];
   "flow_event.resident.response.completed" -> "river" [label="DURABLE_EVENT"];
   "river" -> "resident_gateway_runtime" [label="CONSUMED/EVALUATED"];
@@ -191,6 +205,12 @@ digraph riverview {
   "codex" -> "flow_event.codex.execution.completed" [label="EMITS"];
   "flow_event.codex.execution.completed" -> "river" [label="DURABLE_EVENT"];
   "river" -> "verification" [label="CONSUMED/EVALUATED"];
+  "relay" -> "flow_event.work.order.queued" [label="EMITS"];
+  "flow_event.work.order.queued" -> "river" [label="DURABLE_EVENT"];
+  "river" -> "cme_runtime" [label="CONSUMED/EVALUATED"];
+  "relay" -> "flow_event.work.order.completed" [label="EMITS"];
+  "flow_event.work.order.completed" -> "river" [label="DURABLE_EVENT"];
+  "river" -> "cme_runtime" [label="CONSUMED/EVALUATED"];
   "diagnostics" -> "flow_event.diagnostic.checkpoint.fired" [label="EMITS"];
   "flow_event.diagnostic.checkpoint.fired" -> "river" [label="DURABLE_EVENT"];
   "river" -> "notifications" [label="CONSUMED/EVALUATED"];

@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from riverview.database import DatabaseConfig, connect
+from riverview.river.events import Classification, RiverEvent
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,29 @@ class RelayStore:
     def __init__(self, config: DatabaseConfig | None = None) -> None:
         self._config = config
 
+    @staticmethod
+    def _append_event(cursor: Any, *, event_type: str, work_order_id: UUID, correlation_id: UUID, payload: dict[str, Any]) -> None:
+        event = RiverEvent(
+            event_type=event_type,
+            aggregate_type="work_order",
+            aggregate_id=work_order_id,
+            correlation_id=correlation_id,
+            causation_id=work_order_id,
+            idempotency_key=f"{event_type}:{work_order_id}",
+            classification=Classification.RIVER,
+            payload=payload,
+        )
+        cursor.execute(
+            """INSERT INTO river_events(
+                event_id,event_type,aggregate_type,aggregate_id,correlation_id,causation_id,
+                idempotency_key,classification,payload,occurred_at
+            ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
+            ON CONFLICT(idempotency_key) DO NOTHING""",
+            (event.event_id, event.event_type, event.aggregate_type, event.aggregate_id,
+             event.correlation_id, event.causation_id, event.idempotency_key,
+             event.classification.value, json.dumps(dict(event.payload)), event.occurred_at),
+        )
+
     def enqueue(self, action_type: str, parameters: dict[str, Any], requested_by: str, idempotency_key: str, correlation_id: UUID | None = None, causation_id: UUID | None = None) -> WorkOrder:
         """Create one durable order or return the existing idempotent order."""
         with connect(self._config) as connection, connection.cursor() as cursor:
@@ -60,7 +84,9 @@ class RelayStore:
             if not inserted:
                 cursor.execute("SELECT work_order_id FROM work_orders WHERE idempotency_key=%s", (idempotency_key,)); order_id = cursor.fetchone()[0]
             cursor.execute("SELECT action_type, parameters, requested_by, idempotency_key, correlation_id, work_order_id, action_version, expected_duration_seconds, hard_timeout_seconds, status FROM work_orders WHERE work_order_id=%s", (order_id,))
-            return WorkOrder(*cursor.fetchone())
+            row = cursor.fetchone()
+            self._append_event(cursor, event_type="work.order.queued", work_order_id=row[5], correlation_id=row[4], payload={"action_type": row[0], "status": row[9]})
+            return WorkOrder(*row)
 
     def claim(self, worker_id: str, lease_seconds: int = 30) -> ClaimedWork | None:
         """Claim one queued order without permitting duplicate workers."""
@@ -89,9 +115,11 @@ class RelayStore:
 
     def complete(self, work_order_id: UUID, worker_id: str, result: dict[str, Any]) -> None:
         with connect(self._config) as connection, connection.cursor() as cursor:
-            cursor.execute("UPDATE work_orders SET status='succeeded',result_report=%s::jsonb,finished_at=now(),lease_expires_at=NULL,updated_at=now() WHERE work_order_id=%s AND lease_owner=%s AND status IN ('claimed','running')", (json.dumps(result), work_order_id, worker_id))
+            cursor.execute("UPDATE work_orders SET status='succeeded',result_report=%s::jsonb,finished_at=now(),lease_expires_at=NULL,updated_at=now() WHERE work_order_id=%s AND lease_owner=%s AND status IN ('claimed','running') RETURNING correlation_id", (json.dumps(result), work_order_id, worker_id))
             if cursor.rowcount != 1: raise RuntimeError("RIV-WRK-0003: Completion did not own an active lease.")
+            correlation_id = cursor.fetchone()[0]
             cursor.execute("UPDATE work_order_attempts SET finished_at=now(),exit_code=0 WHERE work_order_id=%s AND worker_id=%s AND finished_at IS NULL", (work_order_id, worker_id))
+            self._append_event(cursor, event_type="work.order.completed", work_order_id=work_order_id, correlation_id=correlation_id, payload={"status": "succeeded", "result_category": result.get("status", "succeeded")})
 
     def sweep_expired(self) -> list[UUID]:
         """Mark expired leases and open one Steward escalation per order."""

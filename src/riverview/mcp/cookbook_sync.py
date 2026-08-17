@@ -125,6 +125,16 @@ ENTRIES = [
         "docs/operations/troubleshooting/checkpoints/RIV-GRC-0004_MOMENTUM_CONTROL.md",
     ),
     (
+        "RIV-GRC-0008",
+        "River-to-CME wakeup boundary",
+        "An authoritative River event is committed but CME does not wake, heartbeat, replay, or preserve idempotent progress.",
+        ["event-committed-no-wakeup", "consumer-stopped", "heartbeat-stale", "cursor-replay", "lost-wakeup", "duplicate-delivery"],
+        ["Confirm the event in river_events, inspect cme_runtime_status, verify LISTEN riverview_river_events, and compare the durable cursor with sequence_id."],
+        "Restore the persistent CME consumer, notification trigger, or cursor reconciliation; never manually insert business events or kick CME from the browser.",
+        "Promote a fresh bounded seed through Steward confirmation, observe CME without a manual cycle call, stop/restart CME, and verify replay exactly once.",
+        "docs/operations/troubleshooting/checkpoints/RIV-GRC-0008_RIVER_CME_WAKEUP.md",
+    ),
+    (
         "RIV-CAP-0001",
         "Capability or dispatch evidence unavailable",
         "No measured healthy capability with current capacity can be selected for a bounded task.",

@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from uuid import UUID, uuid4
 
+from riverview.autonomy.runtime import CMEStatusStore
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
 from riverview.operator.snapshot import build_snapshot
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
@@ -25,8 +26,8 @@ from riverview.river.store import EventStore
 
 UI_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Riverview Operator</title>
-<style>body{font:16px sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem}textarea{width:100%;height:8rem}input,button{margin:.4rem 0;padding:.5rem}#result{white-space:pre-wrap;background:#f3f3f3;padding:1rem}</style></head>
-<body><h1>Riverview Operator</h1><p id="status">Use the local credential handoff, then enter an instruction and optionally attach a harmless artifact. Attachments are reference-only unless the selected provider explicitly supports content inspection.</p>
+<style>body{font:16px sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem}textarea{width:100%;height:8rem}input,button{margin:.4rem 0;padding:.5rem}#result{white-space:pre-wrap;background:#f3f3f3;padding:1rem}.cme{position:fixed;right:1rem;top:1rem;border:0;border-radius:999px;padding:.45rem .7rem;color:#fff;font-weight:700;cursor:pointer}.cme-healthy{background:#178447}.cme-active{background:#168aad}.cme-waiting{background:#a66b00}.cme-unhealthy{background:#b42318}.cme-unavailable{background:#667085}</style></head>
+<body><button id="cme-indicator" class="cme cme-unavailable" title="CME unavailable">CME: UNAVAILABLE</button><h1>Riverview Operator</h1><p id="status">Use the local credential handoff, then enter an instruction and optionally attach a harmless artifact. Attachments are reference-only unless the selected provider explicitly supports content inspection.</p>
 <button id="snapshot">Snapshot</button> <button id="local-auth">Use local Riverview credential</button><br>
 <label>Resident <select id="resident"><option value="">General Riverview operator</option></select></label><br>
 <span id="resident-state">Active resident: General operator · session: none</span><br>
@@ -53,7 +54,9 @@ async function submit(){
   if(response.ok&&residentId&&body.session_id)residentSessions[residentId]=body.session_id;
   $('result').textContent=JSON.stringify({correlation_id:correlation,artifact_refs:refs,artifact_semantics:body.artifact_semantics||'none',resident:body.resident||null,session_id:body.session_id||null,response:body.response||body.error},null,2);
 }
-async function localAuth(){const response=await fetch('/session',{method:'POST'}); if(response.ok){$('status').textContent='Authenticated through local Riverview credential handoff';await loadResidents();}else $('status').textContent='Authentication handoff failed';}
+async function localAuth(){const response=await fetch('/session',{method:'POST'}); if(response.ok){$('status').textContent='Authenticated through local Riverview credential handoff';await loadResidents();await loadCme();}else $('status').textContent='Authentication handoff failed';}
+function cmeLabel(body){const state=body.effective_state||body.current_state||'UNAVAILABLE';const health=body.heartbeat_health||'UNAVAILABLE';return 'CME: '+health+' '+state;}
+async function loadCme(){try{const response=await fetch('/api/cme/status',{cache:'no-store'});const body=await response.json();const indicator=$('cme-indicator');if(!response.ok)throw Error(body.error||'unavailable');indicator.textContent=cmeLabel(body);indicator.title=cmeLabel(body)+' | heartbeat '+(body.heartbeat_age_seconds??'?')+'s | event '+(body.last_event_type||'none')+' | River '+(body.last_river_sequence_seen??'0');indicator.className='cme '+((body.effective_state==='UNHEALTHY')?'cme-unhealthy':(body.effective_state==='WAITING_EXTERNAL'||body.effective_state==='WAITING_STEWARD')?'cme-waiting':(['EVENT_OBSERVED','EVALUATING','ADVANCING','DISPATCHING'].includes(body.effective_state)?'cme-active':'cme-healthy'));}catch(error){const indicator=$('cme-indicator');indicator.textContent='CME: UNAVAILABLE';indicator.title='CME status unavailable';indicator.className='cme cme-unavailable';}}
 async function loadResidents(){const response=await fetch('/api/residents');if(!response.ok)return;const body=await response.json();for(const resident of body.residents){const option=document.createElement('option');option.value=resident.resident_id;option.textContent=resident.name+' — '+resident.role;$('resident').appendChild(option);}}
 async function createRoom(){const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participants:['RES-000001','RES-000002','RES-000003']})});const body=await response.json();if(!response.ok)throw Error(body.error||'room creation failed');$('room-state').textContent='Room '+body.room_id+' ready; use the selected resident to submit a bounded turn.';window.riverviewRoomId=body.room_id;}
 async function snapshot(){ $('status').textContent='Creating snapshot…'; try { const clone=document.documentElement.cloneNode(true); clone.querySelector('#token')?.setAttribute('value','[REDACTED]'); clone.querySelector('#token')?.removeAttribute('value'); clone.querySelector('#artifact')?.removeAttribute('value'); clone.querySelectorAll('textarea').forEach(x=>x.textContent=x.value); const file=$('artifact').files[0]; const refs=file?['browser-artifact:'+file.name]:[]; let roomState={}; if(window.riverviewRoomId){const room=await fetch('/api/rooms/'+window.riverviewRoomId);if(room.ok)roomState=await room.json();} const health=await fetch('/health'); const residents=await fetch('/api/residents'); const body={current_dom:'<!doctype html>'+clone.outerHTML,page_url:location.href,title:document.title,visible_status:$('status').textContent,selected_resident:$('resident').value,active_resident_display:$('resident-state').textContent,composer:$('message').value,result:$('result').textContent,correlation_ids:($('result').textContent.match(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi)||[]),artifact_refs:refs,room_id:window.riverviewRoomId||null,room_state:roomState,resident_state:{selected_resident:$('resident').value,active_display:$('resident-state').textContent,session_ids:residentSessions},api_state:{health:health.ok?await health.json():{status:false},residents:residents.ok?await residents.json():{available:false}},provider_identities:['ollama:qwen3-coder:30b-qwencode-20k']}; const response=await fetch('/snapshot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!response.ok)throw Error('snapshot failed'); const blob=await response.blob(); const url=URL.createObjectURL(blob), link=document.createElement('a'); link.href=url; link.download=(response.headers.get('Content-Disposition')||'riverview-snapshot.zip').split('filename="')[1]?.split('"')[0]||'riverview-snapshot.zip'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); $('status').textContent='Snapshot downloaded.'; } catch(error) { $('status').textContent='Snapshot failed — RIV-UI-0019'; $('result').textContent=String(error); } }
@@ -64,7 +67,9 @@ $('send').addEventListener('click',()=>submit().catch(error=>{$('status').textCo
  $('resident').addEventListener('change',()=>{const option=$('resident').selectedOptions[0];$('resident-state').textContent=option&&option.value?'Active resident: '+option.textContent+' · session: '+(residentSessions[option.value]||'not started'):'Active resident: General operator · session: none';});
  $('snapshot').addEventListener('click',()=>snapshot());
  $('create-room').addEventListener('click',()=>createRoom().catch(error=>{$('room-state').textContent='Room unavailable';}));
+ $('cme-indicator').addEventListener('click',()=>{location.href='/cme';});
 loadResidents().catch(()=>{});
+loadCme().catch(()=>{}); setInterval(()=>loadCme().catch(()=>{}),2000);
 </script></body></html>"""
 
 
@@ -168,6 +173,8 @@ class RiverviewOpenWebUIService:
             def do_GET(self) -> None:
                 if self.path == "/":
                     self._send_html(UI_HTML)
+                elif self.path == "/cme":
+                    self._send_html("""<!doctype html><meta charset='utf-8'><title>CME status</title><style>body{font:16px sans-serif;max-width:760px;margin:3rem auto}pre{white-space:pre-wrap;background:#f3f3f3;padding:1rem}</style><h1>Continuous Motion Engine</h1><p>Authoritative status from the CME runtime projection.</p><pre id='status'>Loading…</pre><script>async function load(){const r=await fetch('/api/cme/status',{cache:'no-store'});document.getElementById('status').textContent=JSON.stringify(await r.json(),null,2)}load();setInterval(load,2000);</script>""")
                 elif self.path == "/spatial":
                     from riverview.spatial.prototype import prototype_html
                     self._send_html(prototype_html())
@@ -180,6 +187,17 @@ class RiverviewOpenWebUIService:
                 elif self.path == "/api/residents" and self._auth():
                     self._send(HTTPStatus.OK, {"residents": service.resident_gateway.residents()})
                 elif self.path == "/api/residents":
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                elif self.path == "/api/cme/status" and self._auth():
+                    try:
+                        status = CMEStatusStore().read()
+                        if status is None:
+                            self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cme_unavailable", "checkpoint": "RIV-GRC-0008"})
+                        else:
+                            self._send(HTTPStatus.OK, status)
+                    except (RuntimeError, OSError, TypeError, ValueError):
+                        self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cme_status_unavailable", "checkpoint": "RIV-GRC-0008"})
+                elif self.path == "/api/cme/status":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif self.path.startswith("/api/rooms/") and self._auth():
                     try:

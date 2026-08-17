@@ -1,7 +1,9 @@
 flowchart LR
     steward["Steward"]
     river["River event runtime / PostgreSQL"]
-    grace["Grace / CME"]
+    cme_runtime["Persistent CME River consumer/runtime"]
+    cme_status_projection["CME heartbeat/status projection"]
+    grace["Grace / CME evaluation"]
     objective_state["Objective and stage state"]
     relay["Relay / work-order lifecycle"]
     execution_envelope["Execution envelope"]
