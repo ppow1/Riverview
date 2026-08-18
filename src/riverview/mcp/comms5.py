@@ -217,6 +217,7 @@ class Comms5Service:
         evaluations: list[dict[str, Any]] = []
         checkpoints: list[dict[str, Any]] = []
         work: list[dict[str, Any]] = []
+        engineering_intent: dict[str, Any] | None = None
         events: list[dict[str, Any]] = []
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT lifecycle_event_id,transition,replacement_seed_id,actor,reason,classification,correlation_id,created_at FROM steward_seed_lifecycle_events WHERE seed_id=%s ORDER BY created_at", (seed_uuid,))
@@ -227,9 +228,12 @@ class Comms5Service:
                 cursor.execute("SELECT evaluation_id,decision,reason,next_action,created_at FROM grace_transition_evaluations WHERE objective_id=%s ORDER BY created_at DESC LIMIT 10", (UUID(str(objective_id)),)); evaluations = _rows(cursor)
                 cursor.execute("SELECT checkpoint_code,state,reason,required_action,created_at FROM grace_checkpoints WHERE subject_id=%s ORDER BY created_at DESC LIMIT 10", (UUID(str(objective_id)),)); checkpoints = _rows(cursor)
                 cursor.execute("SELECT work_order_id,action_type,status,requested_by,correlation_id,error_checkpoint,created_at,started_at,finished_at FROM work_orders WHERE correlation_id=%s ORDER BY created_at LIMIT 20", (objective["correlation_id"],)); work = _rows(cursor)
+                cursor.execute("SELECT intent_id,status,repository_identity,capability_name,action_type,classification,correlation_id,causation_id,idempotency_key,created_at,updated_at FROM engineering_intents WHERE objective_id=%s ORDER BY created_at LIMIT 1", (UUID(str(objective_id)),)); row = cursor.fetchone()
+                if row:
+                    engineering_intent = dict(zip(("intent_id","status","repository_identity","capability_name","action_type","classification","correlation_id","causation_id","idempotency_key","created_at","updated_at"), row, strict=True))
             events = _json(EventStore().read_aggregate("objective", UUID(str(objective_id))))[-20:]
         cme = CMEStatusStore().read()
-        return {"seed": seed, "promotion": {"status": "not_created" if not objective_id else "promoted", "objective_id": objective_id}, "lifecycle_events": _json(lifecycle_events), "objective": objective or {"status": "not_created"}, "grace_evaluations": _json(evaluations), "checkpoints": _json(checkpoints), "work_orders": _json(work), "river_events": events, "cme": cme or {"status": "not_observed"}, "steward_attention_required": bool(seed["steward_action_required"] or checkpoints), "protected_payloads_returned": False}
+        return {"seed": seed, "promotion": {"status": "not_created" if not objective_id else "promoted", "objective_id": objective_id}, "engineering_intent": engineering_intent or {"status": "not_created"}, "lifecycle_events": _json(lifecycle_events), "objective": objective or {"status": "not_created"}, "grace_evaluations": _json(evaluations), "checkpoints": _json(checkpoints), "work_orders": _json(work), "river_events": events, "cme": cme or {"status": "not_observed"}, "steward_attention_required": bool(seed["steward_action_required"] or checkpoints), "protected_payloads_returned": False}
 
     def seed_lineage(self, seed_id: str) -> dict[str, Any]:
         try: seed_uuid = UUID(seed_id)
@@ -246,7 +250,9 @@ class Comms5Service:
         cme = CMEStatusStore().read()
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT work_order_id,action_type,status,correlation_id,error_checkpoint,created_at,started_at,finished_at FROM work_orders WHERE correlation_id=%s ORDER BY created_at LIMIT 20", (status["correlation_id"],)); work = _rows(cursor)
-        return {"objective": status, "cme": cme, "work_orders": _json(work), "steward_attention_required": any(stage.get("steward_checkpoint") for stage in status["stages"])}
+            cursor.execute("SELECT intent_id,status,repository_identity,capability_name,action_type,classification,correlation_id,causation_id,idempotency_key,created_at,updated_at FROM engineering_intents WHERE objective_id=%s ORDER BY created_at LIMIT 1", (objective_uuid,)); row = cursor.fetchone()
+        intent = dict(zip(("intent_id","status","repository_identity","capability_name","action_type","classification","correlation_id","causation_id","idempotency_key","created_at","updated_at"), row, strict=True)) if row else {"status": "not_created"}
+        return {"objective": status, "engineering_intent": intent, "cme": cme, "work_orders": _json(work), "steward_attention_required": any(stage.get("steward_checkpoint") for stage in status["stages"])}
 
     def cme_status(self) -> dict[str, Any] | None:
         return CMEStatusStore().read()

@@ -434,6 +434,54 @@
     {
       "checkpoint": "RIV-GRC-0004",
       "derivation": "DERIVED",
+      "relation": "authorizes bounded typed engineering intent",
+      "source": "steward",
+      "source_ref": "intake/engineering.py:EngineeringIntentStore.bind",
+      "target": "engineering_intent",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "DERIVED",
+      "relation": "binds one registered action to one eligible stage",
+      "source": "engineering_intent",
+      "source_ref": "intake/engineering.py:EngineeringIntentStore.bind",
+      "target": "declared_action_binding",
+      "views": [
+        "engineering",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "persists typed declared_action without executable shell text",
+      "source": "declared_action_binding",
+      "source_ref": "grace/objectives.py:objective_stages.declared_action",
+      "target": "objective_state",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "records durable formation fact",
+      "source": "engineering_intent",
+      "source_ref": "intake/engineering.py:engineering.intent.bound",
+      "target": "river",
+      "views": [
+        "engineering",
+        "events",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "DERIVED",
       "relation": "evaluates readiness/checkpoints",
       "source": "grace",
       "source_ref": "autonomy/control.py:GraceMomentum.evaluate",
@@ -1437,6 +1485,38 @@
       "relation": "CONSUMED/EVALUATED",
       "source": "river",
       "source_ref": "grace/seeds.py:confirm_and_promote",
+      "target": "cme_runtime",
+      "views": [
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "EMITS",
+      "source": "engineering_intent",
+      "source_ref": "intake/engineering.py:EngineeringIntentStore.bind",
+      "target": "flow_event.engineering.intent.bound",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "DURABLE_EVENT",
+      "source": "flow_event.engineering.intent.bound",
+      "source_ref": "intake/engineering.py:EngineeringIntentStore.bind",
+      "target": "river",
+      "views": [
+        "events"
+      ]
+    },
+    {
+      "derivation": "DERIVED",
+      "relation": "CONSUMED/EVALUATED",
+      "source": "river",
+      "source_ref": "intake/engineering.py:EngineeringIntentStore.bind",
       "target": "cme_runtime",
       "views": [
         "events",
@@ -2604,6 +2684,20 @@
       "views": []
     },
     {
+      "id": "engineering_intent",
+      "kind": "core",
+      "label": "Durable typed Steward engineering intent",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "declared_action_binding",
+      "kind": "core",
+      "label": "Approved typed stage action binding",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
       "id": "relay",
       "kind": "core",
       "label": "Relay / work-order lifecycle",
@@ -2989,6 +3083,16 @@
       "kind": "event",
       "label": "steward.seed.promoted",
       "source": "grace/seeds.py:confirm_and_promote",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "id": "flow_event.engineering.intent.bound",
+      "kind": "event",
+      "label": "engineering.intent.bound",
+      "source": "intake/engineering.py:EngineeringIntentStore.bind",
       "views": [
         "engineering",
         "events"

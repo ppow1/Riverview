@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -21,6 +22,9 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from riverview.database import connect
+from riverview.grace.objectives import ObjectiveStore
+from riverview.river.events import Classification, RiverEvent
+from riverview.river.store import EventStore
 
 
 def _json(value: Any) -> str:
@@ -46,6 +50,7 @@ class ExecutionEnvelope:
     objective_id: UUID | None = None
     stage_id: UUID | None = None
     work_order_id: UUID | None = None
+    write_policy: str = "read_only"
 
     def __post_init__(self) -> None:
         if not self.capability_name or not self.repository_identity:
@@ -62,6 +67,8 @@ class ExecutionEnvelope:
             raise ValueError("RIV-EXE-0001: timeout is outside its safe limit.")
         if self.classification not in {"river", "internal"}:
             raise ValueError("RIV-EXE-0001: unsupported classification.")
+        if self.write_policy != "read_only":
+            raise ValueError("RIV-EXE-0001: only the bounded read-only policy is enabled.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,6 +213,27 @@ class GraceMomentum:
         order = RelayStore().enqueue(action["action_type"], action["parameters"], requested_by, f"grace:{objective_key}:{stage_key}", correlation_id)
         return {"stage_id": str(stage_id), "work_order_id": str(order.work_order_id), "correlation_id": str(correlation_id), "action_type": order.action_type}
 
+    def reconcile_execution(self, execution_id: UUID) -> dict[str, Any]:
+        """Accept only a durable, successful, reconciled execution as stage evidence."""
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""SELECT e.status,r.result_category,rr.decision,o.objective_key,s.stage_key
+                FROM execution_envelopes e JOIN execution_results r ON r.execution_id=e.execution_id
+                LEFT JOIN reconciliation_records rr ON rr.execution_id=e.execution_id
+                JOIN objectives o ON o.objective_id=e.objective_id
+                JOIN objective_stages s ON s.stage_id=e.stage_id
+                WHERE e.execution_id=%s ORDER BY rr.created_at DESC LIMIT 1""", (execution_id,))
+            row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError("RIV-REC-0001: execution reconciliation record is missing.")
+        status, result_category, decision, objective_key, stage_key = row
+        if status != "reconciled" or result_category != "succeeded" or decision != "accepted":
+            return {"execution_id": str(execution_id), "progressed": False, "reason": "execution is not an accepted reconciled success"}
+        store = ObjectiveStore()
+        store.add_evidence(objective_key, stage_key, f"execution:reconciled:{execution_id}")
+        store.complete_stage(objective_key, stage_key, {"execution_id": str(execution_id), "result": "accepted"})
+        store.finalize(objective_key, {"execution_id": str(execution_id), "result": "accepted"})
+        return {"execution_id": str(execution_id), "progressed": True, "objective_key": objective_key, "stage_key": stage_key}
+
     def detect_stale_work(self, correlation_id: UUID | None = None) -> list[dict[str, Any]]:
         """Record stale leases/checkpoints without changing user intent."""
         correlation_id = correlation_id or uuid4()
@@ -252,16 +280,23 @@ class ContinuousMomentumEngine:
         """Delegate approved work formation to Grace's authority boundary."""
         return GraceMomentum().enqueue_declared_action(objective_key, stage_key, requested_by=requested_by)
 
-    def frontier(self, *, limit: int = 16, priority_objective_id: UUID | None = None) -> list[dict[str, Any]]:
+    def frontier(
+        self,
+        *,
+        limit: int = 16,
+        priority_objective_id: UUID | None = None,
+        declared_only: bool = False,
+    ) -> list[dict[str, Any]]:
         if not 1 <= limit <= 64:
             raise ValueError("RIV-GRC-0004: frontier limit is outside the bounded range.")
         with connect() as connection, connection.cursor() as cursor:
             order_clause = "CASE WHEN o.objective_id=%s THEN 0 ELSE 1 END, o.created_at,s.sort_order" if priority_objective_id else "o.created_at,s.sort_order"
+            declared_clause = " AND s.declared_action IS NOT NULL" if declared_only else ""
             query = f"""SELECT o.objective_id,o.objective_key,o.correlation_id,s.stage_id,s.stage_key,
                           s.readiness,s.status,s.declared_action,s.steward_checkpoint
                    FROM objectives o JOIN objective_stages s ON s.objective_id=o.objective_id
                    WHERE o.status IN ('ready','active') AND s.status<>'completed'
-                     AND s.readiness='ready' AND s.steward_checkpoint=false
+                     AND s.readiness='ready' AND s.steward_checkpoint=false{declared_clause}
                    ORDER BY {order_clause} LIMIT %s"""
             cursor.execute(query, (priority_objective_id, limit) if priority_objective_id else (limit,))
             names = [item.name for item in cursor.description]
@@ -427,23 +462,44 @@ class CodexCliAdapter:
             executable = shutil.which(f"{self.executable}.cmd") or shutil.which(f"{self.executable}.exe") or self.executable
         else:
             executable = shutil.which(self.executable) or self.executable
-        command = [executable, "exec", "--json", "--ephemeral", "--sandbox", "workspace-write", "-C", str(repository), envelope.bounded_instruction]
+        output_path = Path(tempfile.gettempdir()) / f"riverview-codex-result-{uuid4()}.txt"
+        command = [
+            executable, "exec", "--json", "--ephemeral", "--sandbox", "read-only",
+            "--output-last-message", str(output_path), "-C", str(repository), envelope.bounded_instruction,
+        ]
         started = datetime.now(UTC)
         try:
             process = subprocess.Popen(command, cwd=repository, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
-            _stdout, stderr = process.communicate(timeout=envelope.timeout_seconds)
+            stdout, stderr = process.communicate(timeout=envelope.timeout_seconds)
             category = "succeeded" if process.returncode == 0 else "failed"
             exit_state = f"exit:{process.returncode}"
-            summary = "Codex CLI completed the bounded package." if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
+            provider_output = output_path.read_text(encoding="utf-8") if output_path.exists() else stdout
+            summary = self._bounded_success_summary(repository, provider_output) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
             checkpoint = () if process.returncode == 0 else ("RIV-EXE-0004",)
         except subprocess.TimeoutExpired:
             process.kill()
             _stdout, stderr = process.communicate()
             category, exit_state, summary, checkpoint = "timed_out", "timeout", "Codex CLI exceeded the bounded execution deadline.", ("RIV-EXE-0003",)
+        finally:
+            output_path.unlink(missing_ok=True)
         finished = datetime.now(UTC)
         del stderr
-        result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, (), (), None, None, checkpoint, (), summary, started, finished)
+        result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, (), (summary,), None, None, checkpoint, (), summary, started, finished)
         return result
+
+    @staticmethod
+    def _bounded_success_summary(repository: Path, provider_output: str) -> str:
+        """Keep provider output plus independently bounded repository evidence."""
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
+        evidence = {
+            "provider_output": provider_output[-2600:] if provider_output else "",
+            "repository_identity": "ppow1/Riverview",
+            "observed_git_head": head,
+            "ai_hints_readable": (repository / "AI_HINTS.md").is_file(),
+            "charter_readable": (repository / "docs" / "governance" / "RIVERVIEW_CHARTER.md").is_file(),
+            "write_policy": "read_only",
+        }
+        return json.dumps(evidence, ensure_ascii=False, separators=(",", ":"))[-3800:]
 
 
 class ResultReconciler:
@@ -471,6 +527,12 @@ class ResultReconciler:
                        ON CONFLICT(idempotency_key) DO NOTHING""",
                     (uuid4(), checkpoint, "Bounded adapter result was not successful.", repair, f"execution.failure:{result.execution_id}:{checkpoint}", result.execution_id),
                 )
+        EventStore().append(RiverEvent(
+            event_type="execution.result.recorded", aggregate_type="execution", aggregate_id=result.execution_id,
+            correlation_id=result.correlation_id, causation_id=result.execution_id,
+            idempotency_key=f"execution.result.recorded:{result.execution_id}", classification=Classification.RIVER,
+            payload={"execution_id": str(result.execution_id), "result_category": result.result_category},
+        ))
 
     def reconcile_repository(self, execution_id: UUID, repository_root: Path, allowed_paths: tuple[str, ...], baseline_paths: tuple[str, ...] = ()) -> dict[str, Any]:
         """Independently verify changed paths and close only a bounded result."""
@@ -495,7 +557,22 @@ class ResultReconciler:
                 (_json(changed), _json(["git status path-boundary check passed"]), execution_id),
             )
             cursor.execute("UPDATE execution_envelopes SET status='reconciled',updated_at=now() WHERE execution_id=%s", (execution_id,))
+        EventStore().append(RiverEvent(
+            event_type="execution.reconciled", aggregate_type="execution", aggregate_id=execution_id,
+            correlation_id=UUID(str(self._execution_correlation(execution_id))), causation_id=execution_id,
+            idempotency_key=f"execution.reconciled:{execution_id}", classification=Classification.RIVER,
+            payload={"execution_id": str(execution_id), "changed_paths": list(changed), "outside_scope": list(outside)},
+        ))
         return {"execution_id": str(execution_id), "changed_paths": changed, "outside_scope": outside, "reconciled": True}
+
+    @staticmethod
+    def _execution_correlation(execution_id: UUID) -> UUID:
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT correlation_id FROM execution_envelopes WHERE execution_id=%s", (execution_id,))
+            row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError("RIV-REC-0001: execution correlation is missing.")
+        return row[0]
 
     def record_publication(self, execution_id: UUID, commit_sha: str, remote_verified_sha: str) -> None:
         if len(commit_sha) != 40 or len(remote_verified_sha) != 40 or commit_sha != remote_verified_sha:
@@ -516,7 +593,13 @@ class ResultReconciler:
             result = cursor.fetchone()[0]
             if decision in {"rejected", "conflict", "checkpoint"}:
                 cursor.execute("UPDATE execution_envelopes SET status='escalated',finished_at=COALESCE(finished_at,now()),updated_at=now() WHERE execution_id=%s", (execution_id,))
-            return result
+        EventStore().append(RiverEvent(
+            event_type="execution.reconciliation.recorded", aggregate_type="execution", aggregate_id=execution_id,
+            correlation_id=correlation_id, causation_id=execution_id,
+            idempotency_key=f"execution.reconciliation.recorded:{idempotency_key}", classification=Classification.RIVER,
+            payload={"execution_id": str(execution_id), "decision": decision},
+        ))
+        return result
 
 
 class LaneRegistry:

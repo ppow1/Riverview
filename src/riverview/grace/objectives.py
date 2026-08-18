@@ -158,7 +158,7 @@ class ObjectiveStore:
                 """
                 SELECT stage_id,stage_key,sort_order,title,description,status,readiness,
                        required_evidence,accepted_evidence,final_output,steward_checkpoint,
-                       created_at,updated_at,completed_at
+                       declared_action,created_at,updated_at,completed_at
                 FROM objective_stages
                 WHERE objective_id=%s
                 ORDER BY sort_order

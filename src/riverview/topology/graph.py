@@ -28,6 +28,7 @@ CORE_NODES = (
     ("cme_supervisor", "CME external supervisor / recovery boundary", "service"), ("cme_runtime", "Persistent CME River consumer/runtime", "core"), ("cme_status_projection", "CME heartbeat/status projection", "core"),
     ("cme_indicator", "Operator CME trust indicator", "runtime"),
     ("grace", "Grace / CME evaluation", "core"), ("objective_state", "Objective and stage state", "core"),
+    ("engineering_intent", "Durable typed Steward engineering intent", "core"), ("declared_action_binding", "Approved typed stage action binding", "core"),
     ("relay", "Relay / work-order lifecycle", "core"), ("execution_envelope", "Execution envelope", "core"),
     ("providers", "Provider registry / capacity", "core"), ("core_contract", "Riverview core contract 1.0", "contract"),
     ("reasoning_contract", "Provider-neutral reasoning contract", "contract"),
@@ -130,6 +131,10 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
 
     add_edge("steward", "projects", "submits accepted engineering seed", "grace/objective_acceptance.py", views=engineering + context)
     add_edge("projects", "grace", "objective intake", "autonomy/control.py:GraceMomentum", views=engineering + event, checkpoint="RIV-GRC-0004")
+    add_edge("steward", "engineering_intent", "authorizes bounded typed engineering intent", "intake/engineering.py:EngineeringIntentStore.bind", views=engineering, checkpoint="RIV-GRC-0004")
+    add_edge("engineering_intent", "declared_action_binding", "binds one registered action to one eligible stage", "intake/engineering.py:EngineeringIntentStore.bind", views=engineering + event, checkpoint="RIV-GRC-0004")
+    add_edge("declared_action_binding", "objective_state", "persists typed declared_action without executable shell text", "grace/objectives.py:objective_stages.declared_action", views=engineering)
+    add_edge("engineering_intent", "river", "records durable formation fact", "intake/engineering.py:engineering.intent.bound", views=engineering + event)
     add_edge("grace", "objective_state", "evaluates readiness/checkpoints", "autonomy/control.py:GraceMomentum.evaluate", views=engineering + event, checkpoint="RIV-GRC-0004")
     add_edge("objective_state", "river", "records objective/stage events", "grace/objectives.py:EventStore", views=engineering + event)
     add_edge("river", "grace", "wakes reevaluation", "river/store.py + autonomy/control.py", views=engineering + event, checkpoint="RIV-GRC-0004")
@@ -218,6 +223,7 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     event_specs = (
         ("resident.message.submitted", "operator_runtime", "resident_gateway_runtime", "operator/openwebui.py:emit_event", ("resident", "events")),
         ("steward.seed.promoted", "steward", "cme_runtime", "grace/seeds.py:confirm_and_promote", ("engineering", "events")),
+        ("engineering.intent.bound", "engineering_intent", "cme_runtime", "intake/engineering.py:EngineeringIntentStore.bind", ("engineering", "events")),
         ("steward.seed.cancelled", "comms5", "steward", "grace/seeds.py:cancel_draft", ("comms", "events")),
         ("steward.seed.superseded", "comms5", "steward", "grace/seeds.py:supersede_seed", ("comms", "events")),
         ("resident.response.completed", "resident_gateway_runtime", "resident_gateway_runtime", "operator/openwebui.py:emit_event", ("resident", "events")),

@@ -6,6 +6,7 @@ Version: 0.6.1
 from __future__ import annotations
 
 import os
+import signal
 import socket
 import threading
 from dataclasses import dataclass
@@ -104,3 +105,20 @@ class RelayWorker:
                 ready.set()
             self._record("stopped")
         return self.statistics
+
+
+def main() -> None:
+    """Run the durable Relay consumer under the repository-owned lifecycle."""
+    stop = threading.Event()
+
+    def shutdown(_signum: int, _frame: object) -> None:
+        stop.set()
+
+    signal.signal(signal.SIGINT, shutdown)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, shutdown)
+    RelayWorker(Path.cwd(), "relay.primary", poll_seconds=1.0).serve(stop)
+
+
+if __name__ == "__main__":
+    main()

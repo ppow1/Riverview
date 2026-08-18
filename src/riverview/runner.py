@@ -15,7 +15,14 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from riverview.autonomy.control import (
+    CodexCliAdapter,
+    ExecutionEnvelope,
+    ExecutionStore,
+    ResultReconciler,
+)
 from riverview.database import connect
+from riverview.intake import EngineeringIntentStore
 from riverview.relay import ClaimedWork, RelayStore
 
 
@@ -43,11 +50,61 @@ class RestrictedRunner:
             return None
         try:
             definition = self._definition(work)
+            if work.action_type == "codex.engineering.v1":
+                return self._execute_codex(work)
             command = self._command(work, definition)
             return self._execute(work, command)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             self._fail(work.work_order_id, "RIV-RUN-0001", str(exc), timed_out=False)
             return {"status": "failed", "checkpoint_id": "RIV-RUN-0001"}
+
+    def _execute_codex(self, work: ClaimedWork) -> dict[str, Any]:
+        intent_id = UUID(str(work.parameters.get("engineering_intent_id", "")))
+        record = EngineeringIntentStore().load(intent_id)
+        if record is None:
+            raise RuntimeError("RIV-EXE-0002: engineering intent is missing.")
+        envelope = ExecutionEnvelope(
+            execution_id=uuid4(), work_order_id=work.work_order_id, objective_id=record["objective_id"],
+            stage_id=record["stage_id"], correlation_id=record["correlation_id"], causation_id=record["causation_id"],
+            capability_name=record["capability_name"], repository_identity=record["repository_identity"],
+            repository_root=Path(record["repository_root"]), expected_base_sha=record["expected_base_sha"],
+            bounded_instruction=record["bounded_instruction"], allowed_paths=tuple(record["allowed_paths"]),
+            acceptance_criteria=tuple(record["acceptance_criteria"]), evidence_requirements=tuple(record["evidence_requirements"]),
+            timeout_seconds=record["timeout_seconds"], retry_key=f"execution:{intent_id}",
+            classification=record["classification"], write_policy=record["write_policy"],
+        )
+        baseline = self._working_paths(envelope.repository_root)
+        execution = ExecutionStore().persist(envelope)
+        ExecutionStore().start(execution)
+        result = CodexCliAdapter().run(envelope)
+        ResultReconciler().persist(result)
+        reconciled = ResultReconciler().reconcile_repository(execution, envelope.repository_root, envelope.allowed_paths, baseline)
+        ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Read-only Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
+        observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=envelope.repository_root, text=True).strip()
+        report = {
+            "status": result.result_category,
+            "execution_id": str(execution),
+            "changed_paths": list(reconciled["changed_paths"]),
+            "summary": result.bounded_summary,
+            "repository_evidence": {
+                "observed_git_head": observed_head,
+                "ai_hints_readable": (envelope.repository_root / "AI_HINTS.md").is_file(),
+                "charter_readable": (envelope.repository_root / "docs" / "governance" / "RIVERVIEW_CHARTER.md").is_file(),
+                "changed_files": list(reconciled["changed_paths"]),
+                "repository_suitable_for_bounded_codex_work": True,
+                "write_policy": envelope.write_policy,
+            },
+        }
+        if result.result_category == "succeeded":
+            self.store.complete(work.work_order_id, self.worker_id, report)
+        else:
+            self._fail(work.work_order_id, result.checkpoint_refs[0] if result.checkpoint_refs else "RIV-EXE-0001", result.bounded_summary, result.result_category == "timed_out")
+        return report
+
+    @staticmethod
+    def _working_paths(repository: Path) -> tuple[str, ...]:
+        output = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=all"], cwd=repository, text=True)
+        return tuple(line[3:].strip() for line in output.splitlines() if len(line) >= 4)
 
     def _definition(self, work: ClaimedWork) -> ActionDefinition:
         with connect() as connection, connection.cursor() as cursor:

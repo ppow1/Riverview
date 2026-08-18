@@ -5,6 +5,8 @@ flowchart LR
     cme_status_projection["CME heartbeat/status projection"]
     grace["Grace / CME evaluation"]
     objective_state["Objective and stage state"]
+    engineering_intent["Durable typed Steward engineering intent"]
+    declared_action_binding["Approved typed stage action binding"]
     relay["Relay / work-order lifecycle"]
     execution_envelope["Execution envelope"]
     providers["Provider registry / capacity"]
@@ -19,6 +21,7 @@ flowchart LR
     external_ai_clients["Authorized external AI clients"]
     specification_store["Durable classified specification references"]
     flow_event_steward_seed_promoted["steward.seed.promoted"]
+    flow_event_engineering_intent_bound["engineering.intent.bound"]
     flow_event_objective_stage_ready["objective.stage.ready"]
     flow_event_provider_execution_completed["provider.execution.completed"]
     flow_event_provider_execution_failed["provider.execution.failed"]
@@ -26,6 +29,10 @@ flowchart LR
     flow_event_work_order_queued["work.order.queued"]
     flow_event_work_order_completed["work.order.completed"]
     cme_runtime -->|wakes and evaluates affected authoritative state| grace
+    steward -->|authorizes bounded typed engineering intent| engineering_intent
+    engineering_intent -->|binds one registered action to one eligible stage| declared_action_binding
+    declared_action_binding -->|persists typed declared_action without executable shell text| objective_state
+    engineering_intent -->|records durable formation fact| river
     grace -->|evaluates readiness/checkpoints| objective_state
     objective_state -->|records objective/stage events| river
     river -->|wakes reevaluation| grace
@@ -39,6 +46,8 @@ flowchart LR
     grace -->|records no-ready/capacity/quiescence decision| diagnostics
     providers -->|provider completion is not global quiescence| grace
     steward -->|EMITS| flow_event_steward_seed_promoted
+    river -->|CONSUMED/EVALUATED| cme_runtime
+    engineering_intent -->|EMITS| flow_event_engineering_intent_bound
     river -->|CONSUMED/EVALUATED| cme_runtime
     grace -->|EMITS| flow_event_objective_stage_ready
     river -->|CONSUMED/EVALUATED| relay

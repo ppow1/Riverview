@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 
-from riverview.autonomy.control import ContinuousMomentumEngine
+from riverview.autonomy.control import ContinuousMomentumEngine, GraceMomentum
 from riverview.database import connect
 from riverview.database.connection import load_database_config
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
@@ -162,7 +162,20 @@ class ContinuousMomentumRuntime:
         ObjectiveStore().add_evidence(row[0], "validate", "seed:confirmed")
 
     def _process(self, event: dict[str, Any]) -> None:
-        self.status.observe(event)
+        if event["event_type"] in {"execution.reconciled", "execution.reconciliation.recorded"}:
+            try:
+                outcome = GraceMomentum().reconcile_execution(UUID(str(event["aggregate_id"])))
+                if outcome.get("progressed"):
+                    self.status.update(
+                        current_state="DISPATCHING", current_state_since=datetime.now(UTC),
+                        current_action="reconciled execution", last_progress_at=datetime.now(UTC),
+                        last_successful_progress_summary="Accepted bounded execution result and advanced objective.",
+                        current_objective_id=None, current_stage_id=None,
+                    )
+                self.status.observe(event)
+            except (RuntimeError, ValueError) as exc:
+                self._diagnose("result-reconciliation-failure", "CME could not reconcile an execution result.", str(exc))
+            return
         if event["event_type"] == "work.order.queued":
             # Queue creation is evidence of dispatch, not a new objective
             # frontier. Record it durably and return to listening; completion
@@ -172,6 +185,7 @@ class ContinuousMomentumRuntime:
                 current_action="declared approved action", last_river_sequence_seen=event["sequence_id"],
                 last_successful_progress_summary="Bounded work order queued for Relay execution.",
             )
+            self.status.observe(event)
             return
         self.status.update(current_state="EVALUATING", current_state_since=datetime.now(UTC))
         self._promoted_seed_validation(event)
@@ -208,6 +222,30 @@ class ContinuousMomentumRuntime:
                 last_successful_progress_summary="Authoritative event evaluated; no eligible frontier remains.",
             )
         self.status.update(last_river_sequence_seen=event["sequence_id"])
+        self.status.observe(event)
+
+    def _recover_declared_actions(self) -> None:
+        """Replay only already-bound actions after restart or cursor recovery.
+
+        A River cursor is a delivery checkpoint, not proof that the evaluation
+        and work formation side effects completed.  Re-querying the authoritative
+        ready frontier closes that gap without granting any new authority: only
+        stages with a persisted, typed declared action are considered, and Relay
+        owns idempotent work-order formation.
+        """
+        try:
+            frontier = self.engine.frontier(limit=64, declared_only=True)
+            for item in frontier:
+                if not isinstance(item.get("declared_action"), dict):
+                    continue
+                self.engine.cycle_until_quiescent(
+                    limit=1,
+                    max_cycles=1,
+                    correlation_id=item.get("correlation_id"),
+                    priority_objective_id=item["objective_id"],
+                )
+        except (RuntimeError, ValueError, TypeError) as exc:
+            self._diagnose("declared-action-recovery-failure", "CME could not replay a persisted declared action.", str(exc))
 
     def _reconcile(self) -> None:
         while not self.stop_event.is_set():
@@ -230,6 +268,7 @@ class ContinuousMomentumRuntime:
     def serve(self, ready: threading.Event | None = None) -> None:
         config = load_database_config()
         self.status.ensure(self.runtime_instance_id)
+        self._recover_declared_actions()
         heartbeat_thread: threading.Thread | None = None
         failed = False
         try:
