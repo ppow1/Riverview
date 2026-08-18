@@ -389,7 +389,7 @@ class RiverviewOpenWebUIService:
                         conversation = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
                         if conversation:
                             conversation_id = UUID(str(conversation["id"]))
-                            service.projection.append(conversation_id, role="system", text=f"{resident_id} was added to the room.", speaker_id=None, speaker="Room membership", details={"event_type": "room_participant_added", "actor": "steward", "target": resident_id, "context_window": context_window, "correlation_id": str(correlation_id)})
+                            service.projection.append(conversation_id, role="system", text=f"{service.resident_gateway.resolve(resident_id).name} was added to the room.", speaker_id=None, speaker="Room membership", details={"event_type": "room_participant_added", "actor": "steward", "target": resident_id, "context_window": context_window, "correlation_id": str(correlation_id)})
                         emit_event("room.participant.added", "room", str(room_id), correlation_id, {"actor": "steward", "resident_id": resident_id, "context_window": context_window})
                         self._send(HTTPStatus.OK, {"membership": membership, "room": state})
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:
@@ -416,6 +416,10 @@ class RiverviewOpenWebUIService:
                         length = int(self.headers.get("Content-Length", "0"))
                         payload = json.loads(self.rfile.read(length))
                         admin = service.room_administration.grant_admin(room_id, str(payload["administrator_id"]), actor="steward", primary=bool(payload.get("primary", False)))
+                        conversation = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
+                        if conversation and admin["administrator_id"] != "steward":
+                            profile = service.resident_gateway.resolve(admin["administrator_id"])
+                            service.projection.append(UUID(str(conversation["id"])), role="system", text=f"{profile.name} was granted Room Administrator status.", speaker_id=None, speaker="Room membership", details={"event_type": "room_administrator_granted", "actor": "steward", "target": admin["administrator_id"]})
                         emit_event("room.administrator.granted", "room", str(room_id), UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None, {"actor": "steward", "administrator_id": admin["administrator_id"], "primary": admin["primary_administrator"]})
                         self._send(HTTPStatus.OK, {"administrator": admin, "room": service.room_administration.snapshot(room_id)})
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:
@@ -456,6 +460,20 @@ class RiverviewOpenWebUIService:
                         self._send(HTTPStatus.OK, room_snapshot)
                     except (TypeError, ValueError, LookupError, PermissionError):
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "room_request_rejected", "checkpoint": "RIV-RES-0002"})
+                    return
+                if self.path == "/api/conversations/bulk":
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        ids = [UUID(str(item)) for item in payload.get("conversation_ids", [])]
+                        archived = bool(payload.get("archived", True))
+                        changed = [service.projection.set_archived(item, archived) for item in ids]
+                        self._send(HTTPStatus.OK, {"updated": [item for item in changed if item is not None], "archived": archived})
+                    except (KeyError, TypeError, ValueError):
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "conversation_bulk_update_rejected", "checkpoint": "RIV-UI-0030"})
                     return
                 if self.path == "/api/conversations":
                     if not self._auth():
@@ -674,7 +692,7 @@ class RiverviewOpenWebUIService:
                     service.resident_gateway.set_room_participants(room_id, tuple(state["participants"]))
                     conversation = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
                     if conversation:
-                        service.projection.append(UUID(str(conversation["id"])), role="system", text=f"{resident_id} was removed from the room.", speaker_id=None, speaker="Room membership", details={"event_type": "room_participant_removed", "actor": "steward", "target": resident_id, "correlation_id": membership.get("correlation_id")})
+                        service.projection.append(UUID(str(conversation["id"])), role="system", text=f"{service.resident_gateway.resolve(resident_id).name} was removed from the room.", speaker_id=None, speaker="Room membership", details={"event_type": "room_participant_removed", "actor": "steward", "target": resident_id, "correlation_id": membership.get("correlation_id")})
                     emit_event("room.participant.removed", "room", str(room_id), None, {"actor": "steward", "resident_id": resident_id})
                     self._send(HTTPStatus.OK, {"membership": membership, "room": state})
                 except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:

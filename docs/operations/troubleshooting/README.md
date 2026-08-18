@@ -76,3 +76,4 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-COMMS-0004` - authoritative Comms binding and rollover
 - `RIV-RDM-0007` - RV-008.3 promotion evidence and authoritative-state reconciliation
 * RIV-UI-0030 — Operator membership governance and layout state
+* RIV-UI-0031 — Operator view async stability and reconciliation
