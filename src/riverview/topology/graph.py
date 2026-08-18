@@ -25,7 +25,7 @@ VIEW_NAMES = {
 
 CORE_NODES = (
     ("steward", "Steward", "external"), ("river", "River event runtime / PostgreSQL", "core"),
-    ("cme_runtime", "Persistent CME River consumer/runtime", "core"), ("cme_status_projection", "CME heartbeat/status projection", "core"),
+    ("cme_supervisor", "CME external supervisor / recovery boundary", "service"), ("cme_runtime", "Persistent CME River consumer/runtime", "core"), ("cme_status_projection", "CME heartbeat/status projection", "core"),
     ("cme_indicator", "Operator CME trust indicator", "runtime"),
     ("grace", "Grace / CME evaluation", "core"), ("objective_state", "Objective and stage state", "core"),
     ("relay", "Relay / work-order lifecycle", "core"), ("execution_envelope", "Execution envelope", "core"),
@@ -121,6 +121,8 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("operator_runtime", "operator_module", "owned by", "config/modules/operator.json", views=modules)
     add_edge("operator_runtime", "river", "publishes bounded workflow events", "operator/openwebui.py:emit_event", views=event + context, checkpoint="RIV-UI-0009")
     add_edge("river", "cme_runtime", "durable notification and cursor replay", "database/migrations/0024_cme_runtime.sql", views=event + context, checkpoint="RIV-GRC-0008")
+    add_edge("cme_supervisor", "cme_runtime", "owns child lifecycle and restarts on exit or stale heartbeat", "autonomy/supervisor.py:CMESupervisor", views=services + failures, checkpoint="RIV-GRC-0008")
+    add_edge("cme_status_projection", "cme_supervisor", "external health probe", "autonomy/supervisor.py:CMESupervisor", views=services + failures, checkpoint="RIV-GRC-0008")
     add_edge("cme_runtime", "grace", "wakes and evaluates affected authoritative state", "autonomy/runtime.py:ContinuousMomentumRuntime", views=engineering + event, checkpoint="RIV-GRC-0008")
     add_edge("cme_runtime", "cme_status_projection", "heartbeats and projects activity", "autonomy/runtime.py:CMEStatusStore", views=context + services)
     add_edge("cme_status_projection", "cme_indicator", "authoritative runtime status", "operator/openwebui.py:/api/cme/status", views=context + services)

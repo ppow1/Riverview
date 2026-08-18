@@ -143,9 +143,9 @@ ENTRIES = [
         "River-to-CME wakeup boundary",
         "An authoritative River event is committed but CME does not wake, heartbeat, replay, or preserve idempotent progress.",
         ["event-committed-no-wakeup", "consumer-stopped", "heartbeat-stale", "cursor-replay", "lost-wakeup", "duplicate-delivery"],
-        ["Confirm the event in river_events, inspect cme_runtime_status, verify LISTEN riverview_river_events, and compare the durable cursor with sequence_id."],
-        "Restore the persistent CME consumer, notification trigger, or cursor reconciliation; never manually insert business events or kick CME from the browser.",
-        "Promote a fresh bounded seed through Steward confirmation, observe CME without a manual cycle call, stop/restart CME, and verify replay exactly once.",
+        ["Confirm the event in river_events, inspect cme_runtime_status, verify LISTEN riverview_river_events, compare the durable cursor with sequence_id, then inspect the external supervisor child/PID and restart evidence. If GPU/provider pressure is suspected, correlate absolute timestamps with measured nvidia-smi/provider evidence; do not infer causation from current load alone."],
+        "Restore the persistent CME consumer, notification trigger, cursor reconciliation, or external supervisor. CME heartbeat must remain independent of provider execution; never manually insert business events, advance stages, or kick CME from the browser.",
+        "Promote a fresh bounded seed through Steward confirmation, observe CME without a manual cycle call, induce a safe child exit or stale heartbeat, verify external restart and exactly-once cursor replay, and confirm healthy listening while a provider is busy or unavailable.",
         "docs/operations/troubleshooting/checkpoints/RIV-GRC-0008_RIVER_CME_WAKEUP.md",
     ),
     (

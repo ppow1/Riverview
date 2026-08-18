@@ -11,9 +11,11 @@ from .control import (
     ResultReconciler,
 )
 from .runtime import CMEStatusStore, ContinuousMomentumRuntime
+from .supervisor import CMESupervisor
 
 __all__ = [
     "CMEStatusStore",
+    "CMESupervisor",
     "CapabilityRegistry",
     "CodexCliAdapter",
     "ContinuousMomentumRuntime",

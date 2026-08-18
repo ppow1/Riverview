@@ -338,6 +338,32 @@
     {
       "checkpoint": "RIV-GRC-0008",
       "derivation": "DERIVED",
+      "relation": "owns child lifecycle and restarts on exit or stale heartbeat",
+      "source": "cme_supervisor",
+      "source_ref": "autonomy/supervisor.py:CMESupervisor",
+      "target": "cme_runtime",
+      "views": [
+        "services",
+        "context",
+        "failures"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0008",
+      "derivation": "DERIVED",
+      "relation": "external health probe",
+      "source": "cme_status_projection",
+      "source_ref": "autonomy/supervisor.py:CMESupervisor",
+      "target": "cme_supervisor",
+      "views": [
+        "services",
+        "context",
+        "failures"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0008",
+      "derivation": "DERIVED",
       "relation": "wakes and evaluates affected authoritative state",
       "source": "cme_runtime",
       "source_ref": "autonomy/runtime.py:ContinuousMomentumRuntime",
@@ -2532,6 +2558,13 @@
       "id": "river",
       "kind": "core",
       "label": "River event runtime / PostgreSQL",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "cme_supervisor",
+      "kind": "service",
+      "label": "CME external supervisor / recovery boundary",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },

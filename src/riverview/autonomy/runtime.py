@@ -22,6 +22,7 @@ from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryStat
 from riverview.grace.objectives import ObjectiveStore
 
 HEARTBEAT_FRESHNESS_SECONDS = 5.0
+HEARTBEAT_INTERVAL_SECONDS = 1.0
 CONSUMER_ID = "cme.primary"
 
 
@@ -137,11 +138,12 @@ class ContinuousMomentumRuntime:
         self.runtime_instance_id = uuid4()
         self._listener: psycopg.Connection[Any] | None = None
 
-    def _diagnose(self, failure_class: str, summary: str) -> None:
+    def _diagnose(self, failure_class: str, summary: str, detail: str | None = None) -> None:
+        bounded = summary if not detail else f"{summary} Detail: {detail[:240]}"
         self.diagnostics.emit(DiagnosticEvent(
             checkpoint_id="RIV-GRC-0008", component="riverview.autonomy.runtime",
             operation="river_consumer", severity=Severity.ERROR, failure_class=failure_class,
-            summary=summary[:500], cookbook_entry="CB-RIV-GRC-0008",
+            summary=bounded[:500], cookbook_entry="CB-RIV-GRC-0008",
             evidence_refs=("cme://runtime-status",), recovery_state=RecoveryState.UNVERIFIED,
         ))
 
@@ -215,9 +217,21 @@ class ContinuousMomentumRuntime:
             for event in rows:
                 self._process(event)
 
+    def _heartbeat_loop(self) -> None:
+        """Keep liveness independent from one bounded evaluation slice."""
+        while not self.stop_event.wait(HEARTBEAT_INTERVAL_SECONDS):
+            try:
+                self.status.heartbeat()
+            except (RuntimeError, OSError, psycopg.Error) as exc:
+                # A database outage is not healthy telemetry; the supervisor
+                # observes the unchanged projection and owns recovery.
+                self._diagnose("heartbeat-write-failure", "CME heartbeat update failed.", str(exc))
+
     def serve(self, ready: threading.Event | None = None) -> None:
         config = load_database_config()
         self.status.ensure(self.runtime_instance_id)
+        heartbeat_thread: threading.Thread | None = None
+        failed = False
         try:
             with psycopg.connect(
                 host=config.host, port=config.port, dbname=config.database,
@@ -226,6 +240,8 @@ class ContinuousMomentumRuntime:
                 self._listener = listener
                 listener.execute("LISTEN riverview_river_events")
                 self.status.heartbeat("HEALTHY_LISTENING")
+                heartbeat_thread = threading.Thread(target=self._heartbeat_loop, name="cme-heartbeat", daemon=True)
+                heartbeat_thread.start()
                 self._reconcile()
                 if ready:
                     ready.set()
@@ -242,17 +258,22 @@ class ContinuousMomentumRuntime:
         except Exception as exc:  # runtime must expose failure, then remain stopped rather than lie
             if self.stop_event.is_set():
                 return
+            failed = True
             try:
                 self.status.update(current_state="UNHEALTHY", current_state_since=datetime.now(UTC), last_failure_code="RIV-GRC-0008", last_failure_at=datetime.now(UTC))
-                self._diagnose("consumer-runtime-failure", f"CME River consumer failed: {type(exc).__name__}.")
+                self._diagnose("consumer-runtime-failure", f"CME River consumer failed: {type(exc).__name__}.", str(exc))
             finally:
                 if ready:
                     ready.set()
             raise
         finally:
+            self.stop_event.set()
+            if heartbeat_thread is not None:
+                heartbeat_thread.join(timeout=2.0)
             self._listener = None
             try:
-                self.status.update(current_state="STOPPED", current_state_since=datetime.now(UTC))
+                if not failed:
+                    self.status.update(current_state="STOPPED", current_state_since=datetime.now(UTC))
             except (RuntimeError, OSError, psycopg.Error):
                 self._diagnose("status-projection-failure", "CME stopped but its final status projection could not be written.")
 

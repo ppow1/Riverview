@@ -2,6 +2,7 @@ digraph riverview {
   rankdir=LR;
   "steward" [label="Steward"];
   "river" [label="River event runtime / PostgreSQL"];
+  "cme_supervisor" [label="CME external supervisor / recovery boundary"];
   "cme_runtime" [label="Persistent CME River consumer/runtime"];
   "cme_status_projection" [label="CME heartbeat/status projection"];
   "cme_indicator" [label="Operator CME trust indicator"];
@@ -121,6 +122,8 @@ digraph riverview {
   "operator_runtime" -> "operator_module" [label="owned by"];
   "operator_runtime" -> "river" [label="publishes bounded workflow events"];
   "river" -> "cme_runtime" [label="durable notification and cursor replay"];
+  "cme_supervisor" -> "cme_runtime" [label="owns child lifecycle and restarts on exit or stale heartbeat"];
+  "cme_status_projection" -> "cme_supervisor" [label="external health probe"];
   "cme_runtime" -> "grace" [label="wakes and evaluates affected authoritative state"];
   "cme_runtime" -> "cme_status_projection" [label="heartbeats and projects activity"];
   "cme_status_projection" -> "cme_indicator" [label="authoritative runtime status"];
