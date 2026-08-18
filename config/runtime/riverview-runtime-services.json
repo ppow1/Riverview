@@ -12,7 +12,7 @@
       "secret_file": "A:/AI/OpenWebUI/.webui_secret_key",
       "secret_env": "RIVERVIEW_OPENWEBUI_TOKEN",
       "restart": true,
-      "startup_timeout": 30.0
+      "startup_timeout": 60.0
     },
     {
       "service_id": "cme-supervisor",
