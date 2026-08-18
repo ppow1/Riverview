@@ -255,7 +255,7 @@ class RuntimeSupervisor:
                     return False
         if spec.health_url:
             try:
-                with urllib.request.urlopen(spec.health_url, timeout=2) as response:
+                with urllib.request.urlopen(spec.health_url, timeout=5) as response:
                     return response.status == 200
             except (OSError, urllib.error.URLError):
                 return False
