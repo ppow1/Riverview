@@ -5,6 +5,7 @@ flowchart LR
     cme_status_projection["CME heartbeat/status projection"]
     grace["Grace / CME evaluation"]
     objective_state["Objective and stage state"]
+    steward_authority["Durable exact-scope Steward authority grant"]
     engineering_intent["Durable typed Steward engineering intent"]
     declared_action_binding["Approved typed stage action binding"]
     relay["Relay / work-order lifecycle"]
@@ -53,7 +54,8 @@ flowchart LR
     event_provider_execution_failed["provider.execution.failed"]
     river -->|durable notification and cursor replay| cme_runtime
     cme_runtime -->|wakes and evaluates affected authoritative state| grace
-    steward -->|authorizes bounded typed engineering intent| engineering_intent
+    steward -->|authorizes exact specification version and hash| steward_authority
+    steward_authority -->|Grace consumes active durable authority for bounded formation| engineering_intent
     engineering_intent -->|binds one registered action to one eligible stage| declared_action_binding
     declared_action_binding -->|persists typed declared_action without executable shell text| objective_state
     engineering_intent -->|records durable formation fact| river

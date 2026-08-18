@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from riverview.intake.authority import StewardAuthorityError, StewardAuthorityStore
+from riverview.intake.engineering import EngineeringIntentStore
+
+
+def _contract() -> dict[str, object]:
+    return {
+        "repository_identity": "ppow1/Riverview",
+        "repository_root": str(Path.cwd()),
+        "expected_base_sha": "a" * 40,
+        "bounded_instruction": "Read-only repository inspection.",
+        "allowed_paths": ["AI_HINTS.md", "docs/governance/RIVERVIEW_CHARTER.md"],
+        "acceptance_criteria": ["return structured evidence"],
+        "evidence_requirements": ["exact Git HEAD", "zero changed files"],
+        "capability_name": "codex.engineering.v1",
+        "action_type": "codex.engineering.v1",
+        "timeout_seconds": 300,
+        "write_policy": "read_only",
+    }
+
+
+def test_typed_contract_is_bounded_and_rejects_unregistered_action() -> None:
+    contract = StewardAuthorityStore.validate_formation_contract(_contract())
+    assert contract["action_type"] == "codex.engineering.v1"
+    invalid = {**contract, "action_type": "shell.execute"}
+    with pytest.raises(StewardAuthorityError, match="registered read-only Codex"):
+        StewardAuthorityStore.validate_formation_contract(invalid)
+
+
+def test_free_form_or_missing_authority_cannot_bind() -> None:
+    with pytest.raises(PermissionError, match="durable Steward authority"):
+        EngineeringIntentStore().bind(None, explicit_steward_confirmation=True)  # type: ignore[arg-type]
+
+
+def test_contract_shape_is_not_authority() -> None:
+    contract = _contract()
+    with pytest.raises(StewardAuthorityError, match="incomplete or unrecognized"):
+        StewardAuthorityStore.validate_formation_contract({**contract, "shell": "never"})

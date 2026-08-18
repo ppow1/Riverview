@@ -213,6 +213,20 @@ class GraceMomentum:
         order = RelayStore().enqueue(action["action_type"], action["parameters"], requested_by, f"grace:{objective_key}:{stage_key}", correlation_id)
         return {"stage_id": str(stage_id), "work_order_id": str(order.work_order_id), "correlation_id": str(correlation_id), "action_type": order.action_type}
 
+    def form_authorized_intent(self, objective_id: UUID, stage_id: UUID) -> dict[str, Any]:
+        """Consume a valid durable grant; never infer authority from prose."""
+        from riverview.intake.authority import StewardAuthorityError, StewardAuthorityStore
+        from riverview.intake.engineering import EngineeringIntentStore
+
+        authority = StewardAuthorityStore().for_stage(objective_id, stage_id)
+        if authority is None:
+            return {"formed": False, "reason": "no_active_steward_authority"}
+        try:
+            result = EngineeringIntentStore().bind_from_authority(UUID(str(authority["authority_id"])))
+        except (StewardAuthorityError, PermissionError, RuntimeError, ValueError) as exc:
+            return {"formed": False, "authority_id": str(authority["authority_id"]), "reason": str(exc)}
+        return {"formed": True, "authority_id": str(authority["authority_id"]), **result}
+
     def reconcile_execution(self, execution_id: UUID) -> dict[str, Any]:
         """Accept only a durable, successful, reconciled execution as stage evidence."""
         with connect() as connection, connection.cursor() as cursor:
@@ -316,9 +330,11 @@ class ContinuousMomentumEngine:
             # alternate/test frontier providers cannot turn a checkpoint into work.
             if item.get("steward_checkpoint", False):
                 continue
+            formation = GraceMomentum().form_authorized_intent(item["objective_id"], item["stage_id"])
             decisions = GraceMomentum().evaluate(item["objective_key"], correlation_id=correlation_id)
             stage = next(entry for entry in decisions if entry["stage_key"] == item["stage_key"])
-            evaluated.append({"objective_key": item["objective_key"], "stage_key": item["stage_key"], "decision": stage["decision"], "declared_action": item["declared_action"]})
+            declared_action = item["declared_action"] if item["declared_action"] is not None else formation.get("action")
+            evaluated.append({"objective_key": item["objective_key"], "stage_key": item["stage_key"], "decision": stage["decision"], "declared_action": declared_action, "formation": formation})
         return {"correlation_id": str(correlation_id), "frontier_count": len(frontier), "evaluated": evaluated, "bounded": True}
 
     def cycle_until_quiescent(

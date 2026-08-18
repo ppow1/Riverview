@@ -119,10 +119,12 @@ class EngineeringIntentStore:
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
-    def bind(self, intent: EngineeringIntent, *, explicit_steward_confirmation: bool) -> dict[str, Any]:
+    def bind(self, intent: EngineeringIntent, *, authority_id: UUID | None = None, explicit_steward_confirmation: bool | None = None) -> dict[str, Any]:
         """Bind one validated intent to one eligible stage and emit one River fact."""
-        if not explicit_steward_confirmation:
-            raise PermissionError("RIV-GRC-0004: explicit Steward confirmation is required for formation.")
+        # A caller-supplied boolean is deliberately not an authority source.
+        # Formation must name the durable grant that covers this exact scope.
+        if authority_id is None:
+            raise PermissionError("RIV-GRC-0010: a durable Steward authority grant is required for formation.")
         intent.validate()
         intent_id = intent.intent_id or uuid4()
         fingerprint = self._fingerprint(intent)
@@ -134,6 +136,19 @@ class EngineeringIntentStore:
                 if existing[1] != fingerprint:
                     raise ValueError("RIV-INT-0005: engineering-intent idempotency conflict.")
                 return {"intent_id": str(existing[0]), "status": "already_bound", "idempotent": True}
+            cursor.execute(
+                """SELECT a.status,a.approving_principal,a.specification_version,a.specification_sha256,
+                          a.seed_id,a.objective_id,a.stage_id,a.classification,a.correlation_id,a.causation_id,
+                          s.version,s.content_sha256,s.formation_contract
+                   FROM steward_authority_grants a JOIN comms5_specifications s ON s.specification_id=a.specification_id
+                   WHERE a.authority_id=%s FOR UPDATE""", (authority_id,))
+            grant = cursor.fetchone()
+            if grant is None or grant[0] != "active" or grant[1] != "steward":
+                raise PermissionError("RIV-GRC-0010: Steward authority grant is missing, inactive, or exhausted.")
+            if (grant[2], grant[3], grant[4], grant[5], grant[6], grant[7], grant[8], grant[9]) != (grant[10], grant[11], intent.seed_id, intent.objective_id, intent.stage_id, intent.classification, intent.correlation_id, intent.causation_id):
+                raise ValueError("RIV-GRC-0010: approved specification, lineage, classification, or correlation does not match formation.")
+            if grant[12] is None:
+                raise ValueError("RIV-GRC-0010: approved specification has no typed engineering formation contract.")
             cursor.execute("""SELECT s.status,s.readiness,s.declared_action,o.status,sd.status,sd.objective_id,sd.classification
                 FROM objective_stages s JOIN objectives o ON o.objective_id=s.objective_id
                 JOIN steward_seed_drafts sd ON sd.objective_id=o.objective_id
@@ -157,12 +172,12 @@ class EngineeringIntentStore:
             if not capability or not capability[0] or capability[1] != "healthy":
                 raise RuntimeError("RIV-CAP-0001: required capability is unavailable.")
             cursor.execute("""INSERT INTO engineering_intents(
-                intent_id,seed_id,objective_id,stage_id,request_hash,repository_identity,repository_root,
+                intent_id,authority_id,seed_id,objective_id,stage_id,request_hash,repository_identity,repository_root,
                 expected_base_sha,bounded_instruction,allowed_paths,acceptance_criteria,evidence_requirements,
                 capability_name,action_type,timeout_seconds,classification,correlation_id,causation_id,
                 idempotency_key,approved_by,write_policy,status)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s,%s,%s,%s,%s,%s,%s,%s,%s,'bound')""",
-                (intent_id, intent.seed_id, intent.objective_id, intent.stage_id, fingerprint, intent.repository_identity,
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s,%s,%s,%s,%s,%s,%s,%s,%s,'bound')""",
+                (intent_id, authority_id, intent.seed_id, intent.objective_id, intent.stage_id, fingerprint, intent.repository_identity,
                  str(intent.repository_root), intent.expected_base_sha, intent.bounded_instruction, json.dumps(intent.allowed_paths),
                  json.dumps(intent.acceptance_criteria), json.dumps(intent.evidence_requirements), intent.capability_name,
                  intent.action_type, intent.timeout_seconds, intent.classification, intent.correlation_id, intent.causation_id,
@@ -170,6 +185,9 @@ class EngineeringIntentStore:
             cursor.execute("UPDATE objective_stages SET declared_action=%s::jsonb,updated_at=now() WHERE stage_id=%s AND declared_action IS NULL", (json.dumps(action), intent.stage_id))
             if cursor.rowcount != 1:
                 raise RuntimeError("RIV-GRC-0004: declared action binding was not applied.")
+            cursor.execute("UPDATE steward_authority_grants SET status='consumed',consumed_at=now(),updated_at=now() WHERE authority_id=%s AND status='active'", (authority_id,))
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-GRC-0010: Steward authority was consumed concurrently.")
             event_id = uuid4()
             cursor.execute("""INSERT INTO river_events(event_id,event_type,aggregate_type,aggregate_id,correlation_id,causation_id,idempotency_key,classification,payload,occurred_at)
                 VALUES(%s,'engineering.intent.bound','objective',%s,%s,%s,%s,%s,%s::jsonb,now())""",
@@ -177,6 +195,16 @@ class EngineeringIntentStore:
                  f"engineering.intent.bound:{intent_id}", intent.classification,
                  json.dumps({"intent_id": str(intent_id), "objective_id": str(intent.objective_id), "stage_id": str(intent.stage_id), "action_type": intent.action_type})))
         return {"intent_id": str(intent_id), "status": "bound", "idempotent": False, "action": action}
+
+    def bind_from_authority(self, authority_id: UUID) -> dict[str, Any]:
+        """Derive only the typed contract stored under a durable grant."""
+        from riverview.intake.authority import StewardAuthorityStore
+
+        authority = StewardAuthorityStore().load(authority_id)
+        if authority is None:
+            raise PermissionError("RIV-GRC-0010: authority grant was not found.")
+        intent = StewardAuthorityStore.intent_from_contract(authority)
+        return self.bind(intent, authority_id=authority_id)
 
     def load(self, intent_id: UUID) -> dict[str, Any] | None:
         with connect() as connection, connection.cursor() as cursor:

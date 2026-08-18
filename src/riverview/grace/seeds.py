@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from riverview.database import connect
 from riverview.grace.objectives import ObjectiveStore, StageSpec
+from riverview.intake.authority import StewardAuthorityStore
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
@@ -124,6 +125,13 @@ class StewardSeedStore:
                        VALUES(%s,%s,%s,%s,%s) ON CONFLICT(idempotency_key) DO NOTHING""",
                     (uuid4(), seed_id, objective_id, confirmer, idempotency_key),
                 )
+                cursor.execute("SELECT request_id FROM steward_seed_promotion_requests WHERE idempotency_key=%s", (idempotency_key,))
+                approval_operation_id = cursor.fetchone()[0]
+            else:
+                approval_operation_id = None
+            cursor.execute("SELECT correlation_id FROM steward_seed_drafts WHERE seed_id=%s", (seed_id,))
+            correlation_id = cursor.fetchone()[0]
+        StewardAuthorityStore().grant_for_promoted_seed(seed_id, objective_id, correlation_id=correlation_id, approval_operation_id=approval_operation_id, idempotency_key=f"steward-authority:{idempotency_key or seed_id}")
         EventStore().append(RiverEvent(
             event_type="steward.seed.promoted", aggregate_type="objective", aggregate_id=objective_id,
             correlation_id=row[0], causation_id=seed_id,

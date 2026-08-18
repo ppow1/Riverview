@@ -507,9 +507,21 @@
     {
       "checkpoint": "RIV-GRC-0004",
       "derivation": "DERIVED",
-      "relation": "authorizes bounded typed engineering intent",
+      "relation": "authorizes exact specification version and hash",
       "source": "steward",
-      "source_ref": "intake/engineering.py:EngineeringIntentStore.bind",
+      "source_ref": "intake/authority.py:StewardAuthorityStore",
+      "target": "steward_authority",
+      "views": [
+        "engineering",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "DERIVED",
+      "relation": "Grace consumes active durable authority for bounded formation",
+      "source": "steward_authority",
+      "source_ref": "intake/engineering.py:EngineeringIntentStore.bind_from_authority",
       "target": "engineering_intent",
       "views": [
         "engineering",
@@ -2576,6 +2588,7 @@
     "database/migrations/0028_comms5_seed_lifecycle.sql",
     "database/migrations/0029_comms5_promotion_idempotency.sql",
     "database/migrations/0030_operator_room_lineage.sql",
+    "database/migrations/0033_steward_authority_grants.sql",
     "config/modules/*.json",
     "src/riverview/river/events.py",
     "src/riverview/autonomy/control.py",
@@ -2586,6 +2599,7 @@
     "src/riverview/mcp/comms5.py",
     "src/riverview/mcp/comms5_server.py",
     "src/riverview/grace/seeds.py",
+    "src/riverview/intake/authority.py",
     "Cookbook checkpoint registry"
   ],
   "manifests": [
@@ -2753,6 +2767,13 @@
       "id": "objective_state",
       "kind": "core",
       "label": "Objective and stage state",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "steward_authority",
+      "kind": "core",
+      "label": "Durable exact-scope Steward authority grant",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },
@@ -3715,7 +3736,7 @@
       "status": "PASS"
     }
   },
-  "schema_version": "riverview-system-graph-2.3",
+  "schema_version": "riverview-system-graph-2.4",
   "views": [
     "character",
     "comms",

@@ -18,6 +18,7 @@ from riverview.autonomy.runtime import CMEStatusStore
 from riverview.database import connect
 from riverview.grace.objectives import ObjectiveStore
 from riverview.grace.seeds import MAX_SEED_BYTES, SeedLifecycleError, StewardSeedStore
+from riverview.intake.authority import StewardAuthorityError, StewardAuthorityStore
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
@@ -156,15 +157,21 @@ class Comms5Service:
         key = str(request.get("idempotency_key", "")).strip()
         if not isinstance(content, str) or not content.strip() or len(content.encode()) > MAX_SPECIFICATION_BYTES or not summary or len(summary.encode()) > MAX_SUMMARY_BYTES or not key:
             raise Comms5Error("RIV-COMMS5-0005", "specification is missing or exceeds its bounded limit", operation, retry_safe=False, checkpoint="RIV-COMMS5-0007")
+        formation_contract = request.get("formation_contract")
+        if formation_contract is not None:
+            try:
+                formation_contract = StewardAuthorityStore.validate_formation_contract(formation_contract)
+            except StewardAuthorityError as exc:
+                raise Comms5Error("RIV-COMMS5-0005", str(exc), operation, retry_safe=False, checkpoint="RIV-GRC-0010") from exc
         digest = hashlib.sha256(content.encode()).hexdigest()
         specification_id = uuid4()
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("""INSERT INTO comms5_specifications(specification_id,version,summary,content,content_bytes,content_sha256,classification,lifecycle_state,client_id,client_type,client_name,client_version,protocol_version,authenticated_principal,correlation_id,idempotency_key) VALUES(%s,1,%s,%s,%s,%s,%s,'stored',%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(idempotency_key) DO NOTHING""", (specification_id, summary, content, len(content.encode()), digest, context.classification, context.client_id, context.client_type, context.client_name, context.client_version, context.protocol_version, context.authenticated_principal, context.correlation_id, key))
-            cursor.execute("SELECT specification_id,version,content_sha256,classification,lifecycle_state,created_at FROM comms5_specifications WHERE idempotency_key=%s", (key,))
+            cursor.execute("""INSERT INTO comms5_specifications(specification_id,version,summary,content,content_bytes,content_sha256,classification,lifecycle_state,client_id,client_type,client_name,client_version,protocol_version,authenticated_principal,correlation_id,idempotency_key,formation_contract) VALUES(%s,1,%s,%s,%s,%s,%s,'stored',%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) ON CONFLICT(idempotency_key) DO NOTHING""", (specification_id, summary, content, len(content.encode()), digest, context.classification, context.client_id, context.client_type, context.client_name, context.client_version, context.protocol_version, context.authenticated_principal, context.correlation_id, key, json.dumps(formation_contract) if formation_contract is not None else None))
+            cursor.execute("SELECT specification_id,version,content_sha256,classification,lifecycle_state,created_at,formation_contract FROM comms5_specifications WHERE idempotency_key=%s", (key,))
             row = _row(cursor)
         if row is None:
             raise Comms5Error("RIV-COMMS5-0007", "specification could not be stored", operation, retry_safe=True, checkpoint="RIV-COMMS5-0007")
-        if row["content_sha256"] != digest or row["classification"] != context.classification:
+        if row["content_sha256"] != digest or row["classification"] != context.classification or _json(row.get("formation_contract") or {}) != _json(formation_contract or {}):
             raise Comms5Error("RIV-COMMS5-0015", "idempotency key conflicts with an existing specification", operation, retry_safe=False, checkpoint="RIV-COMMS5-0015")
         EventStore().append(RiverEvent(event_type="comms5.specification.stored", aggregate_type="specification", aggregate_id=row["specification_id"], correlation_id=context.correlation_id, idempotency_key=f"comms5.specification.stored:{row['specification_id']}", classification=Classification(context.classification), payload={"specification_id": str(row["specification_id"]), "version": row["version"], "content_sha256": row["content_sha256"], "client_id": context.client_id}))
         return {"specification": _json(row), "reference": f"riverview://specification/{row['specification_id']}@v{row['version']}", "content_returned": False}
@@ -218,6 +225,7 @@ class Comms5Service:
         checkpoints: list[dict[str, Any]] = []
         work: list[dict[str, Any]] = []
         engineering_intent: dict[str, Any] | None = None
+        authority: dict[str, Any] | None = None
         events: list[dict[str, Any]] = []
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT lifecycle_event_id,transition,replacement_seed_id,actor,reason,classification,correlation_id,created_at FROM steward_seed_lifecycle_events WHERE seed_id=%s ORDER BY created_at", (seed_uuid,))
@@ -231,9 +239,14 @@ class Comms5Service:
                 cursor.execute("SELECT intent_id,status,repository_identity,capability_name,action_type,classification,correlation_id,causation_id,idempotency_key,created_at,updated_at FROM engineering_intents WHERE objective_id=%s ORDER BY created_at LIMIT 1", (UUID(str(objective_id)),)); row = cursor.fetchone()
                 if row:
                     engineering_intent = dict(zip(("intent_id","status","repository_identity","capability_name","action_type","classification","correlation_id","causation_id","idempotency_key","created_at","updated_at"), row, strict=True))
+                cursor.execute("SELECT authority_id,specification_id,specification_version,specification_sha256,approving_principal,approved_at,status,consumed_at,correlation_id,causation_id,scope,permitted_capabilities FROM steward_authority_grants WHERE objective_id=%s ORDER BY approved_at DESC LIMIT 1", (UUID(str(objective_id)),))
+                row = cursor.fetchone()
+                if row:
+                    authority = dict(zip(("authority_id","specification_id","specification_version","specification_sha256","approving_principal","approved_at","status","consumed_at","correlation_id","causation_id","scope","permitted_capabilities"), row, strict=True))
             events = _json(EventStore().read_aggregate("objective", UUID(str(objective_id))))[-20:]
         cme = CMEStatusStore().read()
-        return {"seed": seed, "promotion": {"status": "not_created" if not objective_id else "promoted", "objective_id": objective_id}, "engineering_intent": engineering_intent or {"status": "not_created"}, "lifecycle_events": _json(lifecycle_events), "objective": objective or {"status": "not_created"}, "grace_evaluations": _json(evaluations), "checkpoints": _json(checkpoints), "work_orders": _json(work), "river_events": events, "cme": cme or {"status": "not_observed"}, "steward_attention_required": bool(seed["steward_action_required"] or checkpoints), "protected_payloads_returned": False}
+        needs_new_authority = bool(objective_id and (authority is None or authority.get("status") in {"superseded", "revoked"} or not (authority.get("scope") or {}).get("formation_contract_present", False)) and engineering_intent is None)
+        return {"seed": seed, "promotion": {"status": "not_created" if not objective_id else "promoted", "objective_id": objective_id}, "authority": authority or {"status": "not_created"}, "engineering_intent": engineering_intent or {"status": "not_created"}, "lifecycle_events": _json(lifecycle_events), "objective": objective or {"status": "not_created"}, "grace_evaluations": _json(evaluations), "checkpoints": _json(checkpoints), "work_orders": _json(work), "river_events": events, "cme": cme or {"status": "not_observed"}, "steward_attention_required": bool(seed["steward_action_required"] or checkpoints or needs_new_authority), "protected_payloads_returned": False}
 
     def seed_lineage(self, seed_id: str) -> dict[str, Any]:
         try: seed_uuid = UUID(seed_id)
@@ -251,8 +264,11 @@ class Comms5Service:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT work_order_id,action_type,status,correlation_id,error_checkpoint,created_at,started_at,finished_at FROM work_orders WHERE correlation_id=%s ORDER BY created_at LIMIT 20", (status["correlation_id"],)); work = _rows(cursor)
             cursor.execute("SELECT intent_id,status,repository_identity,capability_name,action_type,classification,correlation_id,causation_id,idempotency_key,created_at,updated_at FROM engineering_intents WHERE objective_id=%s ORDER BY created_at LIMIT 1", (objective_uuid,)); row = cursor.fetchone()
+            cursor.execute("SELECT authority_id,specification_id,specification_version,specification_sha256,approving_principal,approved_at,status,consumed_at,scope,permitted_capabilities FROM steward_authority_grants WHERE objective_id=%s ORDER BY approved_at DESC LIMIT 1", (objective_uuid,)); authority_row = cursor.fetchone()
         intent = dict(zip(("intent_id","status","repository_identity","capability_name","action_type","classification","correlation_id","causation_id","idempotency_key","created_at","updated_at"), row, strict=True)) if row else {"status": "not_created"}
-        return {"objective": status, "engineering_intent": intent, "cme": cme, "work_orders": _json(work), "steward_attention_required": any(stage.get("steward_checkpoint") for stage in status["stages"])}
+        authority = dict(zip(("authority_id","specification_id","specification_version","specification_sha256","approving_principal","approved_at","status","consumed_at","scope","permitted_capabilities"), authority_row, strict=True)) if authority_row else {"status": "not_created"}
+        formation_gap = authority["status"] == "not_created" or not (authority.get("scope") or {}).get("formation_contract_present", False)
+        return {"objective": status, "authority": authority, "engineering_intent": intent, "cme": cme, "work_orders": _json(work), "steward_attention_required": any(stage.get("steward_checkpoint") for stage in status["stages"]) or (formation_gap and intent["status"] == "not_created")}
 
     def cme_status(self) -> dict[str, Any] | None:
         return CMEStatusStore().read()

@@ -11,6 +11,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from pydantic import BaseModel, ConfigDict, Field
 
 from riverview.mcp.comms5 import CONTRACT_VERSION, Comms5Error, Comms5Service
 
@@ -23,6 +24,26 @@ _GOVERNED_MUTATION_HINTS = ToolAnnotations(
     idempotentHint=True,
     openWorldHint=False,
 )
+
+
+class FormationContractInput(BaseModel):
+    """Bounded schema carrier; authority validation remains server-side."""
+
+    model_config = ConfigDict(extra="forbid")
+    repository_identity: str = ""
+    repository_root: str = ""
+    expected_base_sha: str = ""
+    bounded_instruction: str = ""
+    allowed_paths: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    evidence_requirements: list[str] = Field(default_factory=list)
+    capability_name: str = ""
+    action_type: str = ""
+    timeout_seconds: int = 0
+    write_policy: str = ""
+
+
+_EMPTY_FORMATION_CONTRACT = FormationContractInput()
 
 
 def _safe(value: Any) -> Any:
@@ -111,15 +132,20 @@ def comms5_store_specification(
     client_version: str = "",
     protocol_version: str = CONTRACT_VERSION,
     classification: str = "river",
+    formation_contract: FormationContractInput = _EMPTY_FORMATION_CONTRACT,
 ) -> Any:
     """Store a bounded large specification as an authoritative reference."""
-    return _invoke(service.store_specification, _request(
+    values = _request(
         content=content, summary=summary, idempotency_key=idempotency_key,
         client_id=client_id, client_type=client_type, client_name=client_name,
         authenticated_principal=authenticated_principal, correlation_id=correlation_id,
         client_version=client_version, protocol_version=protocol_version,
         classification=classification,
-    ))
+    )
+    contract = formation_contract.model_dump(exclude_unset=True)
+    if contract:
+        values["formation_contract"] = contract
+    return _invoke(service.store_specification, values)
 
 
 @mcp.tool()

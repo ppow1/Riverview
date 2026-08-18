@@ -65,22 +65,29 @@ and the approved-action registry. The reproduced live specimen was objective
 `92e933d5-6c2d-4855-a06f-88eb970f9c49`: it had accepted `seed:confirmed`, was
 `ready`, and had `declared_action = null`, so no work order was formed.
 
-TYPED FORMATION CLOSED LOOP: A Steward-authorized engineering seed may bind only
-through `EngineeringIntentStore.bind`, which validates the durable seed/objective/
-stage relationship, bounded repository identity and read-only policy, the
-registered `codex.engineering.v1` action, capability health, classification,
-correlation/causation, and idempotency. The resulting stage action is only
+TYPED FORMATION CLOSED LOOP: Promotion of an exact stored specification creates
+one immutable `steward_authority_grants` artifact containing the approving
+Steward, specification version/hash, seed/objective/stage lineage, scope,
+classification, correlation, causation, and idempotency. Grace consumes that
+artifact through `EngineeringIntentStore.bind_from_authority`; a transient
+boolean or client identity is never authority. The binder validates the current
+specification version/hash and typed `formation_contract`, bounded repository
+identity and read-only policy, the registered `codex.engineering.v1` action,
+capability health, classification, correlation/causation, and idempotency. The resulting stage action is only
 `{action_type, parameters.engineering_intent_id}`; it never contains shell text.
 `CME` replays persisted declared actions after startup/cursor recovery, and Relay
 owns idempotent work-order formation. A River cursor is not proof that evaluation
 or dispatch completed, so a failed consumer slice must remain replayable.
 
-DISTINGUISHING FORMATION FAILURES: A missing or malformed typed contract is a
-formation validation failure; an unknown or disabled registered action is
+DISTINGUISHING FORMATION FAILURES: A missing authority is a real Steward
+checkpoint; an inactive/superseded authority or a specification hash/version
+mismatch is a fail-closed authority validation error. A missing or malformed
+typed contract is a formation validation failure; an unknown or disabled registered action is
 `RIV-WRK-0001`; a missing declared action remains the waiting boundary above; an
 idempotency replay returns the existing intent/action/work order and cannot
 duplicate it. Unsupported classification, ineligible completed/cancelled state,
 and absent explicit Steward confirmation fail closed. Inspect
+`steward_authority_grants`, `comms5_specifications.formation_contract`,
 `engineering_intents`, `objective_stages.declared_action`, `approved_actions`,
 the River `engineering.intent.bound` event, then Relay and
 execution/reconciliation records in that order.
