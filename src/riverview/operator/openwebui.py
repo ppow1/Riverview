@@ -43,6 +43,15 @@ class RoomProjectionError(ValueError):
         self.failure_class = failure_class
 
 
+def _canonical_room_title(profiles: list[dict[str, str]], fallback: str = "") -> str:
+    names = [str(item.get("name", "")).strip() for item in profiles if str(item.get("name", "")).strip()]
+    if len(names) == 2:
+        return " & ".join(names)
+    if len(names) > 2:
+        return ", ".join(names[:-1]) + " & " + names[-1]
+    return fallback
+
+
 @dataclass(frozen=True, slots=True)
 class OpenWebUIConfig:
     host: str = "127.0.0.1"
@@ -355,7 +364,7 @@ class RiverviewOpenWebUIService:
                         if projection:
                             room["conversation_id"] = projection.get("id", "")
                             room["declared_title"] = projection.get("title", "")
-                            room["title"] = ", ".join(profile["name"] for profile in room["participant_profiles"]) if room["participant_profiles"] else ("Room membership inconsistent" if not room["room_projection_consistent"] else projection.get("title", ""))
+                            room["title"] = _canonical_room_title(room["participant_profiles"], "Room membership inconsistent" if not room["room_projection_consistent"] else projection.get("title", ""))
                             room["messages"] = projection.get("messages", [])
                             for key in ("source_conversation_id", "inherited_context_window", "inherited_message_count", "participants_added"):
                                 room[key] = projection.get(key, "" if key != "inherited_message_count" else 0)
