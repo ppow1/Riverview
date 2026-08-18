@@ -58,3 +58,53 @@ def test_snapshot_exports_room_consistency_assertions():
         assert room["consistency"]["membership_vs_gateway"] is True
         assert room["consistency"]["membership_vs_profiles"] is True
         assert room["consistency"]["room_projection_consistent"] is True
+
+
+def test_snapshot_preserves_activity_visible_projection_and_rendered_state() -> None:
+    archive, _ = build_snapshot({
+        "current_dom": "<html><body><div id='app'>shell</div><script>application source</script></body></html>",
+        "rendered_state_html": "<div class='layout'><main id='primary'><h1>Activity</h1><li data-activity-id='2'>newest</li><li data-activity-id='1'>older</li></main></div>",
+        "visible_state": {
+            "schema_version": "riverview-visible-state-v1",
+            "captured_at": "2026-08-18T12:00:00Z",
+            "primary_view": "activity",
+            "filters": {"activity_category": "work"},
+            "pagination": {"activity": {"cursor": 42, "has_more": True}},
+            "loading": {"activity": False},
+            "errors": {"activity": None},
+            "empty": {"activity": False},
+            "views": {"activity": {"loaded_items": [{"activity_id": 1}, {"activity_id": 2}], "visible_items": [{"activity_id": 2}, {"activity_id": 1}]}},
+        },
+    }, service_identity="riverview-openwebui", service_url="http://127.0.0.1:18082/")
+    with zipfile.ZipFile(BytesIO(archive)) as bundle:
+        visible = json.loads(bundle.read("visible_state.json"))
+        manifest = json.loads(bundle.read("manifest.json"))
+        rendered = bundle.read("rendered_state.html").decode()
+        assert visible["primary_view"] == "activity"
+        assert visible["views"]["activity"]["visible_items"] == [{"activity_id": 2}, {"activity_id": 1}]
+        assert visible["pagination"]["activity"]["has_more"] is True
+        assert "data-activity-id='2'" in rendered
+        assert manifest["schema_version"] == "riverview-snapshot-v2"
+        assert manifest["rendered_state"]["artifact"] == "rendered_state.html"
+
+
+def test_snapshot_declares_visible_state_truncation() -> None:
+    archive, _ = build_snapshot({
+        "current_dom": "<html></html>",
+        "visible_state": {"primary_view": "activity", "views": {"activity": {"loaded_items": list(range(101))}}},
+    }, service_identity="riverview-openwebui", service_url="http://127.0.0.1:18082/")
+    with zipfile.ZipFile(BytesIO(archive)) as bundle:
+        visible = json.loads(bundle.read("visible_state.json"))
+        assert visible["truncation"]["truncated"] is True
+        assert visible["truncation"]["paths"]
+
+
+def test_snapshot_declares_total_visible_state_bound() -> None:
+    archive, _ = build_snapshot({
+        "current_dom": "<html></html>",
+        "visible_state": {"primary_view": "activity", "views": {"activity": {"loaded_items": [{"summary": "x" * 4000} for _ in range(100)]}}},
+    }, service_identity="riverview-openwebui", service_url="http://127.0.0.1:18082/")
+    with zipfile.ZipFile(BytesIO(archive)) as bundle:
+        visible = json.loads(bundle.read("visible_state.json"))
+        assert visible["truncation"]["truncated"] is True
+        assert "visible_state.total_bytes" in visible["truncation"]["paths"]

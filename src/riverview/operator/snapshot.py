@@ -13,6 +13,10 @@ from typing import Any
 from riverview.database import connect
 
 MAX_CAPTURE_BYTES = 512_000
+MAX_RENDERED_STATE_BYTES = 256_000
+MAX_VISIBLE_STATE_BYTES = 256_000
+MAX_VISIBLE_ITEMS = 100
+MAX_VISIBLE_TEXT = 4_000
 _SECRET_KEYS = {"token", "bearer", "authorization", "cookie", "set-cookie", "password", "secret", "api_key", "apikey"}
 _SECRET_TEXT = re.compile(r"(?i)(bearer\s+)[^\s<\"']+|((?:token|authorization|cookie|password|secret)\s*[=:]\s*)[^\s,;}<\"']+")
 
@@ -35,6 +39,55 @@ def _safe_dom(dom: str) -> str:
             return re.sub(r'(?i)\svalue=["\'][^"\']*["\']', ' value="[REDACTED]"', tag)
         return tag
     return re.sub(r'(?is)<input\b[^>]*>', redact_token_input, dom)
+
+
+def _bound_visible_state(value: Any, *, path: str = "visible_state") -> tuple[Any, list[str]]:
+    """Redact and bound client-visible state without silently losing evidence."""
+    truncated: list[str] = []
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            bounded, nested = _bound_visible_state(item, path=f"{path}.{key}")
+            result[str(key)] = bounded
+            truncated.extend(nested)
+        return result, truncated
+    if isinstance(value, list):
+        items = value
+        if len(items) > MAX_VISIBLE_ITEMS:
+            truncated.append(path)
+            items = items[:MAX_VISIBLE_ITEMS]
+        result = []
+        for index, item in enumerate(items):
+            bounded, nested = _bound_visible_state(item, path=f"{path}[{index}]")
+            result.append(bounded)
+            truncated.extend(nested)
+        return result, truncated
+    if isinstance(value, str) and len(value) > MAX_VISIBLE_TEXT:
+        truncated.append(path)
+        return value[:MAX_VISIBLE_TEXT], truncated
+    return _redact(value), truncated
+
+
+def _visible_state(payload: dict[str, Any]) -> dict[str, Any]:
+    raw = payload.get("visible_state", {})
+    bounded, truncated = _bound_visible_state(raw)
+    if not isinstance(bounded, dict):
+        bounded = {"value": bounded}
+        truncated.append("visible_state")
+    bounded.setdefault("schema_version", "riverview-visible-state-v1")
+    bounded["truncation"] = {"truncated": bool(truncated), "paths": truncated[:100]}
+    encoded_size = len(json.dumps(bounded, default=str, separators=(",", ":")).encode("utf-8"))
+    if encoded_size > MAX_VISIBLE_STATE_BYTES:
+        # Preserve the view identity and the Activity projection first. The
+        # omitted secondary projections are declared rather than silently
+        # disappearing from the forensic artifact.
+        preserved = {key: bounded[key] for key in ("schema_version", "captured_at", "primary_view", "secondary_view", "selected", "filters", "sort", "pagination", "loading", "errors", "empty") if key in bounded}
+        views = bounded.get("views")
+        if isinstance(views, dict) and isinstance(views.get("activity"), dict):
+            preserved["views"] = {"activity": views["activity"]}
+        preserved["truncation"] = {"truncated": True, "paths": [*truncated[:99], "visible_state.total_bytes"], "original_bytes": encoded_size}
+        bounded = preserved
+    return _redact(bounded)
 
 
 def _git_sha() -> str:
@@ -76,6 +129,15 @@ def build_snapshot(payload: dict[str, Any], *, service_identity: str, service_ur
         raise ValueError("RIV-UI-0019: current DOM is missing or exceeds the bounded snapshot size.")
     safe_payload = _redact(payload)
     safe_payload.pop("current_dom", None)
+    visible_state = _visible_state(payload)
+    rendered_state = _safe_dom(str(payload.get("rendered_state_html", "")))
+    rendered_state_truncated = False
+    if len(rendered_state.encode("utf-8")) > MAX_RENDERED_STATE_BYTES:
+        rendered_state = rendered_state.encode("utf-8")[:MAX_RENDERED_STATE_BYTES].decode("utf-8", errors="ignore")
+        rendered_state += "\n<!-- RIV-UI-0019: rendered state truncated -->"
+        rendered_state_truncated = True
+    if not rendered_state:
+        rendered_state = "<!-- RIV-UI-0019: rendered state was unavailable at capture time -->"
     safe_payload["page_url"] = str(payload.get("page_url") or service_url)
     room_state = safe_payload.get("room_state", {})
     if isinstance(room_state, dict) and room_state:
@@ -109,10 +171,15 @@ def build_snapshot(payload: dict[str, Any], *, service_identity: str, service_ur
         "room_state.json": json.dumps(_redact(room_state), indent=2, default=str, sort_keys=True),
         "diagnostics.json": json.dumps(_diagnostics(), indent=2, default=str, sort_keys=True),
         "api_state.json": json.dumps(_redact(safe_payload.get("api_state", {})), indent=2, default=str, sort_keys=True),
+        "visible_state.json": json.dumps(visible_state, indent=2, default=str, sort_keys=True),
+        "rendered_state.html": rendered_state,
     }
-    manifest = {"schema_version": "riverview-snapshot-v1", "generated_at": generated.isoformat(), "service": service_identity,
+    manifest = {"schema_version": "riverview-snapshot-v2", "generated_at": generated.isoformat(), "service": service_identity,
                 "git_sha": runtime["git_sha"], "page_url": safe_payload["page_url"], "capture_reason": "manual_operator_snapshot",
-                "files": list(files) + ["manifest.json"], "redaction_applied": True}
+                "files": list(files) + ["manifest.json"], "redaction_applied": True,
+                "visible_state": {"artifact": "visible_state.json", "schema_version": visible_state.get("schema_version"), "truncated": visible_state.get("truncation", {}).get("truncated", False)},
+                "rendered_state": {"artifact": "rendered_state.html", "truncated": rendered_state_truncated},
+                "provenance": {"client_capture_timestamp": visible_state.get("captured_at"), "server_capture_timestamp": generated.isoformat(), "atomic": False}}
     files["manifest.json"] = json.dumps(manifest, indent=2, sort_keys=True)
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
