@@ -27,6 +27,15 @@ means the connector abandoned the MCP response before canonical promotion was
 committed. The forwarded request proves transport reachability, but does not
 prove that `StewardSeedStore.confirm_and_promote` completed.
 
+Tool discovery is a separate signal. A cached or previously fetched
+`tools/list` result may remain visible after the connector can no longer invoke
+the app. After the reported disabled invocation, correlate the exact time
+window with Caddy logs. If no new request carrying the connector's traffic
+reaches Caddy while independent authenticated `initialize`, `tools/list`, and
+read-only tool probes succeed, the disablement is pre-transport and is not a
+Comms5 response. Do not treat visible tool definitions as proof of a live
+invocation session.
+
 ## Smallest repair
 
 Publish non-destructive, idempotent, closed-world MCP hints and explain that the
@@ -45,6 +54,12 @@ For a connector-disable incident, first query `seed_status` read-only. If the
 seed is still `draft`, reconnect or refresh the existing app and retry the same
 promotion request with the same idempotency key. Do not infer promotion from a
 connector error, and do not create a replacement key.
+
+Record whether the failed read-only call produced any public request at all.
+No Caddy request is the strongest available Riverview evidence of a
+ChatGPT-side connector/app-state failure; a Caddy request with an upstream
+response or cancellation requires tracing the MCP session ID and response
+status before assigning blame.
 
 ## Do not
 
