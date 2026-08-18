@@ -104,7 +104,9 @@ def test_activity_deferred_refresh_keeps_existing_event_cards_rendered() -> None
     const html = activityItemsMarkup([{{activity_id: 2052, category: 'river', occurred_at: 'now', river_sequence: 2052, summary: 'existing event', state: 'observed', source: 'river', details: {{}}}}]);
     if (!html.includes('data-activity-id=\"2052\"') || html.includes('no events are currently available')) process.exit(1);
     """
-    result = subprocess.run(["node", "--check"], input=probe, text=True, capture_output=True)
+    result = subprocess.run(
+        ["node", "--check"], input=probe, text=True, capture_output=True, check=False
+    )
     assert result.returncode == 0, result.stderr
-    result = subprocess.run(["node", "-e", probe], text=True, capture_output=True)
+    result = subprocess.run(["node", "-e", probe], text=True, capture_output=True, check=False)
     assert result.returncode == 0, result.stderr
