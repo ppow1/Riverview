@@ -14,6 +14,7 @@
     "RIV-UI-0026",
     "RIV-UI-0027",
     "RIV-UI-0028",
+    "RIV-UI-0030",
     "RIV-RES-0001",
     "RIV-RES-0002",
     "RIV-REASON-0001",
@@ -134,6 +135,48 @@
         "resident",
         "events",
         "room"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0030",
+      "derivation": "DERIVED",
+      "relation": "manages durable room membership and scoped administrators",
+      "source": "operator_runtime",
+      "source_ref": "operator/room_admin.py:RoomAdministration",
+      "target": "room_membership_projection",
+      "views": [
+        "context",
+        "room",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0030",
+      "derivation": "DERIVED",
+      "relation": "stores membership and administration history",
+      "source": "room_membership_projection",
+      "source_ref": "database/migrations/0031_operator_room_membership_administration.sql",
+      "target": "postgres_service",
+      "views": [
+        "context",
+        "room",
+        "resident",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-UI-0030",
+      "derivation": "DERIVED",
+      "relation": "publishes bounded membership/admin events",
+      "source": "room_membership_projection",
+      "source_ref": "operator/openwebui.py:/api/rooms",
+      "target": "activity_projection",
+      "views": [
+        "context",
+        "room",
+        "resident",
+        "events"
       ]
     },
     {
@@ -2761,6 +2804,13 @@
       "id": "operator_projection",
       "kind": "runtime",
       "label": "Durable Operator conversation/room projection",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "room_membership_projection",
+      "kind": "runtime",
+      "label": "Durable room membership and scoped administration",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },

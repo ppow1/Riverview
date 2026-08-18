@@ -75,3 +75,4 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-MCP-0011` - bounded bridge replay and recovery
 - `RIV-COMMS-0004` - authoritative Comms binding and rollover
 - `RIV-RDM-0007` - RV-008.3 promotion evidence and authoritative-state reconciliation
+* RIV-UI-0030 — Operator membership governance and layout state

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 CHECKPOINTS = (
-    "RIV-UI-0009", "RIV-UI-0013", "RIV-UI-0014", "RIV-UI-0015", "RIV-UI-0019", "RIV-UI-0020", "RIV-UI-0021", "RIV-UI-0022", "RIV-UI-0023", "RIV-UI-0024", "RIV-UI-0025", "RIV-UI-0026", "RIV-UI-0027", "RIV-UI-0028",
+    "RIV-UI-0009", "RIV-UI-0013", "RIV-UI-0014", "RIV-UI-0015", "RIV-UI-0019", "RIV-UI-0020", "RIV-UI-0021", "RIV-UI-0022", "RIV-UI-0023", "RIV-UI-0024", "RIV-UI-0025", "RIV-UI-0026", "RIV-UI-0027", "RIV-UI-0028", "RIV-UI-0030",
     "RIV-RES-0001", "RIV-RES-0002", "RIV-REASON-0001", "RIV-REASON-0002",
     "RIV-CHAR-0004", "RIV-DIA-0001", "RIV-DIA-0002", "RIV-GRC-0004",
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
@@ -45,7 +45,7 @@ CORE_NODES = (
     ("microphone_worker", "PowerShell/System.Speech worker", "runtime"), ("artifact_reference", "Reference-only artifact intake", "runtime"),
     ("spatial", "LAN WebXR / Quest prototype", "deferred"), ("projects", "Project intake / repository", "module"),
     ("character_designer", "Character Designer workflow", "module"), ("session_history", "Session history", "runtime"),
-    ("operator_projection", "Durable Operator conversation/room projection", "runtime"),
+    ("operator_projection", "Durable Operator conversation/room projection", "runtime"), ("room_membership_projection", "Durable room membership and scoped administration", "runtime"),
     ("accepted_continuity", "Accepted durable continuity", "runtime"), ("character_canon", "Versioned accepted character canon", "core"), ("activity_projection", "Authoritative River activity projection", "runtime"),
     ("room_context", "Bounded shared room context", "runtime"), ("resident_expression", "Resident expression boundary", "contract"),
     ("provider_failure", "Provider failure/recovery seam", "failure"), ("diagnostic_spool", "Diagnostic fallback/spool", "runtime"),
@@ -106,6 +106,9 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("operator_runtime", "operator_projection", "executes bounded durable conversation search", "operator/projection.py:search", views=context + resident + room, checkpoint="RIV-UI-0025")
     add_edge("operator_runtime", "operator_projection", "hydrates selected conversation before center rendering and Snapshot", "operator/openwebui.py:activateConversation", views=context + resident + room, checkpoint="RIV-UI-0026")
     add_edge("operator_runtime", "operator_projection", "derives rooms with bounded inherited context and participant lineage", "operator/openwebui.py:/api/rooms", views=context + resident + room, checkpoint="RIV-UI-0027")
+    add_edge("operator_runtime", "room_membership_projection", "manages durable room membership and scoped administrators", "operator/room_admin.py:RoomAdministration", views=context + room, checkpoint="RIV-UI-0030")
+    add_edge("room_membership_projection", "postgres_service", "stores membership and administration history", "database/migrations/0031_operator_room_membership_administration.sql", views=context + room, checkpoint="RIV-UI-0030")
+    add_edge("room_membership_projection", "activity_projection", "publishes bounded membership/admin events", "operator/openwebui.py:/api/rooms", views=context + room, checkpoint="RIV-UI-0030")
     add_edge("river", "activity_projection", "projects bounded meaningful activity by River cursor/category", "operator/activity.py:ActivityProjection", views=context + engineering + comms + notifications, checkpoint="RIV-UI-0028")
     add_edge("activity_projection", "operator_runtime", "serves Activity read workspace without owning workflow state", "operator/openwebui.py:/api/activity", views=context + engineering + comms + notifications, checkpoint="RIV-UI-0028")
     add_edge("operator_projection", "postgres_service", "stores typed conversation/message projection", "database/migrations/0027_operator_projection.sql", views=context + resident + room)

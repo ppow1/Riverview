@@ -176,6 +176,16 @@ class ResidentConversationGateway:
             raise LookupError("RIV-RES-0002: room is not authoritative.") from exc
         return {**room, "room_id": str(room["room_id"]), "participants": list(room["participants"]), "turns": list(room["turns"]), "no_authority_expansion": True}
 
+    def set_room_participants(self, room_id: UUID, participants: tuple[str, ...]) -> None:
+        """Reconcile the bounded room execution roster from authoritative membership."""
+        room = self._rooms.get(room_id)
+        if room is None:
+            raise LookupError("RIV-RES-0002: room is not authoritative.")
+        resolved = [self.resolve(item) for item in participants]
+        if len({profile.resident_id for profile in resolved}) != len(resolved):
+            raise ValueError("RIV-RES-0002: room participants must be unique.")
+        room["participants"] = tuple(profile.resident_id for profile in resolved)
+
     def add_room_turn(self, room_id: UUID, *, speaker: str, text: str, correlation_id: UUID | None = None) -> dict[str, Any]:
         room = self._rooms.get(room_id)
         if room is None or self.resolve(speaker).resident_id not in room["participants"]:

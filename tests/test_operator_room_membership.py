@@ -1,0 +1,47 @@
+from uuid import uuid4
+
+import pytest
+
+from riverview.operator.room_admin import RoomAdministration
+
+
+def _projection() -> RoomAdministration:
+    projection = RoomAdministration.__new__(RoomAdministration)
+    projection.available = False
+    projection.memberships = {}
+    projection.administrators = {}
+    return projection
+
+
+def test_room_membership_expands_removes_and_readds_without_rewriting_history() -> None:
+    projection = _projection()
+    room_id = uuid4()
+    projection.initialize(room_id, ("helen", "marie"))
+    added = projection.add(room_id, "grace", actor="steward", context_window="last_20")
+    assert projection.snapshot(room_id)["participants"] == ["helen", "marie", "grace"]
+    removed = projection.remove(room_id, "marie", actor="steward")
+    assert removed["state"] == "removed"
+    assert projection.snapshot(room_id)["participants"] == ["helen", "grace"]
+    readded = projection.add(room_id, "marie", actor="steward", context_window="from_this_point")
+    assert readded["membership_id"] != added["membership_id"]
+    assert projection.snapshot(room_id)["participants"] == ["helen", "grace", "marie"]
+    assert len(projection.snapshot(room_id)["memberships"]) == 4
+
+
+def test_room_admin_coadministration_and_last_admin_guard() -> None:
+    projection = _projection()
+    room_id = uuid4()
+    projection.initialize(room_id, ("alfred", "grace"))
+    projection.grant_admin(room_id, "alfred", actor="steward")
+    projection.leave(room_id, actor="steward")
+    assert {row["administrator_id"] for row in projection.snapshot(room_id)["administrators"]} == {"alfred"}
+    with pytest.raises(ValueError, match="last room administrator"):
+        projection.leave(room_id, actor="alfred")
+
+
+def test_room_admin_cannot_remove_steward() -> None:
+    projection = _projection()
+    room_id = uuid4()
+    projection.initialize(room_id, ("grace",))
+    with pytest.raises(PermissionError):
+        projection.remove(room_id, "steward", actor="grace")

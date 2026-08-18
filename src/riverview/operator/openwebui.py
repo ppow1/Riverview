@@ -26,6 +26,7 @@ from riverview.database import connect
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
 from riverview.operator.activity import ActivityProjection
 from riverview.operator.projection import OperatorProjection
+from riverview.operator.room_admin import RoomAdministration
 from riverview.operator.snapshot import build_snapshot
 from riverview.operator.ui import UI_HTML as CLEAN_UI_HTML
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
@@ -60,14 +61,17 @@ class RiverviewOpenWebUIService:
         # The projection owns UI history only; resident continuity/canon remains
         # exclusively in the resident/character mechanisms.
         self.projection = OperatorProjection()
+        self.room_administration = RoomAdministration()
         self.activity = ActivityProjection()
         self.conversations: dict[UUID, dict[str, object]] = {}
         for existing in self.projection.list():
             if existing.get("kind") == "room" and existing.get("room_id"):
                 try:
                     service_room_id = UUID(str(existing["room_id"]))
-                    participants = tuple(str(existing.get("resident_id", "")).removeprefix("room:").split(","))
+                    membership_state = self.room_administration.snapshot(service_room_id)
+                    participants = tuple(membership_state["participants"] or tuple(str(existing.get("resident_id", "")).removeprefix("room:").split(",")))
                     self.resident_gateway.restore_room(service_room_id, participants, classification=str(existing.get("classification", "operational")))
+                    self.room_administration.initialize(service_room_id, participants)
                 except (ValueError, LookupError):
                     pass
         self.diagnostics = DiagnosticStore()
@@ -272,10 +276,23 @@ class RiverviewOpenWebUIService:
                         self._send(HTTPStatus.OK, conversation)
                     except (KeyError, ValueError):
                         self._send(HTTPStatus.NOT_FOUND, {"error": "conversation_not_found", "checkpoint": "RIV-UI-0021"})
+                elif urlsplit(self.path).path.startswith("/api/rooms/") and urlsplit(self.path).path.endswith("/members") and self._auth():
+                    try:
+                        room_id = UUID(urlsplit(self.path).path.split("/")[3])
+                        room = service.room_administration.snapshot(room_id)
+                        room["participant_profiles"] = [{"resident_id": p, "name": service.resident_gateway.resolve(p).name, "role": service.resident_gateway.resolve(p).role} for p in room["participants"]]
+                        self._send(HTTPStatus.OK, room)
+                    except (ValueError, LookupError):
+                        self._send(HTTPStatus.NOT_FOUND, {"error": "room_membership_not_found", "checkpoint": "RIV-UI-0030"})
                 elif self.path.startswith("/api/rooms/") and self._auth():
                     try:
                         room_id = UUID(self.path.rsplit("/", 1)[1])
                         room = service.resident_gateway.room_snapshot(room_id)
+                        administration = service.room_administration.snapshot(room_id)
+                        if administration["participants"]:
+                            service.resident_gateway.set_room_participants(room_id, tuple(administration["participants"]))
+                            room["participants"] = list(administration["participants"])
+                        room["membership_state"] = administration
                         room["participant_profiles"] = [{"resident_id": p, "name": service.resident_gateway.resolve(p).name, "role": service.resident_gateway.resolve(p).role} for p in room.get("participants", [])]
                         projection = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
                         if projection:
@@ -325,6 +342,85 @@ class RiverviewOpenWebUIService:
                         diagnostic("RIV-UI-0019", "snapshot", "snapshot_generation_failure", f"Bounded snapshot failed: {type(exc).__name__}.")
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "snapshot_failed", "checkpoint": "RIV-UI-0019"})
                     return
+                if self.path.startswith("/api/conversations/") and self.path.endswith("/members"):
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        source_id = UUID(self.path.removeprefix("/api/conversations/").removesuffix("/members").strip("/"))
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        source = service.projection.refresh(source_id, include_archived=True)
+                        resident_id = str(payload["resident_id"])
+                        if source is None or source.get("kind") != "conversation" or not source.get("resident_id"):
+                            raise ValueError("source must be an established resident conversation")
+                        context_window = str(payload.get("context_window", "from_this_point"))
+                        source_messages = list(source.get("messages", []))
+                        inherited = source_messages[-100:] if context_window == "all" else source_messages[-100:] if context_window == "last_100" else source_messages[-20:] if context_window == "last_20" else []
+                        participants = (str(source["resident_id"]), resident_id)
+                        room_id = service.resident_gateway.create_room(participants, classification=str(source.get("classification", "operational")))
+                        service.room_administration.initialize(room_id, participants, actor="steward")
+                        labels = [service.resident_gateway.resolve(item).name for item in participants]
+                        title = ", ".join(labels[:-1]) + " & " + labels[-1]
+                        operator_conversation = service.projection.create(resident_id="room:" + ",".join(participants), title=title, kind="room", room_id=room_id, classification=str(source.get("classification", "operational")), source_conversation_id=source_id, inherited_context_window=context_window, inherited_message_count=len(inherited), participants_added=[resident_id])
+                        for message in inherited:
+                            service.projection.append(UUID(operator_conversation["id"]), role=str(message.get("role", "resident")), text=str(message.get("text", "")), speaker_id=message.get("speaker_id"), speaker=str(message.get("speaker", "Inherited context")), details={"inherited_from": str(source_id), "context_window": context_window})
+                        operator_conversation = service.projection.refresh(UUID(operator_conversation["id"]), include_archived=True) or operator_conversation
+                        emit_event("room.derived", "room", str(room_id), None, {"source_conversation_id": str(source_id), "resident_id": resident_id, "context_window": context_window, "inherited_message_count": len(inherited)})
+                        self._send(HTTPStatus.OK, {"operator_conversation": operator_conversation, "room_id": str(room_id), "participants": list(participants), "source_conversation_id": str(source_id), "inherited_context_window": context_window, "inherited_message_count": len(inherited)})
+                    except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "conversation_participant_add_rejected", "checkpoint": "RIV-UI-0030", "reason": str(exc)})
+                    return
+                if self.path.startswith("/api/rooms/") and self.path.endswith("/members"):
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        room_id = UUID(self.path.removeprefix("/api/rooms/").removesuffix("/members").strip("/"))
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        resident_id = str(payload["resident_id"])
+                        context_window = str(payload.get("context_window", "from_this_point"))
+                        source_id = UUID(str(payload["source_conversation_id"])) if payload.get("source_conversation_id") else None
+                        correlation_id = UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else uuid4()
+                        membership = service.room_administration.add(room_id, resident_id, actor="steward", context_window=context_window, source_conversation_id=source_id, correlation_id=correlation_id)
+                        state = service.room_administration.snapshot(room_id)
+                        service.resident_gateway.set_room_participants(room_id, tuple(state["participants"]))
+                        conversation = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
+                        if conversation:
+                            conversation_id = UUID(str(conversation["id"]))
+                            service.projection.append(conversation_id, role="system", text=f"{resident_id} was added to the room.", speaker_id=None, speaker="Room membership", details={"event_type": "room_participant_added", "actor": "steward", "target": resident_id, "context_window": context_window, "correlation_id": str(correlation_id)})
+                        emit_event("room.participant.added", "room", str(room_id), correlation_id, {"actor": "steward", "resident_id": resident_id, "context_window": context_window})
+                        self._send(HTTPStatus.OK, {"membership": membership, "room": state})
+                    except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "room_participant_add_rejected", "checkpoint": "RIV-UI-0030", "reason": str(exc)})
+                    return
+                if self.path.startswith("/api/rooms/") and self.path.endswith("/leave"):
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        room_id = UUID(self.path.removeprefix("/api/rooms/").removesuffix("/leave").strip("/"))
+                        administration = service.room_administration.leave(room_id, actor="steward")
+                        emit_event("room.administrator.left", "room", str(room_id), None, {"actor": "steward"})
+                        self._send(HTTPStatus.OK, {"administrator": administration, "room": service.room_administration.snapshot(room_id)})
+                    except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "room_leave_rejected", "checkpoint": "RIV-UI-0030", "reason": str(exc)})
+                    return
+                if self.path.startswith("/api/rooms/") and self.path.endswith("/admins"):
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        room_id = UUID(self.path.removeprefix("/api/rooms/").removesuffix("/admins").strip("/"))
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        admin = service.room_administration.grant_admin(room_id, str(payload["administrator_id"]), actor="steward", primary=bool(payload.get("primary", False)))
+                        emit_event("room.administrator.granted", "room", str(room_id), UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None, {"actor": "steward", "administrator_id": admin["administrator_id"], "primary": admin["primary_administrator"]})
+                        self._send(HTTPStatus.OK, {"administrator": admin, "room": service.room_administration.snapshot(room_id)})
+                    except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "room_administrator_grant_rejected", "checkpoint": "RIV-UI-0030", "reason": str(exc)})
+                    return
                 if self.path == "/api/rooms":
                     if not self._auth():
                         self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
@@ -343,6 +439,7 @@ class RiverviewOpenWebUIService:
                             source_messages = list(source.get("messages", []))
                             inherited = source_messages[-200:] if context_window == "all" else source_messages[-100:] if context_window == "last_100" else source_messages[-20:] if context_window == "last_20" else []
                         room_id = service.resident_gateway.create_room(participants, classification=str(payload.get("classification", "operational")))
+                        service.room_administration.initialize(room_id, participants, actor="steward")
                         labels = [service.resident_gateway.resolve(participant).name for participant in participants]
                         default_title = ", ".join(labels[:-1]) + (" & " + labels[-1] if len(labels) > 1 else "") if labels else "Conference Room"
                         operator_conversation = service.projection.create(resident_id="room:" + ",".join(participants), title=str(payload.get("title") or default_title), kind="room", room_id=room_id, classification=str(payload.get("classification", "operational")), source_conversation_id=source_conversation_id, inherited_context_window=context_window if source_conversation_id else "", inherited_message_count=len(inherited), participants_added=list(participants))
@@ -492,6 +589,24 @@ class RiverviewOpenWebUIService:
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "bounded_request_rejected", "checkpoint": checkpoint, "cause_checkpoint": "RIV-REASON-0002" if provider_failure else "unavailable"})
 
             def do_PATCH(self) -> None:
+                if self._auth() and self.path.startswith("/api/rooms/"):
+                    try:
+                        room_id = UUID(self.path.removeprefix("/api/rooms/").strip("/"))
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        title = str(payload.get("title", "")).strip()[:160]
+                        if not title:
+                            raise ValueError("room title is required")
+                        conversation = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
+                        if conversation is None:
+                            raise LookupError
+                        with connect() as connection, connection.cursor() as cursor:
+                            cursor.execute("UPDATE operator_conversations SET title=%s,updated_at=now() WHERE conversation_id=%s", (title, UUID(str(conversation["id"]))))
+                        emit_event("room.renamed", "room", str(room_id), None, {"actor": "steward", "title": title})
+                        self._send(HTTPStatus.OK, {"room_id": str(room_id), "title": title})
+                    except (KeyError, LookupError, TypeError, ValueError):
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "room_update_rejected", "checkpoint": "RIV-UI-0030"})
+                    return
                 if not self._auth() or not self.path.startswith("/api/conversations/"):
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                     return
@@ -538,6 +653,32 @@ class RiverviewOpenWebUIService:
                     self._send(HTTPStatus.OK, current)
                 except (KeyError, LookupError, TypeError, ValueError):
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "conversation_update_rejected", "checkpoint": "RIV-UI-0021"})
+
+            def do_DELETE(self) -> None:
+                if not self._auth() or not self.path.startswith("/api/rooms/"):
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                    return
+                try:
+                    parts = self.path.removeprefix("/api/rooms/").strip("/").split("/")
+                    room_id = UUID(parts[0])
+                    if len(parts) != 3 or parts[1] not in {"members", "admins"}:
+                        raise ValueError("room membership or administrator path required")
+                    resident_id = parts[2]
+                    if parts[1] == "admins":
+                        admin = service.room_administration.revoke_admin(room_id, resident_id, actor="steward")
+                        emit_event("room.administrator.revoked", "room", str(room_id), None, {"actor": "steward", "administrator_id": resident_id})
+                        self._send(HTTPStatus.OK, {"administrator": admin, "room": service.room_administration.snapshot(room_id)})
+                        return
+                    membership = service.room_administration.remove(room_id, resident_id, actor="steward")
+                    state = service.room_administration.snapshot(room_id)
+                    service.resident_gateway.set_room_participants(room_id, tuple(state["participants"]))
+                    conversation = next((item for item in service.projection.list(include_archived=True) if item.get("room_id") == str(room_id)), None)
+                    if conversation:
+                        service.projection.append(UUID(str(conversation["id"])), role="system", text=f"{resident_id} was removed from the room.", speaker_id=None, speaker="Room membership", details={"event_type": "room_participant_removed", "actor": "steward", "target": resident_id, "correlation_id": membership.get("correlation_id")})
+                    emit_event("room.participant.removed", "room", str(room_id), None, {"actor": "steward", "resident_id": resident_id})
+                    self._send(HTTPStatus.OK, {"membership": membership, "room": state})
+                except (KeyError, TypeError, ValueError, LookupError, PermissionError) as exc:
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": "room_participant_remove_rejected", "checkpoint": "RIV-UI-0030", "reason": str(exc)})
 
             def log_message(self, *_args: object) -> None:
                 return

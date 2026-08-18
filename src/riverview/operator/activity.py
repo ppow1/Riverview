@@ -29,6 +29,18 @@ def _summary(event_type: str, aggregate_type: str, payload: dict[str, Any]) -> s
     supplied = str(payload.get("summary") or payload.get("description") or "").strip()
     if supplied:
         return supplied[:240]
+    membership_labels = {
+        "room.participant.added": "Room participant added",
+        "room.participant.removed": "Room participant removed",
+        "room.administrator.granted": "Room Administrator granted",
+        "room.administrator.revoked": "Room Administrator revoked",
+        "room.administrator.left": "Room Administrator left",
+        "room.renamed": "Room renamed",
+        "room.derived": "Room derived from conversation",
+    }
+    if event_type in membership_labels:
+        target = payload.get("resident_id") or payload.get("administrator_id")
+        return f"{membership_labels[event_type]}{': ' + str(target) if target else ''}"[:240]
     words = event_type.replace(".", " ").replace("_", " ").strip()
     return f"{words[:1].upper() + words[1:]} ({aggregate_type})"[:240]
 

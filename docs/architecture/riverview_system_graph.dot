@@ -41,6 +41,7 @@ digraph riverview {
   "character_designer" [label="Character Designer workflow"];
   "session_history" [label="Session history"];
   "operator_projection" [label="Durable Operator conversation/room projection"];
+  "room_membership_projection" [label="Durable room membership and scoped administration"];
   "accepted_continuity" [label="Accepted durable continuity"];
   "character_canon" [label="Versioned accepted character canon"];
   "activity_projection" [label="Authoritative River activity projection"];
@@ -105,6 +106,9 @@ digraph riverview {
   "operator_runtime" -> "operator_projection" [label="executes bounded durable conversation search"];
   "operator_runtime" -> "operator_projection" [label="hydrates selected conversation before center rendering and Snapshot"];
   "operator_runtime" -> "operator_projection" [label="derives rooms with bounded inherited context and participant lineage"];
+  "operator_runtime" -> "room_membership_projection" [label="manages durable room membership and scoped administrators"];
+  "room_membership_projection" -> "postgres_service" [label="stores membership and administration history"];
+  "room_membership_projection" -> "activity_projection" [label="publishes bounded membership/admin events"];
   "river" -> "activity_projection" [label="projects bounded meaningful activity by River cursor/category"];
   "activity_projection" -> "operator_runtime" [label="serves Activity read workspace without owning workflow state"];
   "operator_projection" -> "postgres_service" [label="stores typed conversation/message projection"];
