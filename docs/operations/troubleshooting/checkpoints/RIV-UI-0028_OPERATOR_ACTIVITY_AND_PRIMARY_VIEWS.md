@@ -11,6 +11,14 @@ human-readable summary without becoming a workflow ledger. Primary views are
 mutually exclusive presentation surfaces: only Conversations owns its rail,
 transcript, resident controls, composer, and room actions.
 
+While Activity is active, the authenticated River event stream is the preferred
+freshness signal. It invalidates the current projection and triggers one
+bounded cursor-based reconciliation; a single in-flight recovery timer may
+supplement that signal while the tab is visible. Do not refresh hidden Activity
+DOM, overlap requests, reset filters, or discard the existing stream on a
+transient fetch failure. The cursor returned by the authoritative projection,
+not display text, is the merge boundary.
+
 Diagnose the served HTML/controller and canonical client state before changing
 backend state. There must be one primary-view router and one binding for each
 conversation, activity, architecture, notification, and settings operation.

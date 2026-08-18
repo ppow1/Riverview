@@ -49,6 +49,12 @@ def test_primary_view_controller_has_generation_ownership_and_functional_setting
         assert "Reset Operator preferences" in html
         assert "data-voice-test" in html
         assert "addVoicePreviewControls" not in html
+        assert "function startActivityRefresh(" in html
+        assert "function scheduleActivityRefresh(" in html
+        assert "activityRequestInFlight" in html
+        assert "document.addEventListener('visibilitychange'" in html
+        assert "state.activityDirty=true" in html
+        assert 'id="activity-list"' in html
     finally:
         service.stop()
 
