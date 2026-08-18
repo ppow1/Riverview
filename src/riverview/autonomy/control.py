@@ -462,6 +462,11 @@ class CodexCliAdapter:
             executable = shutil.which(f"{self.executable}.cmd") or shutil.which(f"{self.executable}.exe") or self.executable
         else:
             executable = shutil.which(self.executable) or self.executable
+        observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
+        if observed_head != envelope.expected_base_sha:
+            raise RuntimeError(
+                f"RIV-EXE-0008: repository HEAD {observed_head} does not match the approved base revision."
+            )
         output_path = Path(tempfile.gettempdir()) / f"riverview-codex-result-{uuid4()}.txt"
         command = [
             executable, "exec", "--json", "--ephemeral", "--sandbox", "read-only",
@@ -474,7 +479,7 @@ class CodexCliAdapter:
             category = "succeeded" if process.returncode == 0 else "failed"
             exit_state = f"exit:{process.returncode}"
             provider_output = output_path.read_text(encoding="utf-8") if output_path.exists() else stdout
-            summary = self._bounded_success_summary(repository, provider_output) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
+            summary = self._bounded_success_summary(repository, provider_output, observed_head) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
             checkpoint = () if process.returncode == 0 else ("RIV-EXE-0004",)
         except subprocess.TimeoutExpired:
             process.kill()
@@ -488,13 +493,12 @@ class CodexCliAdapter:
         return result
 
     @staticmethod
-    def _bounded_success_summary(repository: Path, provider_output: str) -> str:
+    def _bounded_success_summary(repository: Path, provider_output: str, observed_head: str) -> str:
         """Keep provider output plus independently bounded repository evidence."""
-        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
         evidence = {
             "provider_output": provider_output[-2600:] if provider_output else "",
             "repository_identity": "ppow1/Riverview",
-            "observed_git_head": head,
+            "observed_git_head": observed_head,
             "ai_hints_readable": (repository / "AI_HINTS.md").is_file(),
             "charter_readable": (repository / "docs" / "governance" / "RIVERVIEW_CHARTER.md").is_file(),
             "write_policy": "read_only",
