@@ -134,7 +134,7 @@ def comms5_store_specification(
     classification: str = "river",
     formation_contract: FormationContractInput = _EMPTY_FORMATION_CONTRACT,
 ) -> Any:
-    """Store a bounded large specification as an authoritative reference."""
+    """Store a bounded specification and optional typed non-shell formation contract."""
     values = _request(
         content=content, summary=summary, idempotency_key=idempotency_key,
         client_id=client_id, client_type=client_type, client_name=client_name,

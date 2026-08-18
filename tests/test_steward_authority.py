@@ -6,6 +6,7 @@ import pytest
 
 from riverview.intake.authority import StewardAuthorityError, StewardAuthorityStore
 from riverview.intake.engineering import EngineeringIntentStore
+from riverview.mcp.comms5 import Comms5Error, Comms5Service
 
 
 def _contract() -> dict[str, object]:
@@ -41,3 +42,17 @@ def test_contract_shape_is_not_authority() -> None:
     contract = _contract()
     with pytest.raises(StewardAuthorityError, match="incomplete or unrecognized"):
         StewardAuthorityStore.validate_formation_contract({**contract, "shell": "never"})
+
+
+def test_comms5_rejects_malformed_formation_contract_before_storage() -> None:
+    with pytest.raises(Comms5Error, match="registered read-only Codex"):
+        Comms5Service().store_specification({
+            "content": "bounded",
+            "summary": "invalid formation",
+            "idempotency_key": "authority-test-invalid-contract",
+            "client_id": "test",
+            "client_type": "test",
+            "client_name": "test",
+            "authenticated_principal": "authorized-ai-session",
+            "formation_contract": {**_contract(), "action_type": "shell.execute"},
+        })

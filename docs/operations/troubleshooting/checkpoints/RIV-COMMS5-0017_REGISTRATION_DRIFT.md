@@ -23,6 +23,13 @@ approved public endpoint.
 A hand-maintained connector manifest omitted newly added lifecycle tools and
 could not prove the published mutation schemas matched the callable registry.
 
+A related drift occurs when the FastMCP callable schema is current but the
+`Comms5Service` discovery metadata or deployed HTTP process is old. Compare the
+nested `formation_contract` schema and durable-authority promotion wording
+across STDIO, loopback HTTP, and the authenticated public endpoint. Reload the
+managed Comms5 HTTP service through `riverview.runtime.supervisor`; do not add a
+tool or rely on a client cache as the repair.
+
 ## Smallest repair
 
 Derive the packaging manifest from the authoritative FastMCP registry. Do not
@@ -34,6 +41,9 @@ Steward authorization.
 Run the Comms5 registry/schema tests and confirm the public endpoint exposes all
 15 tools, including `comms5_cancel_draft` and `comms5_supersede_seed`, with flat
 top-level mutation fields.
+Also confirm `comms5_store_specification` includes the bounded
+`formation_contract` object and promotion describes durable bounded Steward
+authority rather than direct execution authority.
 
 ## Do not
 
