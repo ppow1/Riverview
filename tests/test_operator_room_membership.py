@@ -55,3 +55,21 @@ def test_projection_marks_duplicate_active_rows_instead_of_hiding_drift() -> Non
     assert projection["active_participant_count"] == 2
     assert projection["duplicate_active_participant_ids"] == ["grace"]
     assert projection["membership_projection_consistent"] is False
+
+
+def test_legacy_reconciliation_does_not_revive_removed_history() -> None:
+    projection = _projection()
+    room_id = uuid4()
+    projection.initialize(room_id, ("grace",))
+    projection.remove(room_id, "grace", actor="steward")
+    repaired = projection.reconcile_legacy(room_id, ("grace", "RES-000001"))
+    assert repaired["participants"] == []
+    assert len(repaired["memberships"]) == 1
+
+
+def test_legacy_reconciliation_backfills_only_empty_room() -> None:
+    projection = _projection()
+    room_id = uuid4()
+    repaired = projection.reconcile_legacy(room_id, ("grace", "RES-000001"))
+    assert repaired["participants"] == ["grace", "RES-000001"]
+    assert repaired["active_participant_count"] == 2

@@ -85,16 +85,15 @@ class RiverviewOpenWebUIService:
             if existing.get("kind") == "room" and existing.get("room_id"):
                 try:
                     service_room_id = UUID(str(existing["room_id"]))
-                    membership_state = self.room_administration.snapshot(service_room_id)
+                    legacy = tuple(item for item in str(existing.get("resident_id", "")).removeprefix("room:").split(",") if item)
+                    # Only an old room with no membership history is eligible
+                    # for deterministic migration.  Removed/left history is
+                    # never revived from a title or transcript.
+                    if legacy and all(self.resident_gateway.resolve(item) for item in legacy):
+                        membership_state = self.room_administration.reconcile_legacy(service_room_id, legacy)
+                    else:
+                        membership_state = self.room_administration.snapshot(service_room_id)
                     participants = tuple(membership_state["participants"])
-                    if not participants:
-                        legacy = tuple(item for item in str(existing.get("resident_id", "")).removeprefix("room:").split(",") if item)
-                        # A legacy room may be repaired only when every legacy
-                        # identity resolves to an admitted resident.  Titles
-                        # and transcript speakers are never used as authority.
-                        if legacy and all(self.resident_gateway.resolve(item) for item in legacy):
-                            self.room_administration.initialize(service_room_id, legacy)
-                            participants = legacy
                     if participants:
                         self.resident_gateway.restore_room(service_room_id, participants, classification=str(existing.get("classification", "operational")))
                 except (ValueError, LookupError):
@@ -174,6 +173,7 @@ class RiverviewOpenWebUIService:
             if gateway_participants != canonical:
                 errors.append("gateway_membership_mismatch")
             return {
+                "room_id": str(room_id),
                 "membership_state": membership,
                 "participants": list(canonical),
                 "participant_profiles": profiles,
@@ -184,6 +184,24 @@ class RiverviewOpenWebUIService:
                 "administrator_ids": [row.get("administrator_id") for row in membership.get("administrators", ())],
                 "primary_administrator": next((row.get("administrator_id") for row in membership.get("administrators", ()) if row.get("primary_administrator")), None),
             }
+
+        def enrich_room_conversation(conversation: dict[str, object]) -> dict[str, object]:
+            """Attach the canonical room projection to every conversation read."""
+            if conversation.get("kind") != "room" or not conversation.get("room_id"):
+                return conversation
+            room = room_projection(UUID(str(conversation["room_id"])))
+            conversation.update({
+                "participants": room["participants"],
+                "participant_profiles": room["participant_profiles"],
+                "participant_count": room["participant_count"],
+                "gateway_participant_ids": room["gateway_participant_ids"],
+                "membership_state": room["membership_state"],
+                "room_projection_consistent": room["room_projection_consistent"],
+                "inconsistency_classes": room["inconsistency_classes"],
+                "administrator_ids": room["administrator_ids"],
+                "primary_administrator": room["primary_administrator"],
+            })
+            return conversation
 
         service.room_projection = room_projection
 
@@ -346,7 +364,7 @@ class RiverviewOpenWebUIService:
                         conversation = service.projection.refresh(conversation_id, include_archived=parse_qs(path.query).get("archived", [""])[0] == "true")
                         if conversation is None:
                             raise KeyError(conversation_id)
-                        self._send(HTTPStatus.OK, conversation)
+                        self._send(HTTPStatus.OK, enrich_room_conversation(conversation))
                     except (KeyError, ValueError):
                         self._send(HTTPStatus.NOT_FOUND, {"error": "conversation_not_found", "checkpoint": "RIV-UI-0021"})
                 elif urlsplit(self.path).path.startswith("/api/rooms/") and urlsplit(self.path).path.endswith("/members") and self._auth():
@@ -635,17 +653,24 @@ class RiverviewOpenWebUIService:
                                     service.projection.append(room_conversation_id, role="resident", text=str(envelope.get("summary", "")), speaker_id=str(response_turn.get("speaker_id", "")), speaker=str(response_turn.get("speaker_name", "Resident")), details={**envelope, "status": "completed", "correlation_id": str(correlation_id) if correlation_id else None})
                                 persisted = service.projection.refresh(room_conversation_id, include_archived=True)
                                 break
-                        diagnostic("RIV-RES-0002", "room_chat", "provider_partial_failure", f"Room turn partially completed; failed resident {exc.failed_resident_id}.")
-                        emit_event("room.turn.partial_failure", "room", room_text, correlation_id, {"failed_participant": exc.failed_resident_id, "completed_participants": [item.get("speaker_id") for item in exc.completed], "classification": "operational"})
-                        self._send(HTTPStatus.BAD_GATEWAY, {"error": "room_chat_partial_failure", "checkpoint": "RIV-RES-0002", "failure_class": "provider_partial_failure", "failed_participant": exc.failed_resident_id, "completed_participants": [item.get("speaker_id") for item in exc.completed], "persisted_message_count": len(persisted.get("messages", [])) if persisted else 0, "correlation_id": str(correlation_id) if correlation_id else None})
+                        failure_class = getattr(exc, "failure_class", "provider_partial_failure")
+                        diagnostic("RIV-RES-0002", "room_chat", failure_class, f"Room turn partially completed; failed resident {exc.failed_resident_id}; completed={len(exc.completed)}; cause={exc.cause_type}.")
+                        emit_event("room.turn.partial_failure", "room", room_text, correlation_id, {"failed_participant": exc.failed_resident_id, "completed_participants": [item.get("speaker_id") for item in exc.completed], "failure_class": failure_class, "cause_type": exc.cause_type, "classification": "operational"})
+                        self._send(HTTPStatus.BAD_GATEWAY, {"error": "room_chat_partial_failure", "checkpoint": "RIV-RES-0002", "failure_class": failure_class, "failed_participant": exc.failed_resident_id, "completed_participants": [item.get("speaker_id") for item in exc.completed], "persisted_message_count": len(persisted.get("messages", [])) if persisted else 0, "correlation_id": str(correlation_id) if correlation_id else None})
                     except (KeyError, TypeError, ValueError, LookupError, PermissionError, RuntimeError) as exc:
                         failure_class = getattr(exc, "failure_class", "room_provider_failure")
                         if isinstance(exc, LookupError):
                             failure_class = "room_missing" if "projection" in str(exc) else "participant_profile_resolution_failed"
                         elif isinstance(exc, PermissionError):
                             failure_class = "room_membership_inconsistent"
-                        diagnostic("RIV-RES-0002", "room_chat", failure_class, f"Bounded room request failed: {failure_class}.")
-                        self._send(HTTPStatus.BAD_REQUEST, {"error": "room_chat_rejected", "checkpoint": "RIV-RES-0002", "failure_class": failure_class, "reason": str(exc)[:240]})
+                        elif "RIV-REASON-0002" in str(exc):
+                            failure_class = "provider_unavailable"
+                        elif "durably reconciled" in str(exc):
+                            failure_class = "persistence_failure"
+                        reason = str(exc)[:240]
+                        diagnostic("RIV-RES-0002", "room_chat", failure_class, f"Bounded room request failed: {failure_class}; reason={reason}.")
+                        emit_event("room.turn.failed", "room", room_text, UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None, {"failure_class": failure_class, "reason": reason, "classification": "operational"})
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "room_chat_rejected", "checkpoint": "RIV-RES-0002", "failure_class": failure_class, "reason": reason})
                     return
                 if self.path != "/api/chat" or not self._auth():
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})

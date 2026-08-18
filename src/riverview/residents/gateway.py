@@ -22,6 +22,7 @@ class RoomTurnPartialFailure(RuntimeError):
         self.completed = completed
         self.failed_resident_id = failed_resident_id
         self.cause_type = type(cause).__name__
+        self.failure_class = "provider_timeout" if isinstance(cause, TimeoutError) or "timed out" in str(cause).casefold() else "provider_failure"
 
 
 @dataclass(frozen=True, slots=True)

@@ -44,12 +44,29 @@ class RoomAdministration:
             memberships = self.memberships.get(room_id, [])
             admins = self.administrators.get(room_id, [])
             return self._projection(memberships, admins)
+
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT membership_id,room_id,resident_id,state,added_by,added_at,removed_by,removed_at,context_window,source_conversation_id,correlation_id FROM operator_room_memberships WHERE room_id=%s ORDER BY added_at", (room_id,))
             memberships = [self._membership(row) for row in cursor.fetchall()]
             cursor.execute("SELECT administration_id,room_id,administrator_id,active,primary_administrator,granted_by,granted_at,revoked_by,revoked_at,correlation_id FROM operator_room_administrators WHERE room_id=%s ORDER BY granted_at", (room_id,))
             admins = [self._admin(row) for row in cursor.fetchall()]
             return self._projection(memberships, admins)
+
+    def reconcile_legacy(self, room_id: UUID, participants: tuple[str, ...] | list[str], *, actor: str = "system") -> dict[str, Any]:
+        """Backfill a pre-0031 room only when it has no membership history.
+
+        The legacy participant encoding is an existing durable conversation
+        projection, not a title or rendered transcript.  Once membership
+        history exists, an empty active set is an explicit inconsistency and
+        must remain visible rather than being silently revived.
+        """
+        current = self.snapshot(room_id)
+        if current.get("participants") or current.get("memberships"):
+            return current
+        normalized = tuple(dict.fromkeys(str(item).strip() for item in participants if str(item).strip()))
+        if normalized:
+            self.initialize(room_id, normalized, actor=actor)
+        return self.snapshot(room_id)
 
     @staticmethod
     def _projection(memberships: list[dict[str, Any]], admins: list[dict[str, Any]]) -> dict[str, Any]:
@@ -76,13 +93,13 @@ class RoomAdministration:
     def _membership(row: tuple[Any, ...]) -> dict[str, Any]:
         keys = ("membership_id", "room_id", "resident_id", "state", "added_by", "added_at", "removed_by", "removed_at", "context_window", "source_conversation_id", "correlation_id")
         result = dict(zip(keys, row, strict=True))
-        return {key: (str(value) if key.endswith("_id") or key == "correlation_id" else value) for key, value in result.items()}
+        return {key: (None if value is None else str(value) if key.endswith("_id") or key == "correlation_id" else value) for key, value in result.items()}
 
     @staticmethod
     def _admin(row: tuple[Any, ...]) -> dict[str, Any]:
         keys = ("administration_id", "room_id", "administrator_id", "active", "primary_administrator", "granted_by", "granted_at", "revoked_by", "revoked_at", "correlation_id")
         result = dict(zip(keys, row, strict=True))
-        return {key: (str(value) if key.endswith("_id") or key == "correlation_id" else value) for key, value in result.items()}
+        return {key: (None if value is None else str(value) if key.endswith("_id") or key == "correlation_id" else value) for key, value in result.items()}
 
     def add(self, room_id: UUID, resident_id: str, *, actor: str, context_window: str, source_conversation_id: UUID | None = None, correlation_id: UUID | None = None) -> dict[str, Any]:
         correlation = correlation_id or uuid4()

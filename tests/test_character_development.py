@@ -70,3 +70,4 @@ def test_room_chat_preserves_completed_turns_when_later_participant_fails():
         service.room_chat(room, "bounded question", provider=provider, interface_id="test")
     assert [item["speaker_id"] for item in failure.value.completed] == ["RES-000003"]
     assert failure.value.failed_resident_id == "RES-000001"
+    assert failure.value.failure_class == "provider_failure"
