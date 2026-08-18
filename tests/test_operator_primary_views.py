@@ -24,6 +24,30 @@ def test_clean_operator_template_owns_mutually_exclusive_primary_views() -> None
         assert "stopImmediatePropagation" not in html
         assert "Authoritative work projection is not available" not in html
         assert '<div id="app"></div>' in html
+        assert html.count("function renderPrimaryView(") == 1
+        assert "data-primary-view" in html
+        assert "recentPrimaryMutations" in html
+        assert "function mountPrimary(" in html
+        assert "MutationObserver" not in html
+        assert "function renderSettingsView(generation=state.viewGeneration)" in html
+    finally:
+        service.stop()
+
+
+def test_primary_view_controller_has_generation_ownership_and_functional_settings() -> None:
+    service = RiverviewOpenWebUIService(OpenWebUIConfig(port=18093, bearer_token="view-race-test"), lambda model, request: None)
+    service.start()
+    try:
+        cookie = _session(18093)
+        with urlopen(Request("http://127.0.0.1:18093/", headers={"Cookie": cookie})) as response:
+            html = response.read().decode()
+        assert "state.primaryView===view&&state.viewGeneration===generation" in html
+        assert "requestedView:view" in html
+        assert "state.primaryView!==view||state.viewGeneration!==generation" in html
+        assert "settings-clean-list" in html
+        assert "/api/conversations/bulk" in html
+        assert "Reset Operator preferences" in html
+        assert "data-voice-test" in html
     finally:
         service.stop()
 
