@@ -48,6 +48,7 @@ def test_primary_view_controller_has_generation_ownership_and_functional_setting
         assert "/api/conversations/bulk" in html
         assert "Reset Operator preferences" in html
         assert "data-voice-test" in html
+        assert "addVoicePreviewControls" not in html
     finally:
         service.stop()
 
