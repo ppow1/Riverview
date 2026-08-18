@@ -14,6 +14,16 @@ from riverview.characters import CharacterStore, ContinuityStore
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 
 
+class RoomTurnPartialFailure(RuntimeError):
+    """A room round stopped after bounded participant results were produced."""
+
+    def __init__(self, completed: list[dict[str, Any]], failed_resident_id: str, cause: Exception) -> None:
+        super().__init__(f"room participant {failed_resident_id} failed: {type(cause).__name__}")
+        self.completed = completed
+        self.failed_resident_id = failed_resident_id
+        self.cause_type = type(cause).__name__
+
+
 @dataclass(frozen=True, slots=True)
 class ResidentProfile:
     resident_id: str
@@ -202,7 +212,10 @@ class ResidentConversationGateway:
         correlation = correlation_id or uuid4()
         results = []
         for resident_id in room["participants"]:
-            session, response, metadata = self.chat(resident_id, instruction, provider=provider, interface_id=interface_id, classification=room["classification"], correlation_id=correlation)
+            try:
+                session, response, metadata = self.chat(resident_id, instruction, provider=provider, interface_id=interface_id, classification=room["classification"], correlation_id=correlation)
+            except Exception as exc:
+                raise RoomTurnPartialFailure(results, resident_id, exc) from exc
             turn = {"speaker_id": resident_id, "speaker_name": metadata["resident_name"], "session_id": str(session.session_id), "character_version": metadata["character_version"], "response": response.as_typed_payload(), "no_authority_expansion": True}
             room["turns"].append(turn); results.append(turn)
         return results

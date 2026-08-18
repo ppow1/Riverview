@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from riverview.characters import CharacterDesignerWorkflow, CharacterStore, ContinuityStore
 from riverview.residents.gateway import ResidentConversationGateway, ResidentProfile
 
@@ -46,3 +48,25 @@ def test_room_chat_produces_identity_preserving_provider_turns():
     turns = service.room_chat(room, "Give one bounded greeting.", provider=provider, interface_id="test")
     assert [turn["speaker_name"] for turn in turns] == ["Helen", "Alfred", "Ingrid"]
     assert all(turn["no_authority_expansion"] for turn in turns)
+
+
+def test_room_chat_preserves_completed_turns_when_later_participant_fails():
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from riverview.reasoning import ReasoningResponse
+    from riverview.residents.gateway import RoomTurnPartialFailure
+
+    service = ResidentConversationGateway(tuple(profiles()) + (ResidentProfile("RES-000001", "Alfred", "Manager", "estate://alfred", "estate://source/alfred"),))
+    room = service.create_room(("Helen", "Alfred"))
+    calls = 0
+    def provider(request):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("bounded provider fixture failure")
+        return ReasoningResponse(uuid4(), request.request_id, request.correlation_id, "local:test", "advice", "completed", ("room-evidence",), request.classification, datetime.now(UTC))
+    with pytest.raises(RoomTurnPartialFailure) as failure:
+        service.room_chat(room, "bounded question", provider=provider, interface_id="test")
+    assert [item["speaker_id"] for item in failure.value.completed] == ["RES-000003"]
+    assert failure.value.failed_resident_id == "RES-000001"

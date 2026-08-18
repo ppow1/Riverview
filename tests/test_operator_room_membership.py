@@ -45,3 +45,13 @@ def test_room_admin_cannot_remove_steward() -> None:
     projection.initialize(room_id, ("grace",))
     with pytest.raises(PermissionError):
         projection.remove(room_id, "steward", actor="grace")
+
+
+def test_projection_marks_duplicate_active_rows_instead_of_hiding_drift() -> None:
+    projection = RoomAdministration._projection(
+        [{"resident_id": "grace", "state": "active"}, {"resident_id": "grace", "state": "active"}],
+        [],
+    )
+    assert projection["active_participant_count"] == 2
+    assert projection["duplicate_active_participant_ids"] == ["grace"]
+    assert projection["membership_projection_consistent"] is False

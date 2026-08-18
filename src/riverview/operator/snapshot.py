@@ -77,6 +77,20 @@ def build_snapshot(payload: dict[str, Any], *, service_identity: str, service_ur
     safe_payload = _redact(payload)
     safe_payload.pop("current_dom", None)
     safe_payload["page_url"] = str(payload.get("page_url") or service_url)
+    room_state = safe_payload.get("room_state", {})
+    if isinstance(room_state, dict) and room_state:
+        participants = list(room_state.get("active_participant_ids", room_state.get("participants", ())) or ())
+        profiles = list(room_state.get("participant_profiles", ()) or ())
+        gateway = list(room_state.get("gateway_participant_ids", ()) or ())
+        conversation_room_id = str(room_state.get("room_id", ""))
+        active_room_id = str(safe_payload.get("resident_state", {}).get("active_room_id", room_state.get("active_room_id", conversation_room_id)) or conversation_room_id)
+        room_state["consistency"] = {
+            "membership_vs_gateway": participants == gateway,
+            "membership_vs_profiles": len(participants) == len(profiles) and {str(item) for item in participants} == {str(item.get("resident_id")) for item in profiles if isinstance(item, dict)},
+            "active_room_matches_conversation_room_id": not active_room_id or not conversation_room_id or active_room_id == conversation_room_id,
+            "header_projection_matches_room_projection": int(room_state.get("participant_count", len(participants)) or 0) == len(participants),
+            "room_projection_consistent": bool(room_state.get("room_projection_consistent", True)) and not bool(room_state.get("inconsistency_classes")),
+        }
     runtime = {
         "capture_timestamp": generated.isoformat(), "service_identity": service_identity,
         "service_pid": pid or os.getpid(), "git_sha": _git_sha(), "working_directory": os.getcwd(),
@@ -86,7 +100,6 @@ def build_snapshot(payload: dict[str, Any], *, service_identity: str, service_ur
         "recent_event_lineage": _events(),
     }
     resident_state = safe_payload.get("resident_state", {})
-    room_state = safe_payload.get("room_state", {})
     files: dict[str, str] = {
         "README.txt": f"Riverview Operator manual debug snapshot.\nCaptured: {generated.isoformat()}\nURL: {safe_payload['page_url']}\nGit SHA: {runtime['git_sha']}\nSecrets and selected file bytes are excluded or redacted.\n",
         "current_dom.html": dom,

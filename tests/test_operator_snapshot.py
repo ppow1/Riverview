@@ -1,3 +1,4 @@
+import json
 import zipfile
 from io import BytesIO
 
@@ -39,3 +40,21 @@ def test_snapshot_rejects_missing_or_oversized_dom():
         build_snapshot({"current_dom": ""}, service_identity="riverview-openwebui", service_url="http://127.0.0.1:18082/")
     with pytest.raises(ValueError):
         build_snapshot({"current_dom": "x" * 512_001}, service_identity="riverview-openwebui", service_url="http://127.0.0.1:18082/")
+
+
+def test_snapshot_exports_room_consistency_assertions():
+    archive, _ = build_snapshot({
+        "current_dom": "<html></html>",
+        "resident_state": {"active_room_id": "room-1"},
+        "room_state": {
+            "room_id": "room-1", "participants": ["grace", "alfred"],
+            "participant_profiles": [{"resident_id": "grace"}, {"resident_id": "alfred"}],
+            "gateway_participant_ids": ["grace", "alfred"], "participant_count": 2,
+            "room_projection_consistent": True, "inconsistency_classes": [],
+        },
+    }, service_identity="riverview-openwebui", service_url="http://127.0.0.1:18082/")
+    with zipfile.ZipFile(BytesIO(archive)) as bundle:
+        room = json.loads(bundle.read("room_state.json"))
+        assert room["consistency"]["membership_vs_gateway"] is True
+        assert room["consistency"]["membership_vs_profiles"] is True
+        assert room["consistency"]["room_projection_consistent"] is True

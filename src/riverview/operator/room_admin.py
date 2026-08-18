@@ -43,13 +43,34 @@ class RoomAdministration:
         if not self.available:
             memberships = self.memberships.get(room_id, [])
             admins = self.administrators.get(room_id, [])
-            return {"memberships": memberships, "participants": [row["resident_id"] for row in memberships if row["state"] == "active"], "administrators": [row for row in admins if row["active"]]}
+            return self._projection(memberships, admins)
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT membership_id,room_id,resident_id,state,added_by,added_at,removed_by,removed_at,context_window,source_conversation_id,correlation_id FROM operator_room_memberships WHERE room_id=%s ORDER BY added_at", (room_id,))
             memberships = [self._membership(row) for row in cursor.fetchall()]
             cursor.execute("SELECT administration_id,room_id,administrator_id,active,primary_administrator,granted_by,granted_at,revoked_by,revoked_at,correlation_id FROM operator_room_administrators WHERE room_id=%s ORDER BY granted_at", (room_id,))
             admins = [self._admin(row) for row in cursor.fetchall()]
-            return {"memberships": memberships, "participants": [row["resident_id"] for row in memberships if row["state"] == "active"], "administrators": [row for row in admins if row["active"]]}
+            return self._projection(memberships, admins)
+
+    @staticmethod
+    def _projection(memberships: list[dict[str, Any]], admins: list[dict[str, Any]]) -> dict[str, Any]:
+        """Return one bounded current-membership projection.
+
+        ``operator_room_memberships`` is authoritative.  The derived list is
+        deliberately accompanied by duplicate/integrity metadata so callers
+        cannot silently treat contradictory legacy rows as a healthy room.
+        """
+        active = [row for row in memberships if row.get("state") == "active"]
+        participants = [str(row["resident_id"]) for row in active]
+        duplicate_ids = sorted({resident_id for resident_id in participants if participants.count(resident_id) > 1})
+        return {
+            "memberships": memberships,
+            "participants": participants,
+            "active_participant_ids": participants,
+            "active_participant_count": len(participants),
+            "duplicate_active_participant_ids": duplicate_ids,
+            "membership_projection_consistent": not duplicate_ids,
+            "administrators": [row for row in admins if row.get("active")],
+        }
 
     @staticmethod
     def _membership(row: tuple[Any, ...]) -> dict[str, Any]:
