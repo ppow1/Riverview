@@ -1,8 +1,11 @@
 import json
+import re
+import subprocess
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from riverview.operator.openwebui import OpenWebUIConfig, RiverviewOpenWebUIService
+from riverview.operator.ui import UI_HTML
 
 
 def _session(port: int) -> str:
@@ -55,6 +58,9 @@ def test_primary_view_controller_has_generation_ownership_and_functional_setting
         assert "document.addEventListener('visibilitychange'" in html
         assert "state.activityDirty=true" in html
         assert 'id="activity-list"' in html
+        assert "function activityItemsMarkup(visible){if(state.activityError&&!visible.length)return" in html
+        assert "if(state.activityLoading&&!visible.length)return" in html
+        assert "return visible.map(x=>" in html
     finally:
         service.stop()
 
@@ -85,3 +91,20 @@ def test_neutral_conversation_assigns_resident_without_changing_id_and_activity_
         assert activity["next_cursor"] >= match[-1]["river_sequence"]
     finally:
         service.stop()
+
+
+def test_activity_deferred_refresh_keeps_existing_event_cards_rendered() -> None:
+    script = re.search(r"<script>([\s\S]*)</script>", UI_HTML).group(1)
+    function = re.search(r"function activityItemsMarkup\(visible\)\{[\s\S]*?\nfunction renderActivityView", script).group(0).rsplit("\nfunction renderActivityView", 1)[0]
+    probe = f"""
+    const state = {{activityError: {{message: 'temporary'}}, activityLoading: false}};
+    const esc = value => String(value ?? '').replace(/[&<>\"']/g, '');
+    const formatActivityTime = value => value;
+    {function}
+    const html = activityItemsMarkup([{{activity_id: 2052, category: 'river', occurred_at: 'now', river_sequence: 2052, summary: 'existing event', state: 'observed', source: 'river', details: {{}}}}]);
+    if (!html.includes('data-activity-id=\"2052\"') || html.includes('no events are currently available')) process.exit(1);
+    """
+    result = subprocess.run(["node", "--check"], input=probe, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    result = subprocess.run(["node", "-e", probe], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
