@@ -207,16 +207,26 @@ Do not treat this sequence as immutable if a later accepted roadmap revision cha
 
 ## 15. Unified runtime control
 
-Riverview should eventually provide one operator-facing runtime interface:
+Riverview provides one operator-facing runtime interface through the installed
+`Riverview Runtime Supervisor` task and its versioned PowerShell wrappers:
 
 - `Start-Riverview.ps1`
 - `Stop-Riverview.ps1`
 - `Restart-Riverview.ps1`
 - `Get-RiverviewStatus.ps1`
 
-The supervisor should manage dependency order, registered service identities, ports, duplicate prevention, health endpoints, bounded stop/restart, and failure evidence. Component launchers may remain internal implementation details. Do not create fifteen unrelated operator startup paths.
+The supervisor manages dependency order, registered service identities, ports,
+duplicate prevention, health endpoints, bounded stop/restart, and failure
+evidence. Component launchers remain internal implementation details. Do not
+create unrelated operator startup paths.
 
-The minimum unified supervisor capability should be pulled forward through a reviewed roadmap revision when persistent Relay, MCP, Grace, and status services require it. Do not silently fold it into an unrelated waypoint.
+The implementation is `riverview.runtime.supervisor` with registry
+`config/runtime/riverview-runtime-services.json`; CME remains a subordinate
+component supervisor, while Comms5 HTTP and its approved reverse transport are
+separate managed identities under the same owner. The Windows migration is
+performed by `Install-RiverviewRuntimeSupervisor.ps1` and reconciles obsolete
+peer tasks. `Estate Operations Runtime Host` is an Estate boundary, not a
+Riverview lifecycle authority.
 
 ## 16. Status and progress visibility
 
@@ -552,7 +562,7 @@ At the time this contract was created:
 - Roadmap size: 103 waypoints
 - Next implementation waypoint: `RV-004.4 — Read-only MCP Relay`
 - Steward Status address when running: `http://127.0.0.1:8770/`
-- A unified runtime supervisor is still planned, not yet implemented.
+- The unified runtime supervisor is implemented as `riverview.runtime.supervisor`; installed/running status must still be verified from its status projection.
 - The status server implementation exists but must not be presumed currently running.
 
 Future work must verify these values rather than assuming they remain current.

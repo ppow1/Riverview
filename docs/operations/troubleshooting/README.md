@@ -46,6 +46,9 @@ Every checkpoint records:
 - `RIV-UI-0027` — Operator room formation, participant addition, room persistence, and bounded context transfer
 - `RIV-UI-0028` — Operator authoritative activity projection and mutually exclusive primary views
 
+`RIV-RUN-0001` — unified Riverview lifecycle owner, peer-task migration, and
+bounded service recovery.
+
 ## Acceptance rule
 
 No capability is operationally complete until a new AI conversation can identify the checkpoint, distinguish modeled failures, perform the smallest safe repair, and verify recovery from repository guidance and captured evidence.

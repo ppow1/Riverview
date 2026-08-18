@@ -55,6 +55,8 @@ digraph riverview {
   "notification_delivery" [label="Notification delivery"];
   "notification_ack" [label="Notification acknowledgement state"];
   "postgres_service" [label="PostgreSQL service"];
+  "windows_lifecycle" [label="Windows Riverview lifecycle boundary"];
+  "runtime_supervisor" [label="Unified Riverview runtime supervisor"];
   "operator_service" [label="Operator service 127.0.0.1:18082"];
   "spatial_service" [label="Spatial service 192.168.1.88:18443 (deferred/experimental)"];
   "comms5_http_service" [label="Comms5 loopback Streamable HTTP 127.0.0.1:11826"];
@@ -104,6 +106,12 @@ digraph riverview {
   "event.provider.response.completed" [label="provider.response.completed"];
   "event.provider.execution.failed" [label="provider.execution.failed"];
   "operator_module" -> "operator_runtime" [label="IMPLEMENTS"];
+  "windows_lifecycle" -> "runtime_supervisor" [label="hosts one top-level owner"];
+  "runtime_supervisor" -> "operator_service" [label="owns start/health/restart"];
+  "runtime_supervisor" -> "cme_supervisor" [label="manages subordinate component supervisor"];
+  "runtime_supervisor" -> "comms5_http_service" [label="owns start/health/restart"];
+  "runtime_supervisor" -> "comms5_external_route" [label="owns approved transport process"];
+  "runtime_supervisor" -> "relay" [label="owns bounded worker lifecycle"];
   "operator_runtime" -> "operator_contract" [label="exposes"];
   "operator_runtime" -> "operator_projection" [label="persists UI conversation and room history"];
   "operator_runtime" -> "operator_projection" [label="archives and restores conversation UI history without changing continuity"];

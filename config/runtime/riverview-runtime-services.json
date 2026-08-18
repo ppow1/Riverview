@@ -1,0 +1,52 @@
+{
+  "schema_version": "riverview-runtime-services-v1",
+  "top_level_owner": "riverview.runtime.supervisor",
+  "services": [
+    {
+      "service_id": "operator",
+      "command": [".venv/Scripts/python.exe", "-m", "riverview.operator.live_service"],
+      "dependencies": [],
+      "port": 18082,
+      "health_url": "http://127.0.0.1:18082/health",
+      "process_match": "riverview.operator.live_service",
+      "secret_file": "A:/AI/OpenWebUI/.webui_secret_key",
+      "secret_env": "RIVERVIEW_OPENWEBUI_TOKEN",
+      "restart": true,
+      "startup_timeout": 8.0
+    },
+    {
+      "service_id": "cme-supervisor",
+      "command": [".venv/Scripts/python.exe", "-m", "riverview.autonomy.supervisor"],
+      "dependencies": [],
+      "process_match": "riverview.autonomy.supervisor",
+      "restart": true,
+      "startup_timeout": 8.0
+    },
+    {
+      "service_id": "comms5-http",
+      "command": [".venv/Scripts/python.exe", "-m", "riverview.mcp.comms5_http_server"],
+      "dependencies": [],
+      "port": 11826,
+      "health_url": null,
+      "process_match": "riverview.mcp.comms5_http_server",
+      "restart": true,
+      "startup_timeout": 8.0
+    },
+    {
+      "service_id": "comms5-transport",
+      "command": ["ssh.exe", "-N", "-T", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=3", "-o", "ConnectTimeout=10", "-i", "${USERPROFILE}/.ssh/id_ed25519", "-R", "127.0.0.1:11826:127.0.0.1:11826", "root@64.227.21.54"],
+      "dependencies": ["comms5-http"],
+      "process_match": "127.0.0.1:11826:127.0.0.1:11826",
+      "restart": true,
+      "startup_timeout": 8.0
+    },
+    {
+      "service_id": "relay-worker",
+      "command": [".venv/Scripts/python.exe", "-m", "riverview.relay.worker"],
+      "dependencies": ["cme-supervisor"],
+      "process_match": "riverview.relay.worker",
+      "restart": true,
+      "startup_timeout": 8.0
+    }
+  ]
+}

@@ -43,7 +43,8 @@
     "RIV-COMMS5-0013",
     "RIV-COMMS5-0014",
     "RIV-COMMS5-0015",
-    "RIV-COMMS5-0016"
+    "RIV-COMMS5-0016",
+    "RIV-RUN-0001"
   ],
   "edges": [
     {
@@ -54,6 +55,78 @@
       "target": "operator_runtime",
       "views": [
         "modules",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RUN-0001",
+      "derivation": "DERIVED",
+      "relation": "hosts one top-level owner",
+      "source": "windows_lifecycle",
+      "source_ref": "tools/powershell/runtime/Start-RiverviewRuntimeSupervisor.ps1",
+      "target": "runtime_supervisor",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RUN-0001",
+      "derivation": "DERIVED",
+      "relation": "owns start/health/restart",
+      "source": "runtime_supervisor",
+      "source_ref": "runtime/supervisor.py:RuntimeSupervisor",
+      "target": "operator_service",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RUN-0001",
+      "derivation": "DERIVED",
+      "relation": "manages subordinate component supervisor",
+      "source": "runtime_supervisor",
+      "source_ref": "runtime/supervisor.py:RuntimeSupervisor",
+      "target": "cme_supervisor",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RUN-0001",
+      "derivation": "DERIVED",
+      "relation": "owns start/health/restart",
+      "source": "runtime_supervisor",
+      "source_ref": "runtime/supervisor.py:RuntimeSupervisor",
+      "target": "comms5_http_service",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RUN-0001",
+      "derivation": "DERIVED",
+      "relation": "owns approved transport process",
+      "source": "runtime_supervisor",
+      "source_ref": "runtime/supervisor.py:RuntimeSupervisor",
+      "target": "comms5_external_route",
+      "views": [
+        "services",
+        "context"
+      ]
+    },
+    {
+      "checkpoint": "RIV-RUN-0001",
+      "derivation": "DERIVED",
+      "relation": "owns bounded worker lifecycle",
+      "source": "runtime_supervisor",
+      "source_ref": "runtime/supervisor.py:RuntimeSupervisor",
+      "target": "relay",
+      "views": [
+        "services",
         "context"
       ]
     },
@@ -3009,6 +3082,20 @@
       "id": "postgres_service",
       "kind": "service",
       "label": "PostgreSQL service",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "windows_lifecycle",
+      "kind": "service",
+      "label": "Windows Riverview lifecycle boundary",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "runtime_supervisor",
+      "kind": "service",
+      "label": "Unified Riverview runtime supervisor",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },

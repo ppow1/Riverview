@@ -13,7 +13,7 @@ CHECKPOINTS = (
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
     "RIV-ARCH-0001", "RIV-INF-0001", "RIV-SPAT-0004", "RIV-GRC-0008",
     "RIV-COMMS5-0001", "RIV-COMMS5-0002", "RIV-COMMS5-0007", "RIV-COMMS5-0008",
-    "RIV-COMMS5-0009", "RIV-COMMS5-0010", "RIV-COMMS5-0011", "RIV-COMMS5-0012", "RIV-COMMS5-0013", "RIV-COMMS5-0014", "RIV-COMMS5-0015", "RIV-COMMS5-0016",
+    "RIV-COMMS5-0009", "RIV-COMMS5-0010", "RIV-COMMS5-0011", "RIV-COMMS5-0012", "RIV-COMMS5-0013", "RIV-COMMS5-0014", "RIV-COMMS5-0015", "RIV-COMMS5-0016", "RIV-RUN-0001",
 )
 
 VIEW_NAMES = {
@@ -51,7 +51,7 @@ CORE_NODES = (
     ("room_context", "Bounded shared room context", "runtime"), ("resident_expression", "Resident expression boundary", "contract"),
     ("provider_failure", "Provider failure/recovery seam", "failure"), ("diagnostic_spool", "Diagnostic fallback/spool", "runtime"),
     ("notification_delivery", "Notification delivery", "runtime"), ("notification_ack", "Notification acknowledgement state", "runtime"),
-    ("postgres_service", "PostgreSQL service", "service"), ("operator_service", "Operator service 127.0.0.1:18082", "service"),
+    ("postgres_service", "PostgreSQL service", "service"), ("windows_lifecycle", "Windows Riverview lifecycle boundary", "service"), ("runtime_supervisor", "Unified Riverview runtime supervisor", "service"), ("operator_service", "Operator service 127.0.0.1:18082", "service"),
     ("spatial_service", "Spatial service 192.168.1.88:18443 (deferred/experimental)", "service"),
     ("comms5_http_service", "Comms5 loopback Streamable HTTP 127.0.0.1:11826", "service"),
     ("comms5_external_route", "Approved Caddy route /comms5/mcp (deployment boundary)", "service"),
@@ -101,6 +101,12 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     services = ("services", "context")
 
     add_edge("operator_module", "operator_runtime", "IMPLEMENTS", "config/modules/operator.json", views=modules + context)
+    add_edge("windows_lifecycle", "runtime_supervisor", "hosts one top-level owner", "tools/powershell/runtime/Start-RiverviewRuntimeSupervisor.ps1", views=services, checkpoint="RIV-RUN-0001")
+    add_edge("runtime_supervisor", "operator_service", "owns start/health/restart", "runtime/supervisor.py:RuntimeSupervisor", views=services, checkpoint="RIV-RUN-0001")
+    add_edge("runtime_supervisor", "cme_supervisor", "manages subordinate component supervisor", "runtime/supervisor.py:RuntimeSupervisor", views=services, checkpoint="RIV-RUN-0001")
+    add_edge("runtime_supervisor", "comms5_http_service", "owns start/health/restart", "runtime/supervisor.py:RuntimeSupervisor", views=services, checkpoint="RIV-RUN-0001")
+    add_edge("runtime_supervisor", "comms5_external_route", "owns approved transport process", "runtime/supervisor.py:RuntimeSupervisor", views=services, checkpoint="RIV-RUN-0001")
+    add_edge("runtime_supervisor", "relay", "owns bounded worker lifecycle", "runtime/supervisor.py:RuntimeSupervisor", views=services, checkpoint="RIV-RUN-0001")
     add_edge("operator_runtime", "operator_contract", "exposes", "openwebui.py:UI_HTML", views=modules + context)
     add_edge("operator_runtime", "operator_projection", "persists UI conversation and room history", "operator/projection.py:OperatorProjection", views=context + resident + room, checkpoint="RIV-UI-0021")
     add_edge("operator_runtime", "operator_projection", "archives and restores conversation UI history without changing continuity", "operator/openwebui.py:do_PATCH", views=context + resident + room, checkpoint="RIV-UI-0024")
