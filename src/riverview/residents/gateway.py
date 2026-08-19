@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from riverview.characters import CharacterStore, ContinuityStore
+from riverview.intake.policy import ENGINEERING_ACTION, ENGINEERING_CAPABILITY, ENGINEERING_POLICIES
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 
 
@@ -58,10 +59,10 @@ _FORMATION_CONTRACT_FORMAT = {
         "allowed_paths": {"type": "array", "items": {"type": "string"}},
         "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
         "evidence_requirements": {"type": "array", "items": {"type": "string"}},
-        "capability_name": {"const": "codex.engineering.v1"},
-        "action_type": {"const": "codex.engineering.v1"},
+        "capability_name": {"const": ENGINEERING_CAPABILITY},
+        "action_type": {"const": ENGINEERING_ACTION},
         "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
-        "write_policy": {"const": "read_only"},
+        "write_policy": {"enum": sorted(ENGINEERING_POLICIES)},
     },
     "required": [
         "repository_identity", "repository_root", "expected_base_sha", "bounded_instruction",

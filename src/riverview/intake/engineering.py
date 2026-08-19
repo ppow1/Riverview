@@ -10,6 +10,12 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from riverview.database import connect
+from riverview.intake.policy import (
+    ENGINEERING_ACTION,
+    ENGINEERING_CAPABILITY,
+    READ_ONLY_POLICY,
+    validate_engineering_policy,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +81,7 @@ class EngineeringIntent:
     causation_id: UUID | None
     idempotency_key: str
     approved_by: str = "steward"
-    write_policy: str = "read_only"
+    write_policy: str = READ_ONLY_POLICY
     intent_id: UUID | None = None
 
     def validate(self) -> None:
@@ -91,12 +97,13 @@ class EngineeringIntent:
             raise ValueError("RIV-INT-0004: allowed paths must be non-empty relative paths.")
         if not self.acceptance_criteria or not self.evidence_requirements:
             raise ValueError("RIV-INT-0004: acceptance and evidence requirements are required.")
-        if self.capability_name != "codex.engineering.v1" or self.action_type != "codex.engineering.v1":
+        if self.capability_name != ENGINEERING_CAPABILITY or self.action_type != ENGINEERING_ACTION:
             raise ValueError("RIV-CAP-0004: only the registered Codex engineering capability is accepted.")
         if not 1 <= self.timeout_seconds <= 86_400 or self.classification not in {"river", "internal"}:
             raise ValueError("RIV-INT-0004: timeout or classification is invalid.")
-        if self.approved_by != "steward" or self.write_policy != "read_only":
-            raise ValueError("RIV-GRC-0004: only Steward-approved read-only formation is accepted.")
+        if self.approved_by != "steward":
+            raise ValueError("RIV-GRC-0004: only Steward-approved formation is accepted.")
+        validate_engineering_policy(self.write_policy)
         if not self.idempotency_key.strip():
             raise ValueError("RIV-INT-0004: idempotency key is required.")
 
@@ -208,7 +215,7 @@ class EngineeringIntentStore:
 
     def load(self, intent_id: UUID) -> dict[str, Any] | None:
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT intent_id,seed_id,objective_id,stage_id,repository_identity,repository_root,expected_base_sha,bounded_instruction,allowed_paths,acceptance_criteria,evidence_requirements,capability_name,action_type,timeout_seconds,classification,correlation_id,causation_id,idempotency_key,approved_by,write_policy,status FROM engineering_intents WHERE intent_id=%s", (intent_id,))
+            cursor.execute("SELECT intent_id,authority_id,seed_id,objective_id,stage_id,repository_identity,repository_root,expected_base_sha,bounded_instruction,allowed_paths,acceptance_criteria,evidence_requirements,capability_name,action_type,timeout_seconds,classification,correlation_id,causation_id,idempotency_key,approved_by,write_policy,status FROM engineering_intents WHERE intent_id=%s", (intent_id,))
             row = cursor.fetchone()
             if row is None:
                 return None

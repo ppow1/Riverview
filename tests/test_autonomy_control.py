@@ -5,7 +5,12 @@ from uuid import uuid4
 
 import pytest
 
-from riverview.autonomy.control import ContinuousMomentumEngine, ExecutionEnvelope, RetryPolicy
+from riverview.autonomy.control import (
+    CodexCliAdapter,
+    ContinuousMomentumEngine,
+    ExecutionEnvelope,
+    RetryPolicy,
+)
 
 
 def envelope(**overrides: object) -> ExecutionEnvelope:
@@ -35,6 +40,30 @@ def test_envelope_rejects_absolute_allowed_path() -> None:
 def test_envelope_rejects_bad_base_sha() -> None:
     with pytest.raises(ValueError, match="base SHA"):
         envelope(expected_base_sha="not-a-sha")
+
+
+def test_envelope_allows_only_the_two_governed_policies() -> None:
+    assert envelope(write_policy="bounded_write").write_policy == "bounded_write"
+    with pytest.raises(ValueError, match="unsupported"):
+        envelope(write_policy="unrestricted").__post_init__()
+
+
+def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    repository = tmp_path
+    (repository / ".git").mkdir()
+    commands: list[list[str]] = []
+
+    class Completed:
+        returncode = 0
+
+        def communicate(self, timeout: int) -> tuple[str, str]:
+            return "provider evidence", ""
+
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.check_output", lambda *args, **kwargs: "a" * 40)
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.Popen", lambda command, **kwargs: commands.append(command) or Completed())
+    result = CodexCliAdapter(executable="codex-test").run(envelope(repository_root=repository, write_policy="bounded_write"))
+    assert result.result_category == "succeeded"
+    assert commands[0][commands[0].index("--sandbox") + 1] == "workspace-write"
 
 
 def test_retry_policy_is_one_bounded_retry() -> None:

@@ -29,7 +29,7 @@ def test_typed_contract_is_bounded_and_rejects_unregistered_action() -> None:
     contract = StewardAuthorityStore.validate_formation_contract(_contract())
     assert contract["action_type"] == "codex.engineering.v1"
     invalid = {**contract, "action_type": "shell.execute"}
-    with pytest.raises(StewardAuthorityError, match="registered read-only Codex"):
+    with pytest.raises(StewardAuthorityError, match="registered bounded Codex"):
         StewardAuthorityStore.validate_formation_contract(invalid)
 
 
@@ -45,7 +45,7 @@ def test_contract_shape_is_not_authority() -> None:
 
 
 def test_comms5_rejects_malformed_formation_contract_before_storage() -> None:
-    with pytest.raises(Comms5Error, match="registered read-only Codex"):
+    with pytest.raises(Comms5Error, match="registered bounded Codex"):
         Comms5Service().store_specification({
             "content": "bounded",
             "summary": "invalid formation",
@@ -56,3 +56,10 @@ def test_comms5_rejects_malformed_formation_contract_before_storage() -> None:
             "authenticated_principal": "authorized-ai-session",
             "formation_contract": {**_contract(), "action_type": "shell.execute"},
         })
+
+
+def test_bounded_write_contract_is_typed_and_not_a_wildcard() -> None:
+    contract = {**_contract(), "write_policy": "bounded_write"}
+    assert StewardAuthorityStore.validate_formation_contract(contract)["write_policy"] == "bounded_write"
+    with pytest.raises(StewardAuthorityError, match="incomplete"):
+        StewardAuthorityStore.validate_formation_contract({**contract, "arbitrary": "write"})

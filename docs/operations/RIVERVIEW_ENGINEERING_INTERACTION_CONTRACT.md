@@ -184,7 +184,7 @@ Data and execution mechanisms must remain separate.
 - Timeouts must terminate or bound the underlying process, not merely abandon the caller.
 - Retries require idempotency or an explicit safe-retry contract.
 - A missing adapter, hash mismatch, invalid parameter, lost lease, timeout, or ambiguous result must stop and escalate.
-- Codex CLI work must be repository-aware, waypoint-bounded, and acceptance-driven. Do not issue a single unbounded instruction to “finish Riverview.”
+- Codex CLI work must be repository-aware, waypoint-bounded, and acceptance-driven. Do not issue a single unbounded instruction to “finish Riverview.” The typed engineering contract distinguishes `read_only` inspection from Steward-authorized `bounded_write`; the latter remains limited by the exact approved specification, base SHA, allowed paths, bounded instruction, acceptance criteria, evidence requirements, and timeout.
 
 ## 14. Codex CLI progression
 

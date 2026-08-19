@@ -9,6 +9,11 @@ from uuid import UUID, uuid4
 
 from riverview.database import connect
 from riverview.intake.engineering import EngineeringIntent
+from riverview.intake.policy import (
+    ENGINEERING_ACTION,
+    ENGINEERING_CAPABILITY,
+    ENGINEERING_POLICIES,
+)
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
@@ -28,8 +33,8 @@ class StewardAuthorityStore:
         required = {"repository_identity", "repository_root", "expected_base_sha", "bounded_instruction", "allowed_paths", "acceptance_criteria", "evidence_requirements", "capability_name", "action_type", "timeout_seconds", "write_policy"}
         if set(value) != required:
             raise StewardAuthorityError("RIV-INT-0004: formation_contract fields are incomplete or unrecognized.")
-        if value["write_policy"] != "read_only" or value["capability_name"] != "codex.engineering.v1" or value["action_type"] != "codex.engineering.v1":
-            raise StewardAuthorityError("RIV-CAP-0004: only the registered read-only Codex action is accepted.")
+        if value["write_policy"] not in ENGINEERING_POLICIES or value["capability_name"] != ENGINEERING_CAPABILITY or value["action_type"] != ENGINEERING_ACTION:
+            raise StewardAuthorityError("RIV-CAP-0004: only the registered bounded Codex engineering action is accepted.")
         for key in ("allowed_paths", "acceptance_criteria", "evidence_requirements"):
             if not isinstance(value[key], list) or not value[key] or any(not isinstance(item, str) for item in value[key]):
                 raise StewardAuthorityError("RIV-INT-0004: formation contract lists are bounded string lists.")

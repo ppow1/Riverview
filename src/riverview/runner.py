@@ -63,6 +63,8 @@ class RestrictedRunner:
         record = EngineeringIntentStore().load(intent_id)
         if record is None:
             raise RuntimeError("RIV-EXE-0002: engineering intent is missing.")
+        if not record["authority_id"] or record["approved_by"] != "steward":
+            raise PermissionError("RIV-GRC-0004: execution requires a durable Steward authority grant.")
         envelope = ExecutionEnvelope(
             execution_id=uuid4(), work_order_id=work.work_order_id, objective_id=record["objective_id"],
             stage_id=record["stage_id"], correlation_id=record["correlation_id"], causation_id=record["causation_id"],
@@ -79,7 +81,7 @@ class RestrictedRunner:
         result = CodexCliAdapter().run(envelope)
         ResultReconciler().persist(result)
         reconciled = ResultReconciler().reconcile_repository(execution, envelope.repository_root, envelope.allowed_paths, baseline)
-        ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Read-only Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
+        ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
         observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=envelope.repository_root, text=True).strip()
         report = {
             "status": result.result_category,

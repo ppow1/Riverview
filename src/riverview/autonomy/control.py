@@ -23,6 +23,12 @@ from uuid import UUID, uuid4
 
 from riverview.database import connect
 from riverview.grace.objectives import ObjectiveStore
+from riverview.intake.policy import (
+    ENGINEERING_ACTION,
+    ENGINEERING_CAPABILITY,
+    READ_ONLY_POLICY,
+    validate_engineering_policy,
+)
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
@@ -45,12 +51,13 @@ class ExecutionEnvelope:
     evidence_requirements: tuple[str, ...]
     timeout_seconds: int
     retry_key: str
+    action_type: str = ENGINEERING_ACTION
     classification: str = "river"
     causation_id: UUID | None = None
     objective_id: UUID | None = None
     stage_id: UUID | None = None
     work_order_id: UUID | None = None
-    write_policy: str = "read_only"
+    write_policy: str = READ_ONLY_POLICY
 
     def __post_init__(self) -> None:
         if not self.capability_name or not self.repository_identity:
@@ -67,8 +74,9 @@ class ExecutionEnvelope:
             raise ValueError("RIV-EXE-0001: timeout is outside its safe limit.")
         if self.classification not in {"river", "internal"}:
             raise ValueError("RIV-EXE-0001: unsupported classification.")
-        if self.write_policy != "read_only":
-            raise ValueError("RIV-EXE-0001: only the bounded read-only policy is enabled.")
+        if self.capability_name != ENGINEERING_CAPABILITY or self.action_type != ENGINEERING_ACTION:
+            raise ValueError("RIV-CAP-0004: the execution envelope is not the registered engineering action.")
+        validate_engineering_policy(self.write_policy)
 
 
 @dataclass(frozen=True, slots=True)
@@ -428,11 +436,11 @@ class ExecutionStore:
     def persist(self, envelope: ExecutionEnvelope) -> UUID:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
-                """INSERT INTO execution_envelopes(execution_id,work_order_id,objective_id,stage_id,correlation_id,causation_id,capability_name,repository_identity,repository_root,expected_base_sha,bounded_instruction,allowed_paths,acceptance_criteria,evidence_requirements,timeout_seconds,retry_key,classification,status)
-                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s,%s,%s,'queued')
+                """INSERT INTO execution_envelopes(execution_id,work_order_id,objective_id,stage_id,correlation_id,causation_id,capability_name,action_type,repository_identity,repository_root,expected_base_sha,bounded_instruction,allowed_paths,acceptance_criteria,evidence_requirements,timeout_seconds,retry_key,classification,write_policy,status)
+                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s,%s,%s,%s,'queued')
                    ON CONFLICT(retry_key) DO NOTHING
                    RETURNING execution_id""",
-                (envelope.execution_id, envelope.work_order_id, envelope.objective_id, envelope.stage_id, envelope.correlation_id, envelope.causation_id, envelope.capability_name, envelope.repository_identity, str(envelope.repository_root), envelope.expected_base_sha, envelope.bounded_instruction, _json(envelope.allowed_paths), _json(envelope.acceptance_criteria), _json(envelope.evidence_requirements), envelope.timeout_seconds, envelope.retry_key, envelope.classification),
+                (envelope.execution_id, envelope.work_order_id, envelope.objective_id, envelope.stage_id, envelope.correlation_id, envelope.causation_id, envelope.capability_name, envelope.action_type, envelope.repository_identity, str(envelope.repository_root), envelope.expected_base_sha, envelope.bounded_instruction, _json(envelope.allowed_paths), _json(envelope.acceptance_criteria), _json(envelope.evidence_requirements), envelope.timeout_seconds, envelope.retry_key, envelope.classification, envelope.write_policy),
             )
             row = cursor.fetchone()
             if row:
@@ -484,8 +492,9 @@ class CodexCliAdapter:
                 f"RIV-EXE-0008: repository HEAD {observed_head} does not match the approved base revision."
             )
         output_path = Path(tempfile.gettempdir()) / f"riverview-codex-result-{uuid4()}.txt"
+        sandbox = "workspace-write" if envelope.write_policy == "bounded_write" else "read-only"
         command = [
-            executable, "exec", "--json", "--ephemeral", "--sandbox", "read-only",
+            executable, "exec", "--json", "--ephemeral", "--sandbox", sandbox,
             "--output-last-message", str(output_path), "-C", str(repository), envelope.bounded_instruction,
         ]
         started = datetime.now(UTC)
@@ -495,7 +504,7 @@ class CodexCliAdapter:
             category = "succeeded" if process.returncode == 0 else "failed"
             exit_state = f"exit:{process.returncode}"
             provider_output = output_path.read_text(encoding="utf-8") if output_path.exists() else stdout
-            summary = self._bounded_success_summary(repository, provider_output, observed_head) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
+            summary = self._bounded_success_summary(repository, provider_output, observed_head, envelope.write_policy) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
             checkpoint = () if process.returncode == 0 else ("RIV-EXE-0004",)
         except subprocess.TimeoutExpired:
             process.kill()
@@ -509,7 +518,7 @@ class CodexCliAdapter:
         return result
 
     @staticmethod
-    def _bounded_success_summary(repository: Path, provider_output: str, observed_head: str) -> str:
+    def _bounded_success_summary(repository: Path, provider_output: str, observed_head: str, write_policy: str) -> str:
         """Keep provider output plus independently bounded repository evidence."""
         evidence = {
             "provider_output": provider_output[-2600:] if provider_output else "",
@@ -517,7 +526,7 @@ class CodexCliAdapter:
             "observed_git_head": observed_head,
             "ai_hints_readable": (repository / "AI_HINTS.md").is_file(),
             "charter_readable": (repository / "docs" / "governance" / "RIVERVIEW_CHARTER.md").is_file(),
-            "write_policy": "read_only",
+            "write_policy": write_policy,
         }
         return json.dumps(evidence, ensure_ascii=False, separators=(",", ":"))[-3800:]
 

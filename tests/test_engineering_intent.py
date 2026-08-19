@@ -48,11 +48,12 @@ def test_typed_intent_rejects_unregistered_action() -> None:
         intent(action_type="shell.exec").validate()
 
 
-def test_typed_intent_requires_steward_read_only_boundary() -> None:
+def test_typed_intent_requires_steward_and_known_policy() -> None:
     with pytest.raises(ValueError, match="Steward-approved"):
         intent(approved_by="chatgpt").validate()
-    with pytest.raises(ValueError, match="read-only"):
+    with pytest.raises(ValueError, match="unsupported"):
         intent(write_policy="workspace_write").validate()
+    intent(write_policy="bounded_write").validate()
 
 
 def test_typed_intent_requires_bounded_idempotency() -> None:

@@ -72,8 +72,10 @@ classification, correlation, causation, and idempotency. Grace consumes that
 artifact through `EngineeringIntentStore.bind_from_authority`; a transient
 boolean or client identity is never authority. The binder validates the current
 specification version/hash and typed `formation_contract`, bounded repository
-identity and read-only policy, the registered `codex.engineering.v1` action,
-capability health, classification, correlation/causation, and idempotency. The resulting stage action is only
+identity and the `read_only` or `bounded_write` policy, the registered
+`codex.engineering.v1` action, capability health, classification,
+correlation/causation, and idempotency. `read_only` is inspection-only;
+`bounded_write` remains limited to the approved typed contract. The resulting stage action is only
 `{action_type, parameters.engineering_intent_id}`; it never contains shell text.
 `CME` replays persisted declared actions after startup/cursor recovery, and Relay
 owns idempotent work-order formation. A River cursor is not proof that evaluation

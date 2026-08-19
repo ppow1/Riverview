@@ -91,7 +91,8 @@ def test_public_discovery_describes_typed_formation_and_durable_authority() -> N
     store = service.describe_operation("store_specification")
     promote = service.describe_operation("confirm_and_promote_seed")
     assert store["optional"] == ["formation_contract"]
-    assert "typed read-only formation_contract" in store["description"]
+    assert "typed formation_contract" in store["description"]
+    assert "bounded_write" in store["description"]
     assert "durable bounded Steward authority" in promote["description"]
     assert "creates no execution authority" not in promote["description"]
     discovery = service.help()
