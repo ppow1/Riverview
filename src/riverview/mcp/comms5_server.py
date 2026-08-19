@@ -7,7 +7,7 @@ stdio by default; deployment/connector registration remains an explicit step.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
@@ -190,31 +190,34 @@ def comms5_recent_steward_submissions(limit: int = 20) -> Any:
 
 @mcp.tool(title="Confirm Steward-approved draft", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_confirm_and_promote_seed(
-    seed_id: str,
-    idempotency_key: str,
-    explicit_steward_confirmation: bool,
-    authenticated_principal: str,
-    client_id: str,
-    client_type: str,
-    client_name: str,
+    seed_id: Annotated[str, Field(description="Exact eligible specification-backed draft ID to approve.")],
+    idempotency_key: Annotated[str, Field(description="Stable retry key for this one approval transition.")],
+    explicit_steward_confirmation: Annotated[bool, Field(description="Pat's explicit approval of this exact draft; must be true.")],
+    client_id: Annotated[str, Field(description="Calling client provenance; not an authority claim.")],
+    client_type: Annotated[str, Field(description="Calling client provenance; not an authority claim.")],
+    client_name: Annotated[str, Field(description="Calling client provenance; not an authority claim.")],
     ctx: Context,
     client_version: str = "",
     protocol_version: str = CONTRACT_VERSION,
     correlation_id: str = "",
     classification: str = "river",
 ) -> Any:
-    """Record explicit Steward confirmation for one existing draft.
+    """Record Pat's approval and atomically materialize one exact draft objective.
 
-    This bounded transition creates only the canonical objective record. It
-    does not execute work, cancel work, supersede an active objective, or grant
-    client authority. The server requires authenticated Steward authority and
-    explicit confirmation.
+    This governed write verifies transport-attested Steward authority, explicit
+    confirmation, the eligible specification ID/version/hash, and idempotency,
+    then records bounded authority and creates the canonical objective record.
+    It does not execute Codex or other work, run shell commands, cancel or
+    supersede work, grant arbitrary authority, or bypass Grace, Relay,
+    capability, or reconciliation gates. Client identity is provenance only.
     """
     return _invoke(service.confirm_and_promote_seed, {
         "seed_id": seed_id,
         "idempotency_key": idempotency_key,
         "explicit_steward_confirmation": explicit_steward_confirmation,
-        "authenticated_principal": authenticated_principal,
+        # ClientContext retains a provenance field for protocol compatibility;
+        # it is deliberately not exposed as a promotion authority input.
+        "authenticated_principal": "untrusted-client-provenance",
         "client_id": client_id,
         "client_type": client_type,
         "client_name": client_name,

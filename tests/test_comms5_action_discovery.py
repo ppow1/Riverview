@@ -55,14 +55,14 @@ def test_mutating_comms5_tools_publish_flat_authoritative_schemas() -> None:
     expected = {
         "comms5_submit_steward_seed": {"seed_text", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal", "correlation_id", "client_version", "protocol_version", "classification", "causation_id", "specification_id"},
             "comms5_store_specification": {"content", "summary", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal", "correlation_id", "client_version", "protocol_version", "classification", "formation_contract"},
-        "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "authenticated_principal", "client_id", "client_type", "client_name", "client_version", "protocol_version", "correlation_id", "classification"},
+        "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "client_version", "protocol_version", "correlation_id", "classification"},
         "comms5_cancel_draft": {"seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal", "client_version", "protocol_version", "correlation_id", "classification"},
         "comms5_supersede_seed": {"seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal", "client_version", "protocol_version", "correlation_id", "classification"},
     }
     required = {
         "comms5_submit_steward_seed": {"seed_text", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal"},
         "comms5_store_specification": {"content", "summary", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal"},
-        "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "authenticated_principal", "client_id", "client_type", "client_name"},
+        "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name"},
         "comms5_cancel_draft": {"seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal"},
         "comms5_supersede_seed": {"seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal"},
     }
@@ -94,6 +94,17 @@ def test_public_discovery_describes_typed_formation_and_durable_authority() -> N
     assert "typed formation_contract" in store["description"]
     assert "bounded_write" in store["description"]
     assert "durable bounded Steward authority" in promote["description"]
-    assert "creates no execution authority" not in promote["description"]
+    assert "exact specification version/hash" in promote["description"]
+    assert "canonical objective" in promote["description"]
+    assert "does not execute work" in promote["description"]
     discovery = service.help()
     assert "formation_contract" in discovery["examples"]["store_specification"]
+
+
+def test_promotion_schema_excludes_non_authoritative_body_principal() -> None:
+    tool = next(tool for tool in mcp._tool_manager.list_tools() if tool.name == "comms5_confirm_and_promote_seed")
+    properties = tool.parameters["properties"]
+    assert "authenticated_principal" not in properties
+    assert "authenticated_principal" not in tool.parameters["required"]
+    assert "not an authority claim" in properties["client_id"]["description"]
+    assert "must be true" in properties["explicit_steward_confirmation"]["description"]
