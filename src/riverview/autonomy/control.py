@@ -27,6 +27,7 @@ from riverview.intake.policy import (
     ENGINEERING_ACTION,
     ENGINEERING_CAPABILITY,
     READ_ONLY_POLICY,
+    validate_allowed_paths,
     validate_engineering_policy,
 )
 from riverview.river.events import Classification, RiverEvent
@@ -68,8 +69,7 @@ class ExecutionEnvelope:
             raise ValueError("RIV-EXE-0001: expected base SHA is invalid.")
         if not 1 <= len(self.bounded_instruction) <= 16_000:
             raise ValueError("RIV-EXE-0001: bounded instruction is outside its safe limit.")
-        if not self.allowed_paths or any(not path or Path(path).is_absolute() for path in self.allowed_paths):
-            raise ValueError("RIV-EXE-0001: allowed paths must be non-empty relative paths.")
+        validate_allowed_paths(self.allowed_paths)
         if not 1 <= self.timeout_seconds <= 86_400:
             raise ValueError("RIV-EXE-0001: timeout is outside its safe limit.")
         if self.classification not in {"river", "internal"}:
@@ -491,19 +491,33 @@ class CodexCliAdapter:
             raise RuntimeError(
                 f"RIV-EXE-0008: repository HEAD {observed_head} does not match the approved base revision."
             )
+        execution_root = repository
+        worktree: Path | None = None
+        if envelope.write_policy == "bounded_write":
+            worktree = Path(tempfile.mkdtemp(prefix="riverview-codex-worktree-"))
+            worktree.rmdir()
+            subprocess.run(["git", "worktree", "add", "--detach", "--quiet", str(worktree), observed_head], cwd=repository, check=True, capture_output=True, text=True)
+            execution_root = worktree
         output_path = Path(tempfile.gettempdir()) / f"riverview-codex-result-{uuid4()}.txt"
         sandbox = "workspace-write" if envelope.write_policy == "bounded_write" else "read-only"
         command = [
             executable, "exec", "--json", "--ephemeral", "--sandbox", sandbox,
-            "--output-last-message", str(output_path), "-C", str(repository), envelope.bounded_instruction,
+            "--output-last-message", str(output_path), "-C", str(execution_root), envelope.bounded_instruction,
         ]
         started = datetime.now(UTC)
         try:
-            process = subprocess.Popen(command, cwd=repository, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+            process = subprocess.Popen(command, cwd=execution_root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
             stdout, stderr = process.communicate(timeout=envelope.timeout_seconds)
             category = "succeeded" if process.returncode == 0 else "failed"
             exit_state = f"exit:{process.returncode}"
             provider_output = output_path.read_text(encoding="utf-8") if output_path.exists() else stdout
+            if process.returncode == 0 and worktree is not None:
+                changed = self._worktree_paths(worktree)
+                allowed = tuple(Path(path).as_posix().rstrip("/") for path in envelope.allowed_paths)
+                outside = tuple(path for path in changed if not any(path == item or path.startswith(f"{item}/") for item in allowed))
+                if outside:
+                    raise RuntimeError(f"RIV-EXE-0007: changed path escaped envelope: {outside!r}")
+                self._copy_allowed_changes(worktree, repository, changed)
             summary = self._bounded_success_summary(repository, provider_output, observed_head, envelope.write_policy) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
             checkpoint = () if process.returncode == 0 else ("RIV-EXE-0004",)
         except subprocess.TimeoutExpired:
@@ -512,10 +526,30 @@ class CodexCliAdapter:
             category, exit_state, summary, checkpoint = "timed_out", "timeout", "Codex CLI exceeded the bounded execution deadline.", ("RIV-EXE-0003",)
         finally:
             output_path.unlink(missing_ok=True)
+            if worktree is not None:
+                subprocess.run(["git", "worktree", "remove", "--force", str(worktree)], cwd=repository, check=False, capture_output=True, text=True)
         finished = datetime.now(UTC)
         del stderr
         result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, (), (summary,), None, None, checkpoint, (), summary, started, finished)
         return result
+
+    @staticmethod
+    def _worktree_paths(worktree: Path) -> tuple[str, ...]:
+        output = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=all"], cwd=worktree, text=True)
+        return tuple(line[3:].strip() for line in output.splitlines() if len(line) >= 4)
+
+    @staticmethod
+    def _copy_allowed_changes(worktree: Path, repository: Path, changed: tuple[str, ...]) -> None:
+        for relative in changed:
+            source = (worktree / relative).resolve()
+            target = (repository / relative).resolve()
+            if repository not in source.parents or repository not in target.parents:
+                raise RuntimeError("RIV-EXE-0007: resolved change escaped repository root.")
+            if source.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            elif target.exists():
+                target.unlink()
 
     @staticmethod
     def _bounded_success_summary(repository: Path, provider_output: str, observed_head: str, write_policy: str) -> str:

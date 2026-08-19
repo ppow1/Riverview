@@ -13,6 +13,7 @@ from riverview.intake.policy import (
     ENGINEERING_ACTION,
     ENGINEERING_CAPABILITY,
     ENGINEERING_POLICIES,
+    validate_allowed_paths,
 )
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
@@ -38,6 +39,10 @@ class StewardAuthorityStore:
         for key in ("allowed_paths", "acceptance_criteria", "evidence_requirements"):
             if not isinstance(value[key], list) or not value[key] or any(not isinstance(item, str) for item in value[key]):
                 raise StewardAuthorityError("RIV-INT-0004: formation contract lists are bounded string lists.")
+        try:
+            validate_allowed_paths(value["allowed_paths"])
+        except ValueError as exc:
+            raise StewardAuthorityError(str(exc)) from exc
         if not isinstance(value["timeout_seconds"], int) or not 1 <= value["timeout_seconds"] <= 86_400:
             raise StewardAuthorityError("RIV-INT-0004: formation timeout is outside its safe limit.")
         encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode()

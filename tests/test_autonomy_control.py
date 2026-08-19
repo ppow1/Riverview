@@ -59,7 +59,11 @@ def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch:
         def communicate(self, timeout: int) -> tuple[str, str]:
             return "provider evidence", ""
 
-    monkeypatch.setattr("riverview.autonomy.control.subprocess.check_output", lambda *args, **kwargs: "a" * 40)
+    def git_output(command: list[str], **kwargs: object) -> str:
+        return "a" * 40 if command[1] == "rev-parse" else ""
+
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.check_output", git_output)
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.run", lambda *args, **kwargs: None)
     monkeypatch.setattr("riverview.autonomy.control.subprocess.Popen", lambda command, **kwargs: commands.append(command) or Completed())
     result = CodexCliAdapter(executable="codex-test").run(envelope(repository_root=repository, write_policy="bounded_write"))
     assert result.result_category == "succeeded"

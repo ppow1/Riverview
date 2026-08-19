@@ -14,6 +14,7 @@ from riverview.intake.policy import (
     ENGINEERING_ACTION,
     ENGINEERING_CAPABILITY,
     READ_ONLY_POLICY,
+    validate_allowed_paths,
     validate_engineering_policy,
 )
 
@@ -93,8 +94,7 @@ class EngineeringIntent:
             raise ValueError("RIV-INT-0004: expected base SHA is invalid.")
         if not 1 <= len(self.bounded_instruction) <= 16_000:
             raise ValueError("RIV-INT-0004: bounded instruction is outside its safe limit.")
-        if not self.allowed_paths or any(not path or Path(path).is_absolute() for path in self.allowed_paths):
-            raise ValueError("RIV-INT-0004: allowed paths must be non-empty relative paths.")
+        validate_allowed_paths(self.allowed_paths)
         if not self.acceptance_criteria or not self.evidence_requirements:
             raise ValueError("RIV-INT-0004: acceptance and evidence requirements are required.")
         if self.capability_name != ENGINEERING_CAPABILITY or self.action_type != ENGINEERING_ACTION:
