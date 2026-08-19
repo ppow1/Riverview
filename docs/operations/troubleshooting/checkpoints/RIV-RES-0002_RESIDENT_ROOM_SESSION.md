@@ -21,6 +21,15 @@ Operator boundary; the client cannot select it. The envelope enters the same
 specification → seed → promotion → `steward_authority_grants` path used by
 Comms5, so one approval produces one replay-safe objective/authority lineage.
 
+The normal Operator conversation presents that exact typed proposal as one
+durable pending approval. Grace owns the approval ceremony; the Steward may
+answer `Yes` or `No` in the conversation, without protocol text or JSON. The
+server binds `Yes` only to the latest unconsumed proposal for that conversation
+and materializes the typed envelope itself. A later proposal supersedes an
+earlier pending proposal; a stale approval control fails closed. `No` records a
+bounded rejection and creates no authority. An unrelated `Yes` is ordinary
+conversation and is never executable.
+
 If Activity records `execution_intent_detected=false` after Grace says it is
 proceeding, inspect the correlated `grace.conversation.completed` event and
 distinguish `execution_intent_candidate` from `governed_execution_intent`.

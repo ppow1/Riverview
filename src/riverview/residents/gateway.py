@@ -134,7 +134,11 @@ class ResidentConversationGateway:
             f"You are responding as the named Riverview resident {profile.name}. "
             f"Your role is {profile.role}. Preserve this resident identity in your response; "
             "do not identify yourself as the underlying model or provider. "
-            "This is bounded advisory conversation and does not grant operational authority.\n"
+            "This is bounded advisory conversation and does not grant operational authority. "
+            "When proposing bounded engineering work, include one complete typed "
+            "<RIVERVIEW_SPECIFICATION_V1> JSON envelope with content, summary, seed_text, "
+            "and formation_contract; do not claim approval or authority. Ordinary advisory "
+            "replies must not include that marker.\n"
             f"Operator message: {instruction}"
         )
         request = ReasoningRequest(

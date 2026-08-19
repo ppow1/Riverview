@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import subprocess
 import time
@@ -30,6 +31,7 @@ from riverview.operator.room_admin import RoomAdministration
 from riverview.operator.snapshot import build_snapshot
 from riverview.operator.ui import UI_HTML as CLEAN_UI_HTML
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
+from riverview.residents.direct_grace import DirectGraceFormation, extract_typed_proposal
 from riverview.residents.gateway import ResidentConversationGateway, RoomTurnPartialFailure
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
@@ -41,6 +43,48 @@ class RoomProjectionError(ValueError):
     def __init__(self, failure_class: str, reason: str) -> None:
         super().__init__(reason)
         self.failure_class = failure_class
+
+
+def _pending_direct_grace_proposal(projection: OperatorProjection, conversation_id: str) -> dict[str, object] | None:
+    """Return the one latest unconsumed typed proposal for a Grace conversation."""
+    try:
+        conversation = projection.refresh(UUID(conversation_id), include_archived=True)
+    except (ValueError, TypeError):
+        return None
+    if not conversation or conversation.get("resident_id") != "grace":
+        return None
+    proposals: list[dict[str, object]] = []
+    consumed: set[str] = set()
+    for message in conversation.get("messages", []):
+        details = message.get("details") or {}
+        result = details.get("direct_grace_approval_result")
+        if isinstance(result, dict) and result.get("specification_id"):
+            consumed.add(str(result["specification_id"]))
+        proposal = details.get("direct_grace_proposal")
+        if isinstance(proposal, dict) and proposal.get("specification_id"):
+            proposals.append(proposal)
+    if not proposals:
+        return None
+    latest = proposals[-1]
+    if str(latest["specification_id"]) in consumed:
+        return None
+    return latest
+
+
+def _latest_direct_grace_proposal(projection: OperatorProjection, conversation_id: str) -> dict[str, object] | None:
+    """Return the latest durable proposal, including one already decided."""
+    try:
+        conversation = projection.refresh(UUID(conversation_id), include_archived=True)
+    except (ValueError, TypeError):
+        return None
+    if not conversation or conversation.get("resident_id") != "grace":
+        return None
+    proposals = [
+        message.get("details", {}).get("direct_grace_proposal")
+        for message in conversation.get("messages", [])
+        if isinstance(message.get("details", {}).get("direct_grace_proposal"), dict)
+    ]
+    return proposals[-1] if proposals else None
 
 
 def _canonical_room_title(profiles: list[dict[str, str]], fallback: str = "") -> str:
@@ -692,9 +736,18 @@ class RiverviewOpenWebUIService:
                     emit_event("resident.message.submitted", "resident", resident_id or "operator", request.correlation_id, {"resident_id": resident_id or None, "classification": request.classification, "interface": service.config.service_identity, "artifact_count": len(request.context_refs)})
                     if resident_id:
                         direct_grace_approval = payload.get("direct_grace_approval") if resident_id == "grace" else None
+                        pending_proposal = None
+                        if resident_id == "grace" and direct_grace_approval is None and payload.get("conversation_id"):
+                            pending_proposal = _pending_direct_grace_proposal(service.projection, str(payload["conversation_id"]))
+                            if pending_proposal is not None and re.fullmatch(r"(?:yes|approve|approved)", request.instruction.strip(), re.IGNORECASE):
+                                direct_grace_approval = {**pending_proposal, "explicit_steward_confirmation": True, "authenticated_principal": "steward"}
                         if direct_grace_approval is not None:
                             if not isinstance(direct_grace_approval, dict):
                                 raise ValueError("RIV-GRC-0010: direct Grace approval must be a typed object.")
+                            if resident_id == "grace" and payload.get("conversation_id"):
+                                current_proposal = _latest_direct_grace_proposal(service.projection, str(payload["conversation_id"]))
+                                if current_proposal is None or str(current_proposal.get("specification_id")) != str(direct_grace_approval.get("specification_id")):
+                                    raise ValueError("RIV-GRC-0010: approval does not target the active exact specification.")
                             # This loopback Operator surface is authenticated by
                             # the existing Steward-owned credential/session. The
                             # client cannot select a different authority principal.
@@ -709,13 +762,27 @@ class RiverviewOpenWebUIService:
                             correlation_id=request.correlation_id,
                             direct_grace_approval=direct_grace_approval,
                         )
+                        if resident_id == "grace" and direct_grace_approval is None:
+                            typed_proposal = extract_typed_proposal(response.summary)
+                            if typed_proposal is not None:
+                                resident_metadata["direct_grace_proposal"] = DirectGraceFormation.materialize_proposal(
+                                    typed_proposal, correlation_id=request.correlation_id
+                                )
+                        response_payload = response.as_typed_payload()
+                        if resident_metadata.get("direct_grace_proposal") is not None:
+                            response_payload["direct_grace_proposal"] = resident_metadata["direct_grace_proposal"]
+                        if resident_metadata.get("formation") is not None:
+                            response_payload["direct_grace_approval_result"] = resident_metadata["formation"]
+                        if pending_proposal is not None and re.fullmatch(r"no|decline|declined", request.instruction.strip(), re.IGNORECASE) and direct_grace_approval is None:
+                            response_payload["direct_grace_approval_result"] = {"decision": "rejected", "specification_id": pending_proposal["specification_id"], "replay_safe": True}
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "resident": resident_metadata, "session_id": str(session.session_id), "response": response.as_typed_payload()}
+                        body["response"] = response_payload
                         conversation_id = str(payload.get("conversation_id") or "")
                         if conversation_id:
                             try:
                                 conversation = UUID(conversation_id)
                                 service.projection.append(conversation, role="steward", text=request.instruction, speaker_id=None, speaker="Steward", details={"request_id": str(request.request_id), "correlation_id": str(request.correlation_id)})
-                                service.projection.append(conversation, role="resident", text=response.summary, speaker_id=resident_id, speaker=resident_metadata["resident_name"], details=response.as_typed_payload())
+                                service.projection.append(conversation, role="resident", text=response.summary, speaker_id=resident_id, speaker=resident_metadata["resident_name"], details=response_payload)
                             except (KeyError, ValueError):
                                 pass
                         emit_event("resident.response.completed", "resident", resident_id, request.correlation_id, {"session_id": str(session.session_id), "resident_id": resident_id, "provider": authorized_model(payload), "classification": request.classification})

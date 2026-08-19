@@ -21,6 +21,10 @@ def test_browser_operator_surface_is_real_html_and_artifact_aware() -> None:
         assert 'type="file"' in page
         assert "crypto.subtle.digest" in page
         assert "/api/chat" in page
+        assert "directGraceProposalMarkup" in page
+        assert "data-approve-proposal" in page
+        assert "direct_grace_approval" in page
+        assert "Yes — approve this exact specification" in page
         assert "Use local Riverview credential" in page
         assert "reference-only" in page
         assert "Enter an instruction describing what you want Riverview to do with this artifact." in page

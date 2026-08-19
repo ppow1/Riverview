@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
-from riverview.residents.direct_grace import DirectGraceApproval, DirectGraceApprovalError
+from riverview.operator.openwebui import _pending_direct_grace_proposal
+from riverview.residents.direct_grace import (
+    DirectGraceApproval,
+    DirectGraceApprovalError,
+    extract_typed_proposal,
+)
 
 
 def contract() -> dict[str, object]:
@@ -55,3 +61,32 @@ def test_direct_grace_non_steward_approval_fails_closed() -> None:
     value["authenticated_principal"] = "resident-grace"
     with pytest.raises(DirectGraceApprovalError, match="authenticated Steward"):
         DirectGraceApproval.from_payload(value, correlation_id=uuid4())
+
+
+def test_direct_grace_typed_proposal_extracts_nested_contract_without_authorizing() -> None:
+    value = payload()
+    marker = "<RIVERVIEW_SPECIFICATION_V1>" + json.dumps({k: value[k] for k in ("content", "summary", "formation_contract", "seed_text")}) + "</RIVERVIEW_SPECIFICATION_V1>"
+    proposal = extract_typed_proposal("Grace proposes:\n" + marker)
+    assert proposal is not None
+    assert proposal["formation_contract"]["write_policy"] == "read_only"
+
+
+def test_direct_grace_plain_approval_has_no_typed_proposal() -> None:
+    assert extract_typed_proposal("Yes, that sounds good.") is None
+
+
+def test_plain_yes_requires_one_latest_unconsumed_pending_proposal() -> None:
+    proposal = {"specification_id": str(uuid4()), "content": "bounded", "formation_contract": contract()}
+
+    class Projection:
+        def __init__(self, messages):
+            self.messages = messages
+
+        def refresh(self, conversation_id, *, include_archived):
+            return {"resident_id": "grace", "messages": self.messages}
+
+    conversation_id = str(uuid4())
+    assert _pending_direct_grace_proposal(Projection([]), conversation_id) is None
+    assert _pending_direct_grace_proposal(Projection([{"details": {"direct_grace_proposal": proposal}}]), conversation_id) == proposal
+    consumed = {"details": {"direct_grace_approval_result": {"specification_id": proposal["specification_id"]}}}
+    assert _pending_direct_grace_proposal(Projection([{ "details": {"direct_grace_proposal": proposal}}, consumed]), conversation_id) is None
