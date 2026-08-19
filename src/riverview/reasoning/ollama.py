@@ -33,7 +33,7 @@ class OllamaReasoningAdapter:
         body_value: dict[str, object] = {"model": model, "prompt": request.instruction, "stream": False}
         if request.response_format is not None:
             body_value["format"] = request.response_format
-            body_value["options"] = {"temperature": 0.2, "num_predict": 2048}
+            body_value["options"] = {"temperature": 0, "seed": 7, "num_predict": 2048}
         body = json.dumps(body_value, separators=(",", ":")).encode()
         try:
             with urlopen(Request(self.endpoint + "/api/generate", data=body, headers={"Content-Type": "application/json"}), timeout=self.timeout_seconds) as response:

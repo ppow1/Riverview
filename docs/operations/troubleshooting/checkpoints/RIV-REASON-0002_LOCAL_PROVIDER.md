@@ -31,7 +31,7 @@ Connection, timeout, invalid JSON, empty response, marker-only output, malformed
 proposal, or non-loopback endpoint fails closed. If raw Ollama already contains the marker,
 the failure is model/template/configuration boundary (not Riverview redaction). If raw output
 is valid but typed response differs, repair the adapter. Use Ollama's bounded JSON-schema
-format with deterministic low-temperature/capped generation for direct Grace; do not infer a
+format with deterministic zero-temperature, fixed-seed, capped generation for direct Grace; do not infer a
 specification from prose, disable redaction, or switch models without comparative evidence.
 
 ## VERIFY

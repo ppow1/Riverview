@@ -70,7 +70,7 @@ def test_ollama_adapter_forwards_bounded_response_format(monkeypatch: pytest.Mon
     )
     response = OllamaReasoningAdapter().complete("qwen3-coder:30b-qwencode-20k", request)
     assert captured["body"]["format"] == {"type": "object"}
-    assert captured["body"]["options"] == {"temperature": 0.2, "num_predict": 2048}
+    assert captured["body"]["options"] == {"temperature": 0, "seed": 7, "num_predict": 2048}
     assert response.summary == "bounded"
 
 
