@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -61,6 +61,16 @@ def _invoke(function: Any, *args: Any, **kwargs: Any) -> Any:
         return _safe(function(*args, **kwargs))
     except Comms5Error as error:
         return error.as_dict()
+
+
+def _transport_principal(context: Context) -> str | None:
+    """Read only the server-injected Comms5 attestation, never body identity."""
+    request_context = getattr(context, "request_context", None)
+    request = getattr(request_context, "request", None)
+    headers = getattr(request, "headers", {}) or {}
+    marker = headers.get("x-riverview-comms5")
+    principal = headers.get("x-riverview-comms5-principal")
+    return "steward" if marker == "1" and principal == "steward" else None
 
 
 @mcp.tool()
@@ -187,6 +197,7 @@ def comms5_confirm_and_promote_seed(
     client_id: str,
     client_type: str,
     client_name: str,
+    ctx: Context,
     client_version: str = "",
     protocol_version: str = CONTRACT_VERSION,
     correlation_id: str = "",
@@ -211,7 +222,7 @@ def comms5_confirm_and_promote_seed(
         "protocol_version": protocol_version,
         "correlation_id": correlation_id,
         "classification": classification,
-    })
+    }, transport_principal=_transport_principal(ctx))
 
 
 @mcp.tool(title="Cancel draft with Steward confirmation", annotations=_GOVERNED_MUTATION_HINTS)

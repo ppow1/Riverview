@@ -18,6 +18,9 @@ riverview-comms.ionoge.com {
             reverse_proxy 127.0.0.1:11826 {
                 header_up Authorization "Bearer {env.RIVERVIEW_COMMS5_UPSTREAM_AUTH}"
                 header_up X-Riverview-Comms5 1
+                # This marker is injected only after the authenticated
+                # Steward-controlled Comms5 connector bearer is accepted.
+                header_up X-Riverview-Comms5-Principal steward
                 header_up Host 127.0.0.1:11826
                 transport http {
                     read_timeout 20s

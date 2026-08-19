@@ -150,6 +150,7 @@ Data and execution mechanisms must remain separate.
 - Do not use an OpenAI API model route.
 - Cloud Codex work should use ChatGPT-managed Codex/Codex CLI authentication or an approved Workspace Agent path.
 - The interactive Steward path may communicate with Riverview through a bounded MCP application.
+- The authenticated Steward-controlled Comms5 connector may carry one explicit approval for one exact stored specification. The server binds that approval to the specification version/hash and durable authority grant; downstream Grace, Relay, Codex, and reconciliation transitions consume the grant without repeated human confirmation. Client identity or a body-supplied principal is never authority.
 - Grace may dispatch to Codex CLI, local AI on the 4090 or P100, or other approved adapters according to capability, cost, policy, and available capacity.
 - Local AI can perform analysis as well as execution.
 - Provider capacity and fuel observations are planning evidence, not guarantees.

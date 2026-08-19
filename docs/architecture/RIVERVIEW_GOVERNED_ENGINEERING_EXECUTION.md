@@ -28,3 +28,19 @@ step and may claim a commit or remote SHA only after independent verification.
 The named adapter uses Codex CLI's `read-only` sandbox for inspection and
 `workspace-write` sandbox for `bounded_write`; it never accepts shell text from
 PostgreSQL or exposes a generic execution operation through MCP.
+
+## One-shot Steward approval
+
+For the external Comms5 path, the authenticated Steward-controlled connector
+bearer is accepted by the Caddy ingress. Caddy then overwrites the upstream
+`X-Riverview-Comms5` and `X-Riverview-Comms5-Principal: steward` attestation
+headers. The Comms5 tool ignores `authenticated_principal` in the request body
+for promotion authority and accepts `explicit_steward_confirmation` only when
+that server-injected attestation is present. A local STDIO client or arbitrary
+client string cannot self-declare Steward.
+
+One successful promotion creates one durable authority grant bound to the
+exact specification ID, version, content hash, formation contract, seed,
+objective, stage, correlation, causation, and approval operation. Grace,
+Engineering Intent, Relay, Codex, and reconciliation consume that grant; they
+do not request another human approval for the same scope.

@@ -7,7 +7,12 @@ Comms5 has two distinct transports:
   `tools/powershell/mcp/Start-RiverviewComms5Http.ps1`
 
 The approved external pattern is the existing Riverview Comms Caddy boundary.
-The Comms5 route is configured separately as:
+The Comms5 route is configured separately. The authenticated bearer is the
+Steward-controlled connector credential; after Caddy accepts it, Caddy
+overwrites the upstream `X-Riverview-Comms5` and
+`X-Riverview-Comms5-Principal: steward` attestation headers. Comms5 ignores
+client-supplied principal strings and accepts promotion authority only from
+that server-injected attestation.
 
 `https://riverview-comms.ionoge.com/comms5/mcp`
 
