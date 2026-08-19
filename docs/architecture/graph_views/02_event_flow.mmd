@@ -71,6 +71,7 @@ flowchart LR
     grace -->|redispatches ready work or escalates| relay
     grace -->|records no-ready/capacity/quiescence decision| diagnostics
     providers -->|provider completion is not global quiescence| grace
+    specification_store -->|direct Grace approval converges on exact specification/hash authority| steward_authority
     river -->|stores correlated reasoning request| mailbox
     chatgpt -->|submits correlated advisory response| mailbox
     mailbox -->|records response event/correlation| river

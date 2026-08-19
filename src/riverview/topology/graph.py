@@ -164,6 +164,8 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("operator_runtime", "resident_gateway_runtime", "authenticated resident message", "operator/openwebui.py:/api/chat", views=resident, checkpoint="RIV-RES-0001")
     add_edge("operator_runtime", "resident_gateway_runtime", "creates authenticated session", "operator/openwebui.py:/session", views=resident)
     add_edge("resident_gateway_runtime", "undercurrent", "checks classification/authority", "residents/gateway.py:chat", views=resident, checkpoint="RIV-RES-0001")
+    add_edge("resident_gateway_runtime", "specification_store", "accepts only a typed authenticated Steward approval envelope", "residents/direct_grace.py:DirectGraceFormation", views=resident + engineering, checkpoint="RIV-RES-0002")
+    add_edge("specification_store", "steward_authority", "direct Grace approval converges on exact specification/hash authority", "residents/direct_grace.py:DirectGraceFormation", views=resident + engineering, checkpoint="RIV-GRC-0004")
     add_edge("resident_gateway_runtime", "providers", "selects eligible provider", "residents/gateway.py:chat", views=resident, checkpoint="RIV-REASON-0001")
     add_edge("providers", "ollama", "dispatches local reasoning", "reasoning/ollama.py", views=resident + services, checkpoint="RIV-REASON-0002")
     add_edge("ollama", "resident_expression", "returns provider text for resident expression", "reasoning/contracts.py", views=resident)

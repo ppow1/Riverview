@@ -47,6 +47,7 @@ flowchart LR
     grace -->|redispatches ready work or escalates| relay
     grace -->|records no-ready/capacity/quiescence decision| diagnostics
     providers -->|provider completion is not global quiescence| grace
+    specification_store -->|direct Grace approval converges on exact specification/hash authority| steward_authority
     steward -->|EMITS| flow_event_steward_seed_promoted
     river -->|CONSUMED/EVALUATED| cme_runtime
     engineering_intent -->|EMITS| flow_event_engineering_intent_bound

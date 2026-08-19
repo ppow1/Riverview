@@ -121,6 +121,7 @@ class ResidentConversationGateway:
         classification: str = "operational",
         session_id: UUID | None = None,
         correlation_id: UUID | None = None,
+        direct_grace_approval: dict[str, Any] | None = None,
     ) -> tuple[ResidentSession, ReasoningResponse, dict[str, Any]]:
         profile = self.resolve(resident)
         session = self._sessions.get(session_id) if session_id else None
@@ -150,14 +151,25 @@ class ResidentConversationGateway:
         session.history.append({"role": "user", "text": instruction})
         session.history.append({"role": "resident", "text": response.summary})
         addressed_grace = profile.is_grace or bool(re.match(r"^\s*grace\s*[,;:]", instruction, re.IGNORECASE))
-        explicit_work = bool(re.search(r"\b(authori[sz]e|promote|create\s+(?:a\s+)?work|start\s+(?:this|the)\s+task)\b", instruction, re.IGNORECASE))
+        explicit_work = bool(re.search(r"\b(authori[sz]e|promote|create\s+(?:a\s+)?work|start\s+(?:this|the)\s+task|proceed\s+autonomously)\b", instruction, re.IGNORECASE))
+        governed_approval: dict[str, Any] | None = None
+        if profile.is_grace and direct_grace_approval is not None:
+            from riverview.residents.direct_grace import DirectGraceApproval, DirectGraceFormation
+
+            governed_approval = DirectGraceFormation().authorize(
+                DirectGraceApproval.from_payload(direct_grace_approval, correlation_id=correlation)
+            )
         metadata = {
             "resident_id": profile.resident_id, "resident_name": profile.name,
             "role": profile.role, "canonical_reference": profile.canonical_reference,
             "source_reference": profile.source_reference, "session_id": str(session.session_id),
             "history_turns": len(session.history), "grace_addressed": addressed_grace,
-            "execution_intent_detected": addressed_grace and explicit_work,
-            "execution_requires_seed_promotion": addressed_grace and explicit_work,
+            "execution_intent_candidate": addressed_grace and explicit_work,
+            "execution_intent_detected": addressed_grace and governed_approval is not None,
+            "governed_execution_intent": addressed_grace and governed_approval is not None,
+            "execution_requires_seed_promotion": addressed_grace and explicit_work and governed_approval is None,
+            "formation": governed_approval,
+            "objective_created": governed_approval is not None,
             "role_authority_expanded": False, "character_version": session.character_version,
             "continuity_refs": [x["continuity_id"] for x in self.continuity_store.accepted(profile.resident_id)],
         }

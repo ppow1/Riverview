@@ -168,6 +168,8 @@ digraph riverview {
   "operator_runtime" -> "resident_gateway_runtime" [label="authenticated resident message"];
   "operator_runtime" -> "resident_gateway_runtime" [label="creates authenticated session"];
   "resident_gateway_runtime" -> "undercurrent" [label="checks classification/authority"];
+  "resident_gateway_runtime" -> "specification_store" [label="accepts only a typed authenticated Steward approval envelope"];
+  "specification_store" -> "steward_authority" [label="direct Grace approval converges on exact specification/hash authority"];
   "resident_gateway_runtime" -> "providers" [label="selects eligible provider"];
   "providers" -> "ollama" [label="dispatches local reasoning"];
   "ollama" -> "resident_expression" [label="returns provider text for resident expression"];

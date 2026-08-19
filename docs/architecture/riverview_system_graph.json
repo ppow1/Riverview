@@ -817,6 +817,32 @@
       ]
     },
     {
+      "checkpoint": "RIV-RES-0002",
+      "derivation": "DERIVED",
+      "relation": "accepts only a typed authenticated Steward approval envelope",
+      "source": "resident_gateway_runtime",
+      "source_ref": "residents/direct_grace.py:DirectGraceFormation",
+      "target": "specification_store",
+      "views": [
+        "resident",
+        "events",
+        "engineering"
+      ]
+    },
+    {
+      "checkpoint": "RIV-GRC-0004",
+      "derivation": "DERIVED",
+      "relation": "direct Grace approval converges on exact specification/hash authority",
+      "source": "specification_store",
+      "source_ref": "residents/direct_grace.py:DirectGraceFormation",
+      "target": "steward_authority",
+      "views": [
+        "resident",
+        "events",
+        "engineering"
+      ]
+    },
+    {
       "checkpoint": "RIV-REASON-0001",
       "derivation": "DERIVED",
       "relation": "selects eligible provider",

@@ -32,12 +32,13 @@ def test_named_sessions_preserve_identity_and_switch_without_bleed() -> None:
     assert alfred_meta["canonical_reference"] != helen_meta["canonical_reference"]
 
 
-def test_grace_is_addressable_but_work_requires_explicit_seed_promotion() -> None:
+def test_grace_is_addressable_but_prose_work_request_is_not_authorized() -> None:
     _, _, metadata = gateway().chat("Grace", "Grace, please explain the current objective.", provider=provider, interface_id="browser")
     assert metadata["grace_addressed"]
     assert not metadata["execution_intent_detected"]
     _, _, authorized = gateway().chat("Grace", "Grace, authorize and create work for this objective.", provider=provider, interface_id="browser")
-    assert authorized["execution_intent_detected"]
+    assert authorized["execution_intent_candidate"]
+    assert not authorized["execution_intent_detected"]
     assert authorized["execution_requires_seed_promotion"]
     assert not authorized["role_authority_expanded"]
 

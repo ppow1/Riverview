@@ -691,6 +691,14 @@ class RiverviewOpenWebUIService:
                     resident_id = str(payload.get("resident_id") or "").strip()
                     emit_event("resident.message.submitted", "resident", resident_id or "operator", request.correlation_id, {"resident_id": resident_id or None, "classification": request.classification, "interface": service.config.service_identity, "artifact_count": len(request.context_refs)})
                     if resident_id:
+                        direct_grace_approval = payload.get("direct_grace_approval") if resident_id == "grace" else None
+                        if direct_grace_approval is not None:
+                            if not isinstance(direct_grace_approval, dict):
+                                raise ValueError("RIV-GRC-0010: direct Grace approval must be a typed object.")
+                            # This loopback Operator surface is authenticated by
+                            # the existing Steward-owned credential/session. The
+                            # client cannot select a different authority principal.
+                            direct_grace_approval = {**direct_grace_approval, "authenticated_principal": "steward"}
                         session, response, resident_metadata = service.resident_gateway.chat(
                             resident_id,
                             request.instruction,
@@ -699,6 +707,7 @@ class RiverviewOpenWebUIService:
                             classification=request.classification,
                             session_id=UUID(str(payload["session_id"])) if payload.get("session_id") else None,
                             correlation_id=request.correlation_id,
+                            direct_grace_approval=direct_grace_approval,
                         )
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "resident": resident_metadata, "session_id": str(session.session_id), "response": response.as_typed_payload()}
                         conversation_id = str(payload.get("conversation_id") or "")
@@ -711,7 +720,7 @@ class RiverviewOpenWebUIService:
                                 pass
                         emit_event("resident.response.completed", "resident", resident_id, request.correlation_id, {"session_id": str(session.session_id), "resident_id": resident_id, "provider": authorized_model(payload), "classification": request.classification})
                         if resident_metadata.get("grace_addressed"):
-                            emit_event("grace.conversation.completed", "grace", resident_id, request.correlation_id, {"execution_intent_detected": bool(resident_metadata.get("execution_intent_detected")), "seed_promotion_required": bool(resident_metadata.get("execution_requires_seed_promotion")), "objective_created": False})
+                            emit_event("grace.conversation.completed", "grace", resident_id, request.correlation_id, {"execution_intent_detected": bool(resident_metadata.get("execution_intent_detected")), "governed_execution_intent": bool(resident_metadata.get("governed_execution_intent")), "seed_promotion_required": bool(resident_metadata.get("execution_requires_seed_promotion")), "objective_created": bool(resident_metadata.get("objective_created")), "formation": resident_metadata.get("formation")})
                     else:
                         response = service.provider(authorized_model(payload), request)
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "response": response.as_typed_payload()}
