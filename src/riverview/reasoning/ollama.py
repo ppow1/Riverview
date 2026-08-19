@@ -30,7 +30,11 @@ class OllamaReasoningAdapter:
     def complete(self, model: str, request: ReasoningRequest, *, response_id: UUID | None = None) -> ReasoningResponse:
         if not model.strip() or len(model) > 200 or any(token in model.lower() for token in ("http://", "https://", "../")):
             raise ValueError("RIV-REASON-0002: model identity is invalid.")
-        body = json.dumps({"model": model, "prompt": request.instruction, "stream": False}, separators=(",", ":")).encode()
+        body_value: dict[str, object] = {"model": model, "prompt": request.instruction, "stream": False}
+        if request.response_format is not None:
+            body_value["format"] = request.response_format
+            body_value["options"] = {"temperature": 0.2, "num_predict": 2048}
+        body = json.dumps(body_value, separators=(",", ":")).encode()
         try:
             with urlopen(Request(self.endpoint + "/api/generate", data=body, headers={"Content-Type": "application/json"}), timeout=self.timeout_seconds) as response:
                 payload = json.loads(response.read(32_000))

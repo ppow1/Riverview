@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -42,6 +43,35 @@ def test_ollama_adapter_is_loopback_only() -> None:
         OllamaReasoningAdapter(endpoint="https://example.invalid")
     assert OllamaReasoningAdapter(endpoint="http://127.0.0.1:11438").endpoint.endswith(":11438")
     assert LlamaCppReasoningAdapter(endpoint="http://127.0.0.1:11439").endpoint.endswith(":11439")
+
+
+def test_ollama_adapter_forwards_bounded_response_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, _limit: int) -> bytes:
+            return json.dumps({"response": "bounded"}).encode()
+
+    def fake_urlopen(request, timeout):
+        captured.update({"body": json.loads(request.data), "timeout": timeout})
+        return Response()
+
+    monkeypatch.setattr("riverview.reasoning.ollama.urlopen", fake_urlopen)
+    request = ReasoningRequest(
+        uuid4(), uuid4(), "advice", "Inspect bounded state", ("riverview://state",),
+        "operational", "resident-direct-grace-v2", ("resident",), datetime.now(UTC),
+        ("read:bounded", "return:advisory"), response_format={"type": "object"},
+    )
+    response = OllamaReasoningAdapter().complete("qwen3-coder:30b-qwencode-20k", request)
+    assert captured["body"]["format"] == {"type": "object"}
+    assert captured["body"]["options"] == {"temperature": 0.2, "num_predict": 2048}
+    assert response.summary == "bounded"
 
 
 def test_gpu_adapter_identity_is_closed() -> None:

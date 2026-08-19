@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -41,6 +42,51 @@ def test_grace_is_addressable_but_prose_work_request_is_not_authorized() -> None
     assert not authorized["execution_intent_detected"]
     assert authorized["execution_requires_seed_promotion"]
     assert not authorized["role_authority_expanded"]
+
+
+def test_grace_structured_provider_response_is_validated_and_rendered_for_pending_approval() -> None:
+    contract = {
+        "repository_identity": "ppow1/Riverview",
+        "repository_root": "A:/Riverview/repo",
+        "expected_base_sha": "a" * 40,
+        "bounded_instruction": "Inspect the repository read-only and return evidence.",
+        "allowed_paths": ["AI_HINTS.md"],
+        "acceptance_criteria": ["change zero files"],
+        "evidence_requirements": ["return the exact Git HEAD"],
+        "capability_name": "codex.engineering.v1",
+        "action_type": "codex.engineering.v1",
+        "timeout_seconds": 300,
+        "write_policy": "read_only",
+    }
+
+    def structured_provider(request: ReasoningRequest) -> ReasoningResponse:
+        assert request.response_format is not None
+        return ReasoningResponse(
+            uuid4(), request.request_id, request.correlation_id, "ollama:test", "advice",
+            json.dumps({"response_text": "Bounded proposal ready for Steward review.", "proposal": {
+                "content": "Inspect Riverview read-only.", "summary": "Read-only inspection",
+                "seed_text": "Create one bounded inspection objective.", "formation_contract": contract,
+            }}), ("provider://ollama/test",), request.classification, datetime.now(UTC),
+        )
+
+    _, response, metadata = gateway().chat(
+        "Grace", "Grace, prepare a bounded read-only inspection proposal.",
+        provider=structured_provider, interface_id="browser",
+    )
+    assert "Bounded proposal ready" in response.summary
+    assert "<RIVERVIEW_SPECIFICATION_V1>" in response.summary
+    assert metadata["execution_intent_detected"] is False
+
+
+def test_grace_marker_only_ollama_response_fails_closed() -> None:
+    def marker_provider(request: ReasoningRequest) -> ReasoningResponse:
+        return ReasoningResponse(
+            uuid4(), request.request_id, request.correlation_id, "ollama:test", "advice",
+            "<REDACTED>", ("provider://ollama/test",), request.classification, datetime.now(UTC),
+        )
+
+    with pytest.raises(RuntimeError, match="structured Grace JSON"):
+        gateway().chat("Grace", "Grace, prepare a bounded proposal.", provider=marker_provider, interface_id="browser")
 
 
 def test_room_preserves_participants_and_denies_unknown_speakers() -> None:

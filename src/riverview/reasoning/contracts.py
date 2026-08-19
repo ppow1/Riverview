@@ -67,6 +67,7 @@ class ReasoningRequest:
     objective_id: UUID | None = None
     stage_id: UUID | None = None
     contract_version: str = CONTRACT_VERSION
+    response_format: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.request_type not in REQUEST_TYPES:
@@ -81,6 +82,8 @@ class ReasoningRequest:
             raise ValueError("RIV-REASON-0001: references must be non-empty strings.")
         if not self.allowed_authority or any(item not in {"read:bounded", "return:advisory", "return:diagnostic"} for item in self.allowed_authority):
             raise ValueError("RIV-REASON-0001: authority is not an allowed reasoning capability.")
+        if self.response_format is not None and not isinstance(self.response_format, dict):
+            raise ValueError("RIV-REASON-0001: response format must be a bounded object.")
 
 
 @dataclass(frozen=True, slots=True)

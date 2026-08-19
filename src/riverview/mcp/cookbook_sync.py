@@ -251,11 +251,11 @@ ENTRIES = [
     (
         "RIV-REASON-0002",
         "Local reasoning provider boundary",
-        "A local reasoning provider is unavailable, times out, returns an invalid response, or is addressed outside loopback.",
-        ["provider-unavailable", "provider-timeout", "invalid-response", "adapter-boundary"],
-        ["Check loopback provider health, model identity, bounded request size, and the provider-neutral response validator."],
-        "Repair only the local adapter/model/runtime seam; do not add an external model route or treat prose as authority.",
-        "Repeat a bounded local reasoning request and verify correlation, classification, and typed response evidence.",
+        "A local reasoning provider is unavailable, times out, returns an invalid response, emits literal <REDACTED> markers, or produces an intermittently malformed direct-Grace proposal.",
+        ["provider-unavailable", "provider-timeout", "invalid-response", "adapter-boundary", "provider-marker-only", "structured-proposal-invalid", "model-template-mismatch"],
+        ["Check loopback provider health and model identity; compare raw Ollama response metadata/hash/marker count with the persisted/API response; inspect the model Modelfile template, stop tokens, temperature, and context; then validate the provider-neutral response and direct-Grace JSON wrapper without printing prompts, payloads, or hidden reasoning."],
+        "Repair only the local adapter/model/runtime seam. For direct Grace, use Ollama's bounded JSON-schema response format with deterministic low-temperature/capped generation and validate the wrapper before restoring the existing proposal marker. Do not disable redaction, infer a specification from prose, add an external model route, or switch models without comparative evidence.",
+        "Repeat the raw and normal bounded local request; verify no marker-only output, valid response shape, parser-valid proposal when appropriate, correlation/classification/evidence lineage, and no authority before Steward approval.",
         "docs/operations/troubleshooting/checkpoints/RIV-REASON-0002_LOCAL_PROVIDER.md",
     ),
     (

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -46,6 +46,76 @@ class ResidentSession:
     classification: str
     history: list[dict[str, str]] = field(default_factory=list)
     character_version: str = "v1"
+
+
+_FORMATION_CONTRACT_FORMAT = {
+    "type": "object",
+    "properties": {
+        "repository_identity": {"type": "string"},
+        "repository_root": {"type": "string"},
+        "expected_base_sha": {"type": "string"},
+        "bounded_instruction": {"type": "string"},
+        "allowed_paths": {"type": "array", "items": {"type": "string"}},
+        "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+        "evidence_requirements": {"type": "array", "items": {"type": "string"}},
+        "capability_name": {"const": "codex.engineering.v1"},
+        "action_type": {"const": "codex.engineering.v1"},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+        "write_policy": {"const": "read_only"},
+    },
+    "required": [
+        "repository_identity", "repository_root", "expected_base_sha", "bounded_instruction",
+        "allowed_paths", "acceptance_criteria", "evidence_requirements", "capability_name",
+        "action_type", "timeout_seconds", "write_policy",
+    ],
+    "additionalProperties": False,
+}
+_DIRECT_GRACE_RESPONSE_FORMAT = {
+    "type": "object",
+    "properties": {
+        "response_text": {"type": "string"},
+        "proposal": {
+            "anyOf": [
+                {"type": "null"},
+                {
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "string"},
+                        "summary": {"type": "string"},
+                        "seed_text": {"type": "string"},
+                        "formation_contract": _FORMATION_CONTRACT_FORMAT,
+                        "classification": {"enum": ["river", "internal"]},
+                    },
+                    "required": ["content", "summary", "seed_text", "formation_contract"],
+                    "additionalProperties": False,
+                },
+            ],
+        },
+    },
+    "required": ["response_text", "proposal"],
+    "additionalProperties": False,
+}
+
+
+def _normalize_direct_grace_response(response: ReasoningResponse) -> ReasoningResponse:
+    """Validate Ollama's structured wrapper and restore the approval marker."""
+    try:
+        value = json.loads(response.summary)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("RIV-REASON-0002: local provider returned invalid structured Grace JSON.") from exc
+    if not isinstance(value, dict) or not isinstance(value.get("response_text"), str) or not value["response_text"].strip():
+        raise RuntimeError("RIV-REASON-0002: local provider omitted bounded Grace response text.")
+    proposal = value.get("proposal")
+    summary = value["response_text"].strip()
+    if proposal is not None:
+        if not isinstance(proposal, dict):
+            raise RuntimeError("RIV-GRC-0010: local provider returned an invalid typed proposal.")
+        from riverview.residents.direct_grace import extract_typed_proposal
+
+        marker = "<RIVERVIEW_SPECIFICATION_V1>" + json.dumps(proposal, separators=(",", ":")) + "</RIVERVIEW_SPECIFICATION_V1>"
+        extract_typed_proposal(marker)
+        summary += "\n\n" + marker
+    return replace(response, summary=summary)
 
 
 class ResidentConversationGateway:
@@ -135,12 +205,14 @@ class ResidentConversationGateway:
             f"Your role is {profile.role}. Preserve this resident identity in your response; "
             "do not identify yourself as the underlying model or provider. "
             "This is bounded advisory conversation and does not grant operational authority. "
-            "When proposing bounded engineering work, include one complete typed "
-            "<RIVERVIEW_SPECIFICATION_V1> JSON envelope with content, summary, seed_text, "
-            "and formation_contract; do not claim approval or authority. Ordinary advisory "
-            "replies must not include that marker.\n"
+            "Return only the JSON object required by the response format. Put the human-readable "
+            "answer in response_text. Set proposal to null unless the request is bounded engineering "
+            "work. For bounded engineering work, proposal must contain one complete self-contained "
+            "typed specification and a non-shell read-only formation_contract. Do not claim approval "
+            "or authority; the server validates and persists any proposal separately.\n"
             f"Operator message: {instruction}"
         )
+        response_format = _DIRECT_GRACE_RESPONSE_FORMAT if profile.is_grace else None
         request = ReasoningRequest(
             request_id=uuid4(), correlation_id=correlation, request_type="advice",
             instruction=provider_instruction, context_refs=(profile.canonical_reference, f"character:{profile.resident_id}:{session.character_version}", *tuple(f"continuity:{x['continuity_id']}" for x in self.continuity_store.accepted(profile.resident_id))),
@@ -148,8 +220,11 @@ class ResidentConversationGateway:
             evidence_requirements=("resident-identity", "resident-provenance", "correlation"),
             expires_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
             allowed_authority=("read:bounded", "return:advisory"),
+            response_format=response_format,
         )
         response = provider(request)
+        if response_format is not None and response.provider_id.startswith("ollama:"):
+            response = _normalize_direct_grace_response(response)
         if response.correlation_id != correlation:
             raise RuntimeError("RIV-RES-0002: resident response correlation mismatch.")
         session.history.append({"role": "user", "text": instruction})
