@@ -37,3 +37,20 @@ Missing typed approval is a real Steward checkpoint; malformed contract,
 missing specification fields, hash/version conflict, or idempotency conflict
 fails closed. Never reconstruct an exact specification from conversation prose
 or insert an objective/work order directly.
+
+Response/redaction boundary: if a Grace turn is persisted with literal repeated
+`<REDACTED>` text, compare the bounded response metadata, provider identity,
+classification, correlation, and the stored/API text hash. The Ollama adapter
+passes its provider `response` field into `ReasoningResponse.summary` without a
+Riverview redaction transform; the Operator projection and client render that
+summary without replacing it. Therefore an operationally classified response
+that is already marker-only at persistence is provider-boundary evidence, not
+proof of Riverview protected-payload redaction. Check the provider result or
+provider logs through a bounded, non-payload diagnostic path. Do not recover
+hidden content, disable redaction, or treat a malformed/missing
+`RIVERVIEW_SPECIFICATION_V1` proposal as authority. A marker-only provider
+result yields no pending approval and must remain a diagnosable failed proposal.
+If persistence/API hashes differ, investigate the projection boundary; if they
+match but the browser differs, investigate Operator rendering. A separate
+external ChatGPT display error is not evidence that Riverview redacted the
+Grace response.
