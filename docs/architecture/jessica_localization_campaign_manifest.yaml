@@ -1,0 +1,171 @@
+# Jessica Localization Campaign Manifest
+# Version: 1.0.0
+# Status: PLANNING_ONLY — NOT AUTHORIZED FOR EXECUTION
+
+schema_version: riverview_campaign_manifest/v1
+campaign_id: jessica_local_residency
+campaign_name: Jessica / Chief Character Architect Local Residency
+status: planning_only
+execution_authorized: false
+
+steward_gate:
+  prerequisite: grace_autonomous_engineering_accepted
+  rule: >-
+    No work package in this campaign may be dispatched until Grace's autonomous
+    engineering workflow has been repaired, validated, and explicitly accepted.
+
+references:
+  roadmap: docs/architecture/riverview_resident_localization_master_roadmap.md
+  execution_spec: docs/architecture/jessica_localization_campaign_execution_spec.md
+  initial_work_packages: docs/work_packages/resident_localization_tranche_0_A_work_packages.md
+
+execution_model:
+  mode: event_driven_dag
+  progressive_elaboration: true
+  automatic_continuation_within_authority: true
+  steward_as_polling_loop: false
+
+reasoning_escalation:
+  enabled: true
+  advisory_only: true
+  proactive_double_check_allowed: true
+  clarification_allowed: true
+  exception_review_allowed: true
+  provider_abstraction_required: true
+  consequential_review_must_be_auditable: true
+  mandatory_review_points:
+    - jca_004_final_disposition
+    - shared_postgresql_continuity_model
+    - resident_self_modification_rules
+    - final_rehydration_design
+    - pre_steward_jessica_acceptance
+    - shared_substrate_material_change
+    - historical_evidence_conflicts_with_steward_fact
+
+notification_policy:
+  notify_on:
+    - steward_authority_required
+    - steward_owned_gate
+    - unresolved_material_contradiction
+    - campaign_scope_change_required
+    - privacy_or_egress_block
+    - recovery_policy_exhausted
+    - mandatory_review_recommends_stop_or_material_redirection
+    - final_jessica_acceptance
+  suppress_routine_notifications_for:
+    - ordinary_package_completion
+    - successful_validation
+    - successful_transient_retry
+    - dependency_ready_with_authorized_successor
+    - advisory_review_reconciled_within_grace_authority
+
+stop_conditions:
+  - steward_identity_fact_would_be_overwritten
+  - critical_source_missing_and_continuation_requires_invention
+  - shared_architectural_invariant_not_viable
+  - unavailable_required_security_or_privacy_capability
+  - campaign_scope_materially_expands
+  - mandatory_review_finds_unresolved_high_impact_risk
+  - downstream_plan_based_on_materially_false_assumption
+  - identity_cannot_be_distinguished_from_implementation_history
+  - autonomous_execution_cannot_reliably_preserve_campaign_state
+
+tranches:
+  tranche_0:
+    name: Population and architecture guardrails
+    initial_state: BLOCKED_BY_CAMPAIGN_AUTHORIZATION
+    packages:
+      rc_000:
+        work_package_id: WP-RC-000
+        depends_on: []
+        parallel_safe_candidate: true
+      rc_001:
+        work_package_id: WP-RC-001
+        depends_on: []
+        parallel_safe_candidate: true
+      rc_002:
+        work_package_id: WP-RC-002
+        depends_on: []
+        parallel_safe_candidate: true
+    gate:
+      gate_id: tranche_0_gate
+      requires_accepted:
+        - WP-RC-000
+        - WP-RC-001
+        - WP-RC-002
+      on_pass: open_tranche_a
+      on_authority_conflict: stop_for_steward
+
+  tranche_a:
+    name: Jessica / Estate archaeology
+    initial_state: BLOCKED_BY_TRANCHE_0_GATE
+    packages:
+      jca_001:
+        work_package_id: WP-JCA-001
+        depends_on:
+          - tranche_0_gate
+        parallel_safe_candidate: true
+      jca_002:
+        work_package_id: WP-JCA-002
+        depends_on:
+          - tranche_0_gate
+        parallel_safe_candidate: true
+      jca_003:
+        work_package_id: WP-JCA-003
+        depends_on:
+          - tranche_0_gate
+        parallel_safe_candidate: true
+      jca_004:
+        work_package_id: WP-JCA-004
+        depends_on:
+          - tranche_0_gate
+          - WP-JCA-001
+          - WP-JCA-002
+          - WP-JCA-003
+        may_begin_before_all_dependencies_accepted: true
+        final_acceptance_requires_all_dependencies: true
+        independent_reasoning_review_required: true
+      jca_005:
+        work_package_id: WP-JCA-005
+        depends_on:
+          - WP-JCA-001
+          - WP-JCA-002
+          - WP-JCA-003
+          - WP-JCA-004
+        parallel_safe_candidate: false
+    gate:
+      gate_id: archaeology_gate
+      requires_accepted:
+        - WP-JCA-005
+      allowed_outcomes:
+        - PASS
+        - PASS_WITH_BOUNDED_UNKNOWNS
+        - STOP_FOR_STEWARD
+      on_pass: prepare_tranche_b_progressive_elaboration
+      on_pass_with_bounded_unknowns: prepare_tranche_b_preserving_unknowns
+      on_stop_for_steward: notify_and_halt_forward_progression
+
+later_tranches:
+  state: ROADMAP_ONLY_NOT_TRANCHE_READY
+  rule: >-
+    Tranches B onward must be progressively elaborated against accepted upstream
+    evidence. Existing roadmap entries are planning intent, not executable work
+    orders and must not be dispatched merely because they are named.
+
+performance_observation:
+  track:
+    - accepted_work_packages
+    - machine_active_minutes
+    - validation_and_rework_minutes
+    - critical_path_wall_clock_time
+    - parallelism
+    - provider_utilization
+    - autonomous_continuation_duration
+    - reasoning_escalation_count_and_purpose
+    - escalations_resolved_without_steward
+    - steward_intervention_count
+    - steward_touch_minutes
+    - cookbook_reuse
+    - novel_cookbook_knowledge
+    - correctly_detected_stop_conditions
+  strategic_metric: steward_intervention_density
