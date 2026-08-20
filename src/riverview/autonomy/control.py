@@ -527,7 +527,15 @@ class CodexCliAdapter:
         commit_sha: str | None = None
         remote_verified_sha: str | None = None
         try:
-            process = subprocess.Popen(command, cwd=execution_root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+            process = subprocess.Popen(
+                command,
+                cwd=execution_root,
+                stdin=subprocess.DEVNULL,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=False,
+            )
             stdout, stderr = process.communicate(timeout=envelope.timeout_seconds)
             category = "succeeded" if process.returncode == 0 else "failed"
             exit_state = f"exit:{process.returncode}"

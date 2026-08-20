@@ -54,6 +54,7 @@ def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch:
     repository = tmp_path
     (repository / ".git").mkdir()
     commands: list[list[str]] = []
+    popen_kwargs: dict[str, object] = {}
 
     class Completed:
         returncode = 0
@@ -66,10 +67,16 @@ def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch:
 
     monkeypatch.setattr("riverview.autonomy.control.subprocess.check_output", git_output)
     monkeypatch.setattr("riverview.autonomy.control.subprocess.run", lambda *args, **kwargs: None)
-    monkeypatch.setattr("riverview.autonomy.control.subprocess.Popen", lambda command, **kwargs: commands.append(command) or Completed())
+    def popen(command: list[str], **kwargs: object) -> Completed:
+        commands.append(command)
+        popen_kwargs.update(kwargs)
+        return Completed()
+
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.Popen", popen)
     result = CodexCliAdapter(executable="codex-test").run(envelope(repository_root=repository, write_policy="bounded_write"))
     assert result.result_category == "succeeded"
     assert commands[0][commands[0].index("--sandbox") + 1] == "workspace-write"
+    assert popen_kwargs["stdin"] is subprocess.DEVNULL
 
 
 def test_timeout_diagnostics_are_bounded_redacted_and_phase_oriented() -> None:
