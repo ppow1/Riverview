@@ -131,25 +131,62 @@ class RelayStore:
             return expired
 
     def retry_if_safe(self, work_order_id: UUID, correlation_id: UUID) -> WorkOrder:
-        """Requeue one retry-safe terminal order once, preserving its identity."""
+        """Create one immutable retry-safe successor without rewriting history."""
         with connect(self._config) as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT action_type,status,correlation_id FROM work_orders WHERE work_order_id=%s FOR UPDATE", (work_order_id,))
+            cursor.execute(
+                """SELECT action_type,action_version,parameters,requested_by,idempotency_key,
+                          correlation_id,expected_duration_seconds,hard_timeout_seconds,status,error_checkpoint
+                   FROM work_orders WHERE work_order_id=%s FOR UPDATE""",
+                (work_order_id,),
+            )
             row = cursor.fetchone()
-            if row is None or row[2] != correlation_id:
+            if row is None or row[5] != correlation_id:
                 raise RuntimeError("RIV-GRC-0007: retry correlation does not match the work order.")
-            if row[1] == "queued":
-                pass
-            elif row[1] not in {"failed", "timed_out"}:
+            if row[8] not in {"failed", "timed_out"}:
                 raise RuntimeError("RIV-GRC-0007: work order is not in a retryable terminal state.")
-            else:
-                cursor.execute("SELECT retry_safe FROM approved_actions WHERE action_type=%s AND enabled=true", (row[0],))
-                safe = cursor.fetchone()
-                cursor.execute("SELECT count(*) FROM work_order_attempts WHERE work_order_id=%s", (work_order_id,))
-                attempts = cursor.fetchone()[0]
-                if not safe or not safe[0] or attempts >= 2:
-                    raise RuntimeError("RIV-GRC-0007: retry requires a Steward checkpoint.")
-                cursor.execute("""UPDATE work_orders SET status='queued',lease_owner=NULL,lease_expires_at=NULL,
-                    last_heartbeat_at=NULL,finished_at=NULL,result_report=NULL,error_checkpoint=NULL,updated_at=now()
-                    WHERE work_order_id=%s""", (work_order_id,))
-            cursor.execute("SELECT action_type,parameters,requested_by,idempotency_key,correlation_id,work_order_id,action_version,expected_duration_seconds,hard_timeout_seconds,status FROM work_orders WHERE work_order_id=%s", (work_order_id,))
+            cursor.execute("SELECT successor_work_order_id FROM work_order_successor_lineage WHERE failed_work_order_id=%s", (work_order_id,))
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute(
+                    """SELECT action_type,parameters,requested_by,idempotency_key,correlation_id,
+                              work_order_id,action_version,expected_duration_seconds,hard_timeout_seconds,status
+                       FROM work_orders WHERE work_order_id=%s""",
+                    (existing[0],),
+                )
+                return WorkOrder(*cursor.fetchone())
+            cursor.execute("SELECT retry_safe FROM approved_actions WHERE action_type=%s AND enabled=true", (row[0],))
+            safe = cursor.fetchone()
+            cursor.execute("SELECT count(*) FROM work_order_attempts WHERE work_order_id=%s", (work_order_id,))
+            attempts = cursor.fetchone()[0]
+            if not safe or not safe[0] or attempts >= 2:
+                raise RuntimeError("RIV-GRC-0007: retry requires a Steward checkpoint.")
+            successor = uuid4()
+            retry_key = f"retry:{work_order_id}:2"
+            cursor.execute(
+                """INSERT INTO work_orders(
+                    work_order_id,action_type,action_version,status,parameters,requested_by,
+                    idempotency_key,correlation_id,causation_id,expected_duration_seconds,hard_timeout_seconds)
+                   VALUES(%s,%s,%s,'queued',%s::jsonb,%s,%s,%s,%s,%s,%s)""",
+                (successor, row[0], row[1], json.dumps(row[2]), row[3], retry_key, row[5], work_order_id, row[6], row[7]),
+            )
+            failure_class = "timeout" if row[8] == "timed_out" or row[9] == "RIV-EXE-0003" else "provider_failure"
+            cursor.execute(
+                """INSERT INTO work_order_successor_lineage(
+                    lineage_id,failed_work_order_id,successor_work_order_id,attempt,failure_class,idempotency_key)
+                   VALUES(%s,%s,%s,2,%s,%s)""",
+                (uuid4(), work_order_id, successor, failure_class, retry_key),
+            )
+            self._append_event(
+                cursor,
+                event_type="work.order.successor.queued",
+                work_order_id=successor,
+                correlation_id=row[5],
+                payload={"failed_work_order_id": str(work_order_id), "attempt": 2, "failure_class": failure_class},
+            )
+            cursor.execute(
+                """SELECT action_type,parameters,requested_by,idempotency_key,correlation_id,
+                          work_order_id,action_version,expected_duration_seconds,hard_timeout_seconds,status
+                   FROM work_orders WHERE work_order_id=%s""",
+                (successor,),
+            )
             return WorkOrder(*cursor.fetchone())
