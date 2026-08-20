@@ -50,7 +50,7 @@ def test_envelope_allows_only_the_two_governed_policies() -> None:
         envelope(write_policy="unrestricted").__post_init__()
 
 
-def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_codex_adapter_rejects_a_bounded_write_with_no_observable_change(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     repository = tmp_path
     (repository / ".git").mkdir()
     commands: list[list[str]] = []
@@ -74,7 +74,53 @@ def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch:
 
     monkeypatch.setattr("riverview.autonomy.control.subprocess.Popen", popen)
     result = CodexCliAdapter(executable="codex-test").run(envelope(repository_root=repository, write_policy="bounded_write"))
+    assert result.result_category == "failed"
+    assert result.checkpoint_refs == ("RIV-EXE-0010",)
+    assert commands[0][commands[0].index("--sandbox") + 1] == "workspace-write"
+
+
+def test_codex_adapter_materializes_a_real_bounded_write(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    repository = tmp_path
+    (repository / ".git").mkdir()
+    commands: list[list[str]] = []
+    popen_kwargs: dict[str, object] = {}
+    target = "docs/accepted.txt"
+
+    class Completed:
+        returncode = 0
+
+        def communicate(self, timeout: int) -> tuple[str, str]:
+            return "provider evidence", ""
+
+    def git_output(command: list[str], **kwargs: object) -> str:
+        if command[1] == "rev-parse":
+            return "a" * 40
+        if command[1] == "status":
+            return f"?? {target}\n"
+        return ""
+
+    def git_run(command: list[str], **kwargs: object) -> None:
+        if command[1:3] == ["worktree", "add"]:
+            worktree = Path(command[5])
+            (worktree / target).parent.mkdir(parents=True)
+            (worktree / target).write_text("bounded result", encoding="utf-8")
+
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.check_output", git_output)
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.run", git_run)
+    def popen(command: list[str], **kwargs: object) -> Completed:
+        commands.append(command)
+        popen_kwargs.update(kwargs)
+        return Completed()
+
+    monkeypatch.setattr("riverview.autonomy.control.subprocess.Popen", popen)
+
+    result = CodexCliAdapter(executable="codex-test").run(
+        envelope(repository_root=repository, write_policy="bounded_write", allowed_paths=("docs/accepted.txt",))
+    )
+
     assert result.result_category == "succeeded"
+    assert result.changed_paths == (target,)
+    assert (repository / target).read_text(encoding="utf-8") == "bounded result"
     assert commands[0][commands[0].index("--sandbox") + 1] == "workspace-write"
     assert popen_kwargs["stdin"] is subprocess.DEVNULL
 

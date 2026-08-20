@@ -99,6 +99,18 @@ class RestrictedRunner:
             ExecutionStore().fail(execution, checkpoint, str(exc))
             raise
         ResultReconciler().persist(result)
+        if result.result_category != "succeeded":
+            checkpoint = result.checkpoint_refs[0] if result.checkpoint_refs else "RIV-EXE-0001"
+            ResultReconciler().record_decision(
+                execution,
+                envelope.correlation_id,
+                "checkpoint",
+                f"Provider execution did not succeed: {result.bounded_summary}",
+                ("execution:provider-failed",),
+                f"execution.provider-failed:{execution}",
+            )
+            self._fail(work.work_order_id, checkpoint, result.bounded_summary, result.result_category == "timed_out")
+            return {"status": result.result_category, "execution_id": str(execution), "checkpoint_id": checkpoint}
         try:
             reconciled = ResultReconciler().reconcile_repository(
                 execution,

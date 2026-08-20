@@ -31,6 +31,8 @@ Every checkpoint records:
 - `RIV-RUN-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â restricted local process execution and enforcement
 - `RIV-RDM-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â master-roadmap structure, dependencies, revisions, and database acceptance
 - `RIV-CME-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â momentum detection and recovery
+- `RIV-GRC-0011` — Grace engineering orchestration, bounded progression, and
+  recovery boundary.
 - `RIV-MCP-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â mailbox, correlation, claims, and responses
 - `RIV-PLY-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Playwright doorbell and conversation state
 - `RIV-LOC-*` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â local execution adapters
@@ -45,6 +47,7 @@ Every checkpoint records:
 - `RIV-UI-0026` — Operator cold conversation activation, durable hydration, and selection/reconciliation races
 - `RIV-UI-0027` — Operator room formation, participant addition, room persistence, and bounded context transfer
 - `RIV-UI-0028` — Operator authoritative activity projection and mutually exclusive primary views
+- `RIV-UI-0032` — Operator stale River sequence, CME status recovery, and cache-safe polling
 
 `RIV-RUN-0001` — unified Riverview lifecycle owner, peer-task migration, and
 bounded service recovery.

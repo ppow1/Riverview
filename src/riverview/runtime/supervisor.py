@@ -158,7 +158,7 @@ class RuntimeSupervisor:
                     "powershell.exe",
                     "-NoProfile",
                     "-Command",
-                    "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress",
+                    "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress",
                 ]
                 output = subprocess.run(
                     command, capture_output=True, text=True, timeout=3, check=True
@@ -170,6 +170,7 @@ class RuntimeSupervisor:
                     {
                         "pid": row.get("ProcessId"),
                         "ppid": row.get("ParentProcessId"),
+                        "executable": row.get("ExecutablePath") or "",
                         "cmdline": row.get("CommandLine") or "",
                     }
                     for row in rows
@@ -177,12 +178,13 @@ class RuntimeSupervisor:
             except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
                 return []
         result = []
-        for process in psutil.process_iter(["pid", "ppid", "cmdline"]):
+        for process in psutil.process_iter(["pid", "ppid", "cmdline", "exe"]):
             try:
                 result.append(
                     {
                         "pid": process.info["pid"],
                         "ppid": process.info["ppid"],
+                        "executable": process.info.get("exe") or "",
                         "cmdline": " ".join(process.info["cmdline"] or []),
                     }
                 )
@@ -208,7 +210,7 @@ class RuntimeSupervisor:
         matches = [
             process
             for process in self._processes()
-            if state.spec.process_match in process["cmdline"]
+            if self._process_matches(state.spec, process)
         ]
         match_pids = {int(process["pid"]) for process in matches}
         roots = [process for process in matches if int(process.get("ppid") or 0) not in match_pids]
@@ -218,12 +220,81 @@ class RuntimeSupervisor:
             state.last_change = _now()
             return True
         if roots:
+            root_pid = int(roots[0]["pid"])
             state.pid = int(roots[0]["pid"])
             state.adopted = True
             state.status = "running"
             state.last_change = _now()
             return True
         return False
+
+    @staticmethod
+    def _terminate_process_tree(pid: int) -> None:
+        if pid <= 0 or pid == os.getpid():
+            return
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False, capture_output=True, text=True)
+        else:
+            try:
+                os.kill(pid, 15)
+            except OSError:
+                pass
+
+    def _recycle_service(self, service_id: str) -> dict[str, Any]:
+        state = self.states.get(service_id)
+        if state is None:
+            raise ValueError("RIV-RUN-0001: unknown managed service.")
+        if service_id not in {"cme-supervisor", "operator"}:
+            raise ValueError("RIV-RUN-0001: only CME or Operator service recycle is enabled.")
+        matches = [p for p in self._processes() if self._process_matches(state.spec, p)]
+        match_pids = {int(process["pid"]) for process in matches}
+        roots = [process for process in matches if int(process.get("ppid") or 0) not in match_pids]
+        if len(roots) != 1:
+            raise RuntimeError("RIV-RUN-0001: service ownership is ambiguous; refusing recycle.")
+        owner = int(roots[0]["pid"])
+        self._terminate_process_tree(int(owner))
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if not [p for p in self._processes() if self._process_matches(state.spec, p)]:
+                break
+            time.sleep(0.2)
+        if [p for p in self._processes() if self._process_matches(state.spec, p)]:
+            raise RuntimeError("RIV-RUN-0001: service descendants remained after bounded recycle.")
+        state.process = None
+        state.pid = None
+        state.adopted = False
+        state.status = "stopped"
+        state.last_failure = None
+        state.backoff_until = 0.0
+        return {"service_id": service_id, "status": "stopped", "old_owner_pid": owner}
+
+    def _process_control_requests(self) -> None:
+        request_dir = self.repository / "runtime" / "riverview-supervisor" / "requests"
+        result_dir = request_dir / "results"
+        request_dir.mkdir(parents=True, exist_ok=True)
+        result_dir.mkdir(parents=True, exist_ok=True)
+        for request in sorted(request_dir.glob("*.json")):
+            try:
+                # Windows PowerShell 5 emits UTF-8 JSON with a BOM.  Accept
+                # that encoding marker while keeping the operation allow-list
+                # and service identity checks below authoritative.
+                payload = json.loads(request.read_text(encoding="utf-8-sig"))
+                if payload.get("operation") != "reload_service":
+                    raise ValueError("RIV-RUN-0001: unsupported supervisor operation.")
+                response = {"ok": True, **self._recycle_service(str(payload.get("service_id", "")))}
+            except (OSError, TypeError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
+                response = {"ok": False, "error": str(exc)[:500]}
+            (result_dir / request.name).write_text(json.dumps(response), encoding="utf-8")
+            request.unlink(missing_ok=True)
+
+    @staticmethod
+    def _process_matches(spec: ServiceSpec, process: dict[str, Any]) -> bool:
+        """Match an owned service command, not arbitrary diagnostic command text."""
+        command_line = str(process.get("cmdline") or "")
+        marker = spec.process_match
+        if marker.startswith("riverview."):
+            return bool(re.search(rf"(?<![A-Za-z0-9_.-])-m\s+{re.escape(marker)}(?:\s|$)", command_line))
+        return marker in command_line
 
     @staticmethod
     def _listener_pids(port: int) -> list[int]:
@@ -244,6 +315,14 @@ class RuntimeSupervisor:
             return []
 
     def _healthy(self, spec: ServiceSpec) -> bool:
+        if spec.service_id == "cme-supervisor":
+            try:
+                from riverview.autonomy.runtime import CMEStatusStore
+
+                status = CMEStatusStore().read()
+                return bool(status and status.get("heartbeat_health") == "HEALTHY")
+            except (OSError, RuntimeError, TypeError, ValueError):
+                return False
         if spec.port is not None:
             import socket
 
@@ -357,7 +436,7 @@ class RuntimeSupervisor:
             healthy = self._healthy(state.spec)
             if state.spec.process_match and state.spec.port is None:
                 healthy = any(
-                    state.spec.process_match in process["cmdline"]
+                    self._process_matches(state.spec, process)
                     and int(process["pid"]) == state.pid
                     for process in self._processes()
                 )
@@ -396,6 +475,7 @@ class RuntimeSupervisor:
                 state.restart_count = 0
 
     def reconcile_once(self) -> None:
+        self._process_control_requests()
         for state in self.states.values():
             self._refresh(state)
         for state in self.states.values():

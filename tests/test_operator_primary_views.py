@@ -55,6 +55,8 @@ def test_primary_view_controller_has_generation_ownership_and_functional_setting
         assert "function startActivityRefresh(" in html
         assert "function scheduleActivityRefresh(" in html
         assert "activityRequestInFlight" in html
+        assert "activityRequestSerial" in html
+        assert "method==='GET'?'no-store'" in html
         assert "document.addEventListener('visibilitychange'" in html
         assert "state.activityDirty=true" in html
         assert 'id="activity-list"' in html
@@ -63,6 +65,15 @@ def test_primary_view_controller_has_generation_ownership_and_functional_setting
         assert "return visible.map(x=>" in html
     finally:
         service.stop()
+
+
+def test_cme_status_page_retries_after_failure_and_disables_caching() -> None:
+    from riverview.operator.openwebui import CME_STATUS_HTML
+
+    assert "UNAVAILABLE · RECONNECTING" in CME_STATUS_HTML
+    assert "setTimeout(load,3000)" in CME_STATUS_HTML
+    assert "cache:'no-store'" in CME_STATUS_HTML
+    assert "visibilitychange" in CME_STATUS_HTML
 
 
 def test_neutral_conversation_assigns_resident_without_changing_id_and_activity_is_durable() -> None:

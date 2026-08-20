@@ -16,9 +16,9 @@
     },
     {
       "service_id": "cme-supervisor",
-      "command": [".venv/Scripts/python.exe", "-m", "riverview.autonomy.supervisor"],
+      "command": [".venv/Scripts/python.exe", "-m", "riverview.autonomy.live_service"],
       "dependencies": [],
-      "process_match": "riverview.autonomy.supervisor",
+      "process_match": "riverview.autonomy.live_service",
       "restart": true,
       "startup_timeout": 8.0
     },

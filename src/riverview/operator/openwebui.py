@@ -33,6 +33,9 @@ from riverview.operator.ui import UI_HTML as CLEAN_UI_HTML
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.residents.direct_grace import DirectGraceFormation, extract_typed_proposal
 from riverview.residents.gateway import ResidentConversationGateway, RoomTurnPartialFailure
+
+
+CME_STATUS_HTML = """<!doctype html><html data-theme='system'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>CME status</title><style>:root{font:16px system-ui;color:#17212b;background:#f5f7fa;--panel:#fff;--border:#dbe2ea}body{max-width:760px;margin:3rem auto;padding:0 1rem}body,pre{background:var(--panel)}pre{white-space:pre-wrap;border:1px solid var(--border);border-radius:10px;padding:1rem}a{display:inline-block;margin-bottom:1rem}html[data-theme='dark']{color-scheme:dark;--panel:#182231;--border:#344257;color:#e8edf5;background:#111722}summary{cursor:pointer}</style><a href='/'>&larr; Back to Operator</a><h1>Continuous Momentum Engine</h1><p>Authoritative operational status.</p><section id='human'>Loading&hellip;</section><details><summary>Raw / Advanced</summary><pre id='status'></pre></details><script>document.documentElement.dataset.theme=localStorage.getItem('riverview-theme')||'system';let timer=0,requestSerial=0,appliedSerial=0;async function load(){const serial=++requestSerial;try{const r=await fetch('/api/cme/status?_rv='+Date.now(),{cache:'no-store'});const b=await r.json();if(serial<appliedSerial)return;appliedSerial=serial;document.getElementById('human').innerHTML='<strong>'+((b.heartbeat_health||'UNAVAILABLE')+' · '+(b.effective_state||'UNAVAILABLE'))+'</strong><p>Heartbeat age: '+(b.heartbeat_age_seconds??'unavailable')+'s</p><p>Last event: '+(b.last_event_type||'unavailable')+'</p><p>Waiting: '+(b.waiting_reason||'none')+'</p>';document.getElementById('status').textContent=JSON.stringify(b,null,2)}catch(error){document.getElementById('human').innerHTML='<strong>UNAVAILABLE · RECONNECTING</strong><p>Status will retry automatically.</p>';document.getElementById('status').textContent=String(error&&error.message||'status_unavailable')}finally{clearTimeout(timer);timer=setTimeout(load,3000)}}load();document.addEventListener('visibilitychange',()=>{if(!document.hidden){clearTimeout(timer);load()}});</script></html>"""
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
@@ -254,6 +257,8 @@ class RiverviewOpenWebUIService:
                 body = json.dumps(payload, separators=(",", ":"), default=str).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+                self.send_header("Pragma", "no-cache")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -262,6 +267,8 @@ class RiverviewOpenWebUIService:
                 encoded = body.encode()
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+                self.send_header("Pragma", "no-cache")
                 self.send_header("Content-Length", str(len(encoded)))
                 self.end_headers()
                 self.wfile.write(encoded)
@@ -290,7 +297,9 @@ class RiverviewOpenWebUIService:
                 self.wfile.write(b'{"authenticated":true}')
 
             def do_GET(self) -> None:
-                if self.path == "/":
+                if self.path == "/cme":
+                    self._send_html(CME_STATUS_HTML)
+                elif self.path == "/":
                     self._send_html(CLEAN_UI_HTML)
                 elif self.path == "/cme":
                     self._send_html("""<!doctype html><html data-theme='system'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>CME status</title><style>:root{font:16px system-ui;color:#17212b;background:#f5f7fa;--panel:#fff;--border:#dbe2ea}body{max-width:760px;margin:3rem auto;padding:0 1rem}body,pre{background:var(--panel)}pre{white-space:pre-wrap;border:1px solid var(--border);border-radius:10px;padding:1rem}a{display:inline-block;margin-bottom:1rem}html[data-theme='dark']{color-scheme:dark;--panel:#182231;--border:#344257;color:#e8edf5;background:#111722}summary{cursor:pointer}</style><a href='/'>← Back to Operator</a><h1>Continuous Momentum Engine</h1><p>Authoritative operational status.</p><section id='human'>Loading…</section><details><summary>Raw / Advanced</summary><pre id='status'></pre></details><script>document.documentElement.dataset.theme=localStorage.getItem('riverview-theme')||'system';async function load(){const r=await fetch('/api/cme/status',{cache:'no-store'});const b=await r.json();document.getElementById('human').innerHTML='<strong>'+((b.heartbeat_health||'UNAVAILABLE')+' · '+(b.effective_state||'UNAVAILABLE'))+'</strong><p>Heartbeat age: '+(b.heartbeat_age_seconds??'unavailable')+'s</p><p>Last event: '+(b.last_event_type||'unavailable')+'</p><p>Waiting: '+(b.waiting_reason||'none')+'</p>';document.getElementById('status').textContent=JSON.stringify(b,null,2)}load();setInterval(load,3000);</script></html>""")

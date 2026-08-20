@@ -546,6 +546,8 @@ class CodexCliAdapter:
                 outside = tuple(path for path in changed if not any(path == item or path.startswith(f"{item}/") for item in allowed))
                 if outside:
                     raise RuntimeError(f"RIV-EXE-0007: changed path escaped envelope: {outside!r}")
+                if not changed:
+                    raise RuntimeError("RIV-EXE-0010: bounded_write completed without an observable repository change.")
                 self._copy_allowed_changes(worktree, repository, changed)
                 if self._requires_commit(envelope.evidence_requirements):
                     commit_sha = self._commit_allowed_changes(repository, changed, envelope.execution_id)
@@ -584,6 +586,9 @@ class CodexCliAdapter:
             )
             changed = timeout_paths
             category, exit_state, checkpoint = "timed_out", "timeout", ("RIV-EXE-0003",)
+        except RuntimeError as exc:
+            category, exit_state, summary = "failed", "adapter_error", str(exc)[:500]
+            checkpoint = ("RIV-EXE-0007" if str(exc).startswith("RIV-EXE-0007") else "RIV-EXE-0010",)
         finally:
             output_path.unlink(missing_ok=True)
             if worktree is not None:
