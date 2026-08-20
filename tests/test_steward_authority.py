@@ -116,3 +116,13 @@ def test_bounded_write_contract_is_typed_and_not_a_wildcard() -> None:
     assert StewardAuthorityStore.validate_formation_contract(contract)["write_policy"] == "bounded_write"
     with pytest.raises(StewardAuthorityError, match="incomplete"):
         StewardAuthorityStore.validate_formation_contract({**contract, "arbitrary": "write"})
+
+
+def test_intent_derives_write_policy_from_approved_contract() -> None:
+    contract = {**_contract(), "write_policy": "bounded_write"}
+    authority = {
+        "authority_id": uuid4(), "seed_id": uuid4(), "objective_id": uuid4(), "stage_id": uuid4(),
+        "classification": "river", "correlation_id": uuid4(), "causation_id": uuid4(),
+        "scope": {"contract": contract},
+    }
+    assert StewardAuthorityStore.intent_from_contract(authority).write_policy == "bounded_write"

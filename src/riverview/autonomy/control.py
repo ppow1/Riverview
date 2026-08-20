@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -522,6 +523,7 @@ class CodexCliAdapter:
             "--output-last-message", str(output_path), "-C", str(execution_root), envelope.bounded_instruction,
         ]
         started = datetime.now(UTC)
+        changed: tuple[str, ...] = ()
         try:
             process = subprocess.Popen(command, cwd=execution_root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
             stdout, stderr = process.communicate(timeout=envelope.timeout_seconds)
@@ -547,20 +549,33 @@ class CodexCliAdapter:
                 subprocess.run(["git", "worktree", "remove", "--force", str(worktree)], cwd=repository, check=False, capture_output=True, text=True)
         finished = datetime.now(UTC)
         del stderr
-        result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, (), (summary,), None, None, checkpoint, (), summary, started, finished)
+        result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, changed, (summary,), None, None, checkpoint, (), summary, started, finished)
         return result
 
     @staticmethod
     def _worktree_paths(worktree: Path) -> tuple[str, ...]:
         output = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=all"], cwd=worktree, text=True)
-        return tuple(line[3:].strip() for line in output.splitlines() if len(line) >= 4)
+        paths: list[str] = []
+        for line in output.splitlines():
+            if len(line) < 4:
+                continue
+            value = line[3:].strip()
+            if " -> " in value:
+                old, new = value.split(" -> ", 1)
+                paths.extend((old, new))
+            else:
+                paths.append(value)
+        return tuple(dict.fromkeys(paths))
 
     @staticmethod
     def _copy_allowed_changes(worktree: Path, repository: Path, changed: tuple[str, ...]) -> None:
         for relative in changed:
-            source = (worktree / relative).resolve()
-            target = (repository / relative).resolve()
-            if repository not in source.parents or repository not in target.parents:
+            relative_path = Path(relative)
+            if relative_path.is_absolute() or ".." in relative_path.parts:
+                raise RuntimeError("RIV-EXE-0007: relative change path is invalid.")
+            source = (worktree / relative_path).resolve()
+            target = (repository / relative_path).resolve()
+            if (source != worktree and worktree not in source.parents) or (target != repository and repository not in target.parents):
                 raise RuntimeError("RIV-EXE-0007: resolved change escaped repository root.")
             if source.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -584,6 +599,65 @@ class CodexCliAdapter:
 
 class ResultReconciler:
     """Persist typed results and refuse unsupported publication claims."""
+
+    @staticmethod
+    def validate_observed_state(
+        *, result_category: str, observed_head: str, expected_base_sha: str,
+        changed_paths: tuple[str, ...], allowed_paths: tuple[str, ...],
+        repository_root: Path, acceptance_criteria: tuple[str, ...] = (),
+        evidence_requirements: tuple[str, ...] = (),
+        write_policy: str = READ_ONLY_POLICY, commit_sha: str | None = None,
+        remote_verified_sha: str | None = None,
+    ) -> dict[str, Any]:
+        if result_category != "succeeded":
+            raise RuntimeError("RIV-REC-0002: provider result is not successful.")
+        if observed_head != expected_base_sha:
+            raise RuntimeError("RIV-REC-0002: authoritative repository HEAD changed during execution.")
+        allowed = tuple(Path(path).as_posix().rstrip("/") for path in allowed_paths)
+        outside = tuple(path for path in changed_paths if not any(path == item or path.startswith(f"{item}/") for item in allowed))
+        if outside:
+            raise RuntimeError(f"RIV-EXE-0007: authoritative changed path escaped envelope: {outside!r}")
+        if write_policy == "bounded_write" and not changed_paths:
+            raise RuntimeError("RIV-REC-0003: bounded write produced no authoritative changed path.")
+        missing: list[str] = []
+        content_failures: list[str] = []
+        for criterion in acceptance_criteria:
+            exists = re.search(r"(?:file|path)?\s*([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)\s+exists\b", criterion, re.IGNORECASE)
+            if exists and not (repository_root / exists.group(1)).is_file():
+                missing.append(exists.group(1))
+            contains = re.search(r"(?:file|path)?\s*([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)\s+contains\s+(.+)", criterion, re.IGNORECASE)
+            if contains:
+                relative, expected = contains.groups()
+                expected = expected.strip().strip("\"'")
+                path = repository_root / relative
+                if not path.is_file() or expected not in path.read_text(encoding="utf-8"):
+                    content_failures.append(relative)
+        if missing:
+            raise RuntimeError(f"RIV-REC-0003: required artifact is missing: {tuple(missing)!r}")
+        if content_failures:
+            raise RuntimeError(f"RIV-REC-0003: required artifact content is not verified: {tuple(content_failures)!r}")
+        commit_required = any("resulting commit" in item.lower() for item in evidence_requirements)
+        publication_required = any("publication" in item.lower() or "origin/main" in item.lower() for item in evidence_requirements)
+        if write_policy == "bounded_write" and commit_required and not commit_sha:
+            raise RuntimeError("RIV-REC-0004: required resulting commit was not independently supplied.")
+        if publication_required and not remote_verified_sha:
+            raise RuntimeError("RIV-REC-0004: required publication was not independently verified.")
+        if commit_sha:
+            try:
+                subprocess.run(["git", "cat-file", "-e", f"{commit_sha}^{{commit}}"], cwd=repository_root, check=True, capture_output=True, text=True)
+                tree = subprocess.check_output(["git", "ls-tree", "-r", "--name-only", commit_sha], cwd=repository_root, text=True).splitlines()
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError("RIV-REC-0004: provider-claimed commit is not present authoritatively.") from exc
+            if not any(path in tree for path in changed_paths):
+                raise RuntimeError("RIV-REC-0004: provider-claimed commit does not contain verified changes.")
+        if remote_verified_sha:
+            if remote_verified_sha != commit_sha:
+                raise RuntimeError("RIV-REC-0004: remote publication SHA does not match commit SHA.")
+            try:
+                subprocess.run(["git", "merge-base", "--is-ancestor", remote_verified_sha, "origin/main"], cwd=repository_root, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError("RIV-REC-0004: published commit is not reachable from origin/main.") from exc
+        return {"observed_head": observed_head, "changed_paths": changed_paths, "outside_scope": outside, "missing_artifacts": missing, "content_verified": not content_failures}
 
     def persist(self, result: ExecutionResult) -> None:
         if result.remote_verified_sha and not result.commit_sha:
@@ -614,7 +688,7 @@ class ResultReconciler:
             payload={"execution_id": str(result.execution_id), "result_category": result.result_category},
         ))
 
-    def reconcile_repository(self, execution_id: UUID, repository_root: Path, allowed_paths: tuple[str, ...], baseline_paths: tuple[str, ...] = ()) -> dict[str, Any]:
+    def reconcile_repository(self, execution_id: UUID, repository_root: Path, allowed_paths: tuple[str, ...], baseline_paths: tuple[str, ...] = (), *, expected_base_sha: str | None = None, acceptance_criteria: tuple[str, ...] = (), evidence_requirements: tuple[str, ...] = (), write_policy: str = READ_ONLY_POLICY) -> dict[str, Any]:
         """Independently verify changed paths and close only a bounded result."""
         if not repository_root.is_dir() or not (repository_root / ".git").exists():
             raise RuntimeError("RIV-EXE-0002: repository root is unavailable during reconciliation.")
@@ -626,24 +700,32 @@ class ResultReconciler:
         )
         baseline = set(baseline_paths)
         changed = tuple(path for path in (line[3:].strip() for line in output.splitlines() if len(line) >= 4) if path not in baseline)
-        allowed = tuple(Path(path).as_posix().rstrip("/") for path in allowed_paths)
-        outside = tuple(path for path in changed if not any(path == item or path.startswith(f"{item}/") for item in allowed))
-        if outside:
-            raise RuntimeError(f"RIV-EXE-0007: changed path escaped envelope: {outside!r}")
+        observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository_root, text=True).strip()
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT result_category,commit_sha,remote_verified_sha FROM execution_results WHERE execution_id=%s", (execution_id,))
+            result_row = cursor.fetchone()
+        if result_row is None:
+            raise RuntimeError("RIV-REC-0001: execution result is missing during authoritative verification.")
+        verified = self.validate_observed_state(
+            result_category=result_row[0], observed_head=observed_head, expected_base_sha=expected_base_sha or observed_head,
+            changed_paths=changed, allowed_paths=allowed_paths, repository_root=repository_root,
+            acceptance_criteria=acceptance_criteria, evidence_requirements=evidence_requirements, write_policy=write_policy,
+            commit_sha=result_row[1], remote_verified_sha=result_row[2],
+        )
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """UPDATE execution_results SET changed_paths=%s::jsonb,validation_evidence=%s::jsonb
                    WHERE execution_id=%s""",
-                (_json(changed), _json(["git status path-boundary check passed"]), execution_id),
+                (_json(changed), _json([{"provider_claimed_result": result_row[0], "provider_claimed_commit": result_row[1], "riverview_verified": verified}]), execution_id),
             )
             cursor.execute("UPDATE execution_envelopes SET status='reconciled',updated_at=now() WHERE execution_id=%s", (execution_id,))
         EventStore().append(RiverEvent(
             event_type="execution.reconciled", aggregate_type="execution", aggregate_id=execution_id,
             correlation_id=UUID(str(self._execution_correlation(execution_id))), causation_id=execution_id,
             idempotency_key=f"execution.reconciled:{execution_id}", classification=Classification.RIVER,
-            payload={"execution_id": str(execution_id), "changed_paths": list(changed), "outside_scope": list(outside)},
+            payload={"execution_id": str(execution_id), "changed_paths": list(changed), "outside_scope": list(verified["outside_scope"])},
         ))
-        return {"execution_id": str(execution_id), "changed_paths": changed, "outside_scope": outside, "reconciled": True}
+        return {"execution_id": str(execution_id), "changed_paths": changed, "outside_scope": verified["outside_scope"], "reconciled": True}
 
     @staticmethod
     def _execution_correlation(execution_id: UUID) -> UUID:
@@ -680,6 +762,19 @@ class ResultReconciler:
             payload={"execution_id": str(execution_id), "decision": decision},
         ))
         return result
+
+    def record_correction(self, execution_id: UUID, correlation_id: UUID, reason: str, evidence: dict[str, Any], idempotency_key: str) -> UUID:
+        """Append a correction without changing the original reconciliation record."""
+        correction_id = uuid4()
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """INSERT INTO execution_reconciliation_corrections(correction_id,execution_id,correlation_id,prior_decision,corrected_decision,reason,evidence,idempotency_key)
+                   VALUES(%s,%s,%s,'accepted','checkpoint',%s,%s::jsonb,%s)
+                   ON CONFLICT(idempotency_key) DO NOTHING""",
+                (correction_id, execution_id, correlation_id, reason, _json(evidence), idempotency_key),
+            )
+            cursor.execute("SELECT correction_id FROM execution_reconciliation_corrections WHERE idempotency_key=%s", (idempotency_key,))
+            return cursor.fetchone()[0]
 
 
 class LaneRegistry:

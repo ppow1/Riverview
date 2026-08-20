@@ -260,6 +260,7 @@ class StewardAuthorityStore:
                 classification=str(authority["classification"]), correlation_id=UUID(str(authority["correlation_id"])),
                 causation_id=UUID(str(authority["causation_id"])) if authority.get("causation_id") else None,
                 idempotency_key=f"engineering-intent:authority:{authority['authority_id']}",
+                write_policy=str(contract["write_policy"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise StewardAuthorityError("RIV-GRC-0010: typed engineering formation contract is malformed.") from exc

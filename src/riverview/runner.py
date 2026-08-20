@@ -90,7 +90,27 @@ class RestrictedRunner:
             ExecutionStore().fail(execution, checkpoint, str(exc))
             raise
         ResultReconciler().persist(result)
-        reconciled = ResultReconciler().reconcile_repository(execution, envelope.repository_root, envelope.allowed_paths, baseline)
+        try:
+            reconciled = ResultReconciler().reconcile_repository(
+                execution,
+                envelope.repository_root,
+                envelope.allowed_paths,
+                baseline,
+                expected_base_sha=envelope.expected_base_sha,
+                acceptance_criteria=envelope.acceptance_criteria,
+                evidence_requirements=envelope.evidence_requirements,
+                write_policy=envelope.write_policy,
+            )
+        except RuntimeError as exc:
+            ResultReconciler().record_decision(
+                execution,
+                envelope.correlation_id,
+                "checkpoint",
+                f"Authoritative execution verification failed: {exc}",
+                ("execution:authoritative-verification-failed",),
+                f"execution.reconciliation.checkpoint:{execution}",
+            )
+            raise
         ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
         observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=envelope.repository_root, text=True).strip()
         report = {

@@ -179,6 +179,16 @@ ENTRIES = [
         "docs/operations/troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md",
     ),
     (
+        "RIV-EXE-0010",
+        "Codex completion versus authoritative repository state",
+        "Codex reports completion while the required artifact, bounded change, commit, or publication is absent from authoritative Riverview state.",
+        ["provider-success-without-artifact", "missing-copy-back", "commit-tree-mismatch", "publication-unverified", "provider-claim-conflict"],
+        ["Identify execution/work-order/objective IDs; inspect the authoritative repository path, git status, expected artifact, resulting commit tree, origin/main reachability, and temporary-worktree copy-back evidence. Compare provider_claimed_* with Riverview-generated riverview_verified_* fields and preserve the first divergence."],
+        "Never accept Codex's completion narrative as proof of repository state. Fail reconciliation closed, preserve the original records, and append a correction/checkpoint when authoritative evidence disproves the prior decision. Do not manually create the missing artifact before forensic capture.",
+        ["Repeat the bounded write only after authoritative verification proves repository identity, approved base, exact allowed changed paths, required artifacts/content, commit tree, publication when required, and post-execution working-tree state."],
+        "docs/operations/troubleshooting/checkpoints/RIV-EXE-0010_AUTHORITATIVE_CODEX_COMPLETION.md",
+    ),
+    (
         "RIV-CAP-0002",
         "Lane ownership or result reconciliation failure",
         "A path is already owned or a typed provider result does not match an execution envelope.",

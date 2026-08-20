@@ -9,6 +9,7 @@ from riverview.autonomy.control import (
     CodexCliAdapter,
     ContinuousMomentumEngine,
     ExecutionEnvelope,
+    ResultReconciler,
     RetryPolicy,
 )
 
@@ -68,6 +69,72 @@ def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch:
     result = CodexCliAdapter(executable="codex-test").run(envelope(repository_root=repository, write_policy="bounded_write"))
     assert result.result_category == "succeeded"
     assert commands[0][commands[0].index("--sandbox") + 1] == "workspace-write"
+
+
+def test_authoritative_verifier_rejects_success_without_required_artifact(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="no authoritative changed path"):
+        ResultReconciler.validate_observed_state(
+            result_category="succeeded", observed_head="a" * 40, expected_base_sha="a" * 40,
+            changed_paths=(), allowed_paths=("docs/result.md",), repository_root=tmp_path,
+            acceptance_criteria=("docs/result.md exists",), write_policy="bounded_write",
+        )
+
+
+def test_authoritative_verifier_rejects_out_of_scope_change(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="escaped envelope"):
+        ResultReconciler.validate_observed_state(
+            result_category="succeeded", observed_head="a" * 40, expected_base_sha="a" * 40,
+            changed_paths=("docs/result.md", "src/other.py"), allowed_paths=("docs/result.md",),
+            repository_root=tmp_path, write_policy="bounded_write",
+        )
+
+
+def test_authoritative_verifier_checks_artifact_and_content(tmp_path: Path) -> None:
+    artifact = tmp_path / "docs" / "result.md"
+    artifact.parent.mkdir()
+    artifact.write_text("governed smoke test; no runtime behavior", encoding="utf-8")
+    evidence = ResultReconciler.validate_observed_state(
+        result_category="succeeded", observed_head="a" * 40, expected_base_sha="a" * 40,
+        changed_paths=("docs/result.md",), allowed_paths=("docs/result.md",), repository_root=tmp_path,
+        acceptance_criteria=("docs/result.md exists", "docs/result.md contains governed smoke test"), write_policy="bounded_write",
+    )
+    assert evidence["content_verified"] is True
+
+
+def test_authoritative_verifier_rejects_provider_failure(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="not successful"):
+        ResultReconciler.validate_observed_state(
+            result_category="failed", observed_head="a" * 40, expected_base_sha="a" * 40,
+            changed_paths=(), allowed_paths=("docs/result.md",), repository_root=tmp_path,
+        )
+
+
+def test_authoritative_verifier_requires_commit_and_publication_when_declared(tmp_path: Path) -> None:
+    artifact = tmp_path / "docs" / "result.md"
+    artifact.parent.mkdir()
+    artifact.write_text("ok", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="resulting commit"):
+        ResultReconciler.validate_observed_state(
+            result_category="succeeded", observed_head="a" * 40, expected_base_sha="a" * 40,
+            changed_paths=("docs/result.md",), allowed_paths=("docs/result.md",), repository_root=tmp_path,
+            acceptance_criteria=("docs/result.md exists",), evidence_requirements=("resulting commit SHA",), write_policy="bounded_write",
+        )
+
+
+def test_bounded_worktree_copy_handles_create_delete_and_path_boundary(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    repository = tmp_path / "repository"
+    worktree.mkdir()
+    repository.mkdir()
+    (worktree / "docs").mkdir()
+    (worktree / "docs" / "result.md").write_text("ok", encoding="utf-8")
+    (repository / "docs").mkdir()
+    (repository / "docs" / "old.md").write_text("old", encoding="utf-8")
+    CodexCliAdapter._copy_allowed_changes(worktree, repository, ("docs/result.md", "docs/old.md"))
+    assert (repository / "docs" / "result.md").read_text(encoding="utf-8") == "ok"
+    assert not (repository / "docs" / "old.md").exists()
+    with pytest.raises(RuntimeError, match="invalid"):
+        CodexCliAdapter._copy_allowed_changes(worktree, repository, ("../outside",))
 
 
 def test_retry_policy_is_one_bounded_retry() -> None:
