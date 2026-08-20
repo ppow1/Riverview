@@ -524,6 +524,8 @@ class CodexCliAdapter:
         ]
         started = datetime.now(UTC)
         changed: tuple[str, ...] = ()
+        commit_sha: str | None = None
+        remote_verified_sha: str | None = None
         try:
             process = subprocess.Popen(command, cwd=execution_root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
             stdout, stderr = process.communicate(timeout=envelope.timeout_seconds)
@@ -537,6 +539,10 @@ class CodexCliAdapter:
                 if outside:
                     raise RuntimeError(f"RIV-EXE-0007: changed path escaped envelope: {outside!r}")
                 self._copy_allowed_changes(worktree, repository, changed)
+                if self._requires_commit(envelope.evidence_requirements):
+                    commit_sha = self._commit_allowed_changes(repository, changed, envelope.execution_id)
+                if self._requires_publication(envelope.evidence_requirements):
+                    remote_verified_sha = self._publish_commit(repository, commit_sha)
             summary = self._bounded_success_summary(repository, provider_output, observed_head, envelope.write_policy) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
             checkpoint = () if process.returncode == 0 else ("RIV-EXE-0004",)
         except subprocess.TimeoutExpired:
@@ -549,8 +555,38 @@ class CodexCliAdapter:
                 subprocess.run(["git", "worktree", "remove", "--force", str(worktree)], cwd=repository, check=False, capture_output=True, text=True)
         finished = datetime.now(UTC)
         del stderr
-        result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, changed, (summary,), None, None, checkpoint, (), summary, started, finished)
+        result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, changed, (summary,), commit_sha, remote_verified_sha, checkpoint, (), summary, started, finished)
         return result
+
+    @staticmethod
+    def _requires_commit(evidence_requirements: tuple[str, ...]) -> bool:
+        return any("resulting commit" in item.lower() for item in evidence_requirements)
+
+    @staticmethod
+    def _requires_publication(evidence_requirements: tuple[str, ...]) -> bool:
+        return any("publication" in item.lower() or "origin/main" in item.lower() for item in evidence_requirements)
+
+    @staticmethod
+    def _commit_allowed_changes(repository: Path, changed: tuple[str, ...], execution_id: UUID) -> str:
+        if not changed:
+            raise RuntimeError("RIV-REC-0004: cannot commit an empty bounded write.")
+        subprocess.run(["git", "add", "--", *changed], cwd=repository, check=True, capture_output=True, text=True)
+        staged = tuple(line.strip() for line in subprocess.check_output(["git", "diff", "--cached", "--name-only"], cwd=repository, text=True).splitlines() if line.strip())
+        if set(staged) != set(changed):
+            raise RuntimeError(f"RIV-REC-0004: staged paths do not exactly match bounded changes: {staged!r}")
+        subprocess.run(["git", "commit", "-m", f"Apply governed bounded engineering write {execution_id}"], cwd=repository, check=True, capture_output=True, text=True)
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
+
+    @staticmethod
+    def _publish_commit(repository: Path, commit_sha: str | None) -> str:
+        if not commit_sha:
+            raise RuntimeError("RIV-REC-0004: publication requires a verified commit.")
+        subprocess.run(["git", "push", "origin", "HEAD:main"], cwd=repository, check=True, capture_output=True, text=True)
+        subprocess.run(["git", "fetch", "origin", "main"], cwd=repository, check=True, capture_output=True, text=True)
+        remote = subprocess.check_output(["git", "rev-parse", "origin/main"], cwd=repository, text=True).strip()
+        if remote != commit_sha:
+            raise RuntimeError("RIV-REC-0004: published commit does not match origin/main.")
+        return remote
 
     @staticmethod
     def _worktree_paths(worktree: Path) -> tuple[str, ...]:
@@ -607,16 +643,25 @@ class ResultReconciler:
         repository_root: Path, acceptance_criteria: tuple[str, ...] = (),
         evidence_requirements: tuple[str, ...] = (),
         write_policy: str = READ_ONLY_POLICY, commit_sha: str | None = None,
-        remote_verified_sha: str | None = None,
+        remote_verified_sha: str | None = None, claimed_changed_paths: tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
         if result_category != "succeeded":
             raise RuntimeError("RIV-REC-0002: provider result is not successful.")
-        if observed_head != expected_base_sha:
+        if commit_sha:
+            if observed_head != commit_sha:
+                raise RuntimeError("RIV-REC-0002: authoritative HEAD does not equal the verified commit.")
+            try:
+                subprocess.run(["git", "merge-base", "--is-ancestor", expected_base_sha, commit_sha], cwd=repository_root, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError("RIV-REC-0002: resulting commit is not based on the approved base SHA.") from exc
+        elif observed_head != expected_base_sha:
             raise RuntimeError("RIV-REC-0002: authoritative repository HEAD changed during execution.")
         allowed = tuple(Path(path).as_posix().rstrip("/") for path in allowed_paths)
         outside = tuple(path for path in changed_paths if not any(path == item or path.startswith(f"{item}/") for item in allowed))
         if outside:
             raise RuntimeError(f"RIV-EXE-0007: authoritative changed path escaped envelope: {outside!r}")
+        if claimed_changed_paths is not None and set(claimed_changed_paths) != set(changed_paths):
+            raise RuntimeError("RIV-REC-0003: provider changed-path claim differs from authoritative paths.")
         if write_policy == "bounded_write" and not changed_paths:
             raise RuntimeError("RIV-REC-0003: bounded write produced no authoritative changed path.")
         missing: list[str] = []
@@ -702,15 +747,19 @@ class ResultReconciler:
         changed = tuple(path for path in (line[3:].strip() for line in output.splitlines() if len(line) >= 4) if path not in baseline)
         observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository_root, text=True).strip()
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT result_category,commit_sha,remote_verified_sha FROM execution_results WHERE execution_id=%s", (execution_id,))
+            cursor.execute("SELECT result_category,commit_sha,remote_verified_sha,changed_paths FROM execution_results WHERE execution_id=%s", (execution_id,))
             result_row = cursor.fetchone()
         if result_row is None:
             raise RuntimeError("RIV-REC-0001: execution result is missing during authoritative verification.")
+        commit_sha = result_row[1]
+        if commit_sha and expected_base_sha:
+            changed = tuple(path for path in subprocess.check_output(["git", "diff", "--name-only", f"{expected_base_sha}..{commit_sha}"], cwd=repository_root, text=True).splitlines() if path)
+        claimed = tuple(result_row[3] or ())
         verified = self.validate_observed_state(
             result_category=result_row[0], observed_head=observed_head, expected_base_sha=expected_base_sha or observed_head,
             changed_paths=changed, allowed_paths=allowed_paths, repository_root=repository_root,
             acceptance_criteria=acceptance_criteria, evidence_requirements=evidence_requirements, write_policy=write_policy,
-            commit_sha=result_row[1], remote_verified_sha=result_row[2],
+            commit_sha=commit_sha, remote_verified_sha=result_row[2], claimed_changed_paths=claimed,
         )
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(

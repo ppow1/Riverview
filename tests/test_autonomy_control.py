@@ -1,5 +1,6 @@
 """Pure contract tests for the bounded autonomous control plane."""
 
+import subprocess
 from pathlib import Path
 from uuid import uuid4
 
@@ -135,6 +136,40 @@ def test_bounded_worktree_copy_handles_create_delete_and_path_boundary(tmp_path:
     assert not (repository / "docs" / "old.md").exists()
     with pytest.raises(RuntimeError, match="invalid"):
         CodexCliAdapter._copy_allowed_changes(worktree, repository, ("../outside",))
+
+
+def test_positive_bounded_write_survives_copyback_commit_publication_and_reconciliation(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    remote = tmp_path / "remote.git"
+    repository.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=repository, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@riverview.local"], cwd=repository, check=True)
+    subprocess.run(["git", "config", "user.name", "Riverview Test"], cwd=repository, check=True)
+    (repository / "README.md").write_text("base", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repository, check=True)
+    subprocess.run(["git", "commit", "-m", "base"], cwd=repository, check=True, capture_output=True)
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=repository, check=True)
+    subprocess.run(["git", "push", "-u", "origin", "main"], cwd=repository, check=True, capture_output=True)
+    worktree = tmp_path / "isolated-worktree"
+    worktree.mkdir()
+    (worktree / "docs").mkdir()
+    (worktree / "docs" / "result.md").write_text("governed bounded write", encoding="utf-8")
+    CodexCliAdapter._copy_allowed_changes(worktree, repository, ("docs/result.md",))
+    commit = CodexCliAdapter._commit_allowed_changes(repository, ("docs/result.md",), uuid4())
+    published = CodexCliAdapter._publish_commit(repository, commit)
+    evidence = ResultReconciler.validate_observed_state(
+        result_category="succeeded", observed_head=commit, expected_base_sha=base,
+        changed_paths=("docs/result.md",), claimed_changed_paths=("docs/result.md",),
+        allowed_paths=("docs/result.md",), repository_root=repository,
+        acceptance_criteria=("docs/result.md exists", "docs/result.md contains governed bounded write"),
+        evidence_requirements=("resulting commit SHA", "publication to origin/main"), write_policy="bounded_write",
+        commit_sha=commit, remote_verified_sha=published,
+    )
+    assert evidence["content_verified"] is True
+    assert (repository / "docs" / "result.md").is_file()
+    assert subprocess.check_output(["git", "rev-parse", "origin/main"], cwd=repository, text=True).strip() == commit
 
 
 def test_retry_policy_is_one_bounded_retry() -> None:

@@ -24,6 +24,16 @@ reconcile observable repository state.
 9. Find the first divergence between the claim and authoritative evidence.
 10. Do not manually create the missing artifact before forensic capture.
 
+## Conservative capability collapse
+
+`bounded_write` silently downgraded to `read_only`, followed by no artifact and
+an empty changed-path set, is a correctness failure. It is not a desirable
+safety behavior and must never be interpreted as a safe successful execution.
+The approved write policy must propagate unchanged through specification,
+authority, objective, engineering intent, work order, and execution envelope.
+If Pat authorized a write, Riverview must either perform and independently
+verify that bounded write or fail closed with a diagnostic checkpoint.
+
 Successful bounded repository work must independently verify repository
 identity, approved base, exact path scope, required artifact/content, commit
 tree, publication when required, and the expected post-execution working tree.
