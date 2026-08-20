@@ -30,6 +30,13 @@ non-Git repository; `RIV-EXE-0003` records a bounded Codex timeout; `RIV-EXE-000
 records a nonzero Codex exit; `RIV-EXE-0005` rejects an unverifiable publication claim;
 `RIV-CAP-0002` rejects missing or overcommitted capacity.
 
+For `RIV-EXE-0003`, inspect the persisted bounded timeout summary before assigning
+the slow phase. It records the provider PID, elapsed time, last structured event
+type, bounded redacted stdout/stderr tails, changed paths observed in the isolated
+worktree, and whether each approved target existed at timeout. Windows timeout
+cleanup terminates the provider process tree; no timeout result is copied back,
+committed, or published.
+
 The first Windows acceptance attempt also failed before process start because the
 installed CLI was exposed as `codex.cmd`, while a bare `codex` name is not directly
 launchable by `CreateProcess`. This is classified as executable discovery, not a

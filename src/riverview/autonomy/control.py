@@ -546,9 +546,36 @@ class CodexCliAdapter:
             summary = self._bounded_success_summary(repository, provider_output, observed_head, envelope.write_policy) if process.returncode == 0 else "Codex CLI returned a nonzero exit state."
             checkpoint = () if process.returncode == 0 else ("RIV-EXE-0004",)
         except subprocess.TimeoutExpired:
-            process.kill()
-            _stdout, stderr = process.communicate()
-            category, exit_state, summary, checkpoint = "timed_out", "timeout", "Codex CLI exceeded the bounded execution deadline.", ("RIV-EXE-0003",)
+            process_id = process.pid
+            self._terminate_process_tree(process)
+            try:
+                _stdout, stderr = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                try:
+                    _stdout, stderr = process.communicate(timeout=2)
+                except subprocess.TimeoutExpired:
+                    _stdout, stderr = "", ""
+            timeout_paths: tuple[str, ...] = ()
+            if worktree is not None:
+                try:
+                    timeout_paths = self._worktree_paths(worktree)
+                except (OSError, subprocess.SubprocessError):
+                    timeout_paths = ()
+            target_state = {
+                path: (worktree / path).is_file() if worktree is not None else False
+                for path in envelope.allowed_paths
+            }
+            summary = self._timeout_diagnostic_summary(
+                process_id=process_id,
+                elapsed_seconds=(datetime.now(UTC) - started).total_seconds(),
+                stdout=_stdout,
+                stderr=stderr,
+                changed_paths=timeout_paths,
+                target_state=target_state,
+            )
+            changed = timeout_paths
+            category, exit_state, checkpoint = "timed_out", "timeout", ("RIV-EXE-0003",)
         finally:
             output_path.unlink(missing_ok=True)
             if worktree is not None:
@@ -557,6 +584,68 @@ class CodexCliAdapter:
         del stderr
         result = ExecutionResult(uuid4(), envelope.execution_id, envelope.correlation_id, self.provider_id, category, exit_state, changed, (summary,), commit_sha, remote_verified_sha, checkpoint, (), summary, started, finished)
         return result
+
+    @staticmethod
+    def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
+        """Terminate the provider and descendants at the bounded timeout boundary."""
+
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            process.kill()
+
+    @staticmethod
+    def _safe_diagnostic_tail(value: str, limit: int = 2000) -> str:
+        """Keep timeout diagnostics bounded and redact common credential-shaped values."""
+
+        redacted = re.sub(
+            r"(?i)(authorization|password|secret|token|api[_-]?key)(?:[\"']?\s*[:=]\s*[\"']?)[^\"'\s,}]+",
+            r"\1=[REDACTED]",
+            value,
+        )
+        return redacted[-limit:]
+
+    @classmethod
+    def _timeout_diagnostic_summary(
+        cls,
+        *,
+        process_id: int,
+        elapsed_seconds: float,
+        stdout: str,
+        stderr: str,
+        changed_paths: tuple[str, ...],
+        target_state: dict[str, bool],
+    ) -> str:
+        """Persist phase metadata without persisting full provider prompts or events."""
+
+        event_types: list[str] = []
+        for line in stdout.splitlines():
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(event, dict):
+                event_type = event.get("type") or event.get("event")
+                if isinstance(event_type, str) and event_type not in event_types:
+                    event_types.append(event_type)
+        payload = {
+            "checkpoint": "RIV-EXE-0003",
+            "message": "Codex CLI exceeded the bounded execution deadline.",
+            "process_id": process_id,
+            "elapsed_seconds": round(elapsed_seconds, 3),
+            "last_event_type": event_types[-1] if event_types else None,
+            "event_types": event_types[-20:],
+            "changed_paths_at_timeout": list(changed_paths),
+            "target_state_at_timeout": target_state,
+            "stdout_tail": cls._safe_diagnostic_tail(stdout),
+            "stderr_tail": cls._safe_diagnostic_tail(stderr),
+        }
+        return _json(payload)
 
     @staticmethod
     def _requires_commit(evidence_requirements: tuple[str, ...]) -> bool:

@@ -72,6 +72,39 @@ def test_codex_adapter_selects_write_sandbox_only_for_bounded_write(monkeypatch:
     assert commands[0][commands[0].index("--sandbox") + 1] == "workspace-write"
 
 
+def test_timeout_diagnostics_are_bounded_redacted_and_phase_oriented() -> None:
+    summary = CodexCliAdapter._timeout_diagnostic_summary(
+        process_id=123,
+        elapsed_seconds=300.25,
+        stdout='{"type":"thread.started"}\n{"type":"turn.started","token":"secret-value"}\n',
+        stderr="authorization=secret-value",
+        changed_paths=("docs/result.md",),
+        target_state={"docs/result.md": True},
+    )
+    assert "turn.started" in summary
+    assert "secret-value" not in summary
+    assert '"process_id":123' in summary
+    assert '"changed_paths_at_timeout":["docs/result.md"]' in summary
+
+
+def test_windows_timeout_terminates_provider_process_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    class Process:
+        pid = 456
+
+        def kill(self) -> None:
+            raise AssertionError("tree termination should use taskkill on Windows")
+
+    monkeypatch.setattr("riverview.autonomy.control.os.name", "nt")
+    monkeypatch.setattr(
+        "riverview.autonomy.control.subprocess.run",
+        lambda command, **kwargs: calls.append(command),
+    )
+    CodexCliAdapter._terminate_process_tree(Process())  # type: ignore[arg-type]
+    assert calls == [["taskkill", "/PID", "456", "/T", "/F"]]
+
+
 def test_authoritative_verifier_rejects_success_without_required_artifact(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="no authoritative changed path"):
         ResultReconciler.validate_observed_state(
