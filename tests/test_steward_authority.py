@@ -9,6 +9,13 @@ from riverview.intake.engineering import EngineeringIntentStore
 from riverview.mcp.comms5 import Comms5Error, Comms5Service
 
 
+def test_promoted_seed_authority_lock_excludes_nullable_specification_join() -> None:
+    sql = Path("src/riverview/intake/authority.py").read_text(encoding="utf-8")
+    assert "LEFT JOIN comms5_specifications s" in sql
+    assert "FOR UPDATE OF sd,o,st" in sql
+    assert "objective_id=%s FOR UPDATE\"\"\"" not in sql
+
+
 def _contract() -> dict[str, object]:
     return {
         "repository_identity": "ppow1/Riverview",

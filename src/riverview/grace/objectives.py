@@ -138,6 +138,71 @@ class ObjectiveStore:
 
         return objective_id
 
+    def create_in_transaction(
+        self,
+        cursor: Any,
+        objective_key: str,
+        title: str,
+        description: str,
+        stages: list[StageSpec],
+        *,
+        owner_id: str = "grace",
+        requested_by: str = "steward",
+        correlation_id: UUID | None = None,
+    ) -> UUID:
+        """Create or recover an objective using the caller's transaction."""
+        if not objective_key.strip() or not stages:
+            raise ValueError("RIV-GRC-0002: objective_key and at least one stage are required.")
+        keys = [stage.key for stage in stages]
+        if len(keys) != len(set(keys)):
+            raise ValueError("RIV-GRC-0002: stage keys must be unique.")
+        objective_id = uuid4()
+        correlation = correlation_id or uuid4()
+        cursor.execute(
+            """INSERT INTO objectives(
+                   objective_id,objective_key,title,description,status,owner_id,requested_by,correlation_id)
+               VALUES(%s,%s,%s,%s,'ready',%s,%s,%s)
+               ON CONFLICT(objective_key) DO NOTHING
+               RETURNING objective_id""",
+            (objective_id, objective_key, title, description, owner_id, requested_by, correlation),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute("SELECT objective_id FROM objectives WHERE objective_key=%s FOR UPDATE", (objective_key,))
+            existing = cursor.fetchone()
+            if existing is None:
+                raise RuntimeError("RIV-GRC-0002: objective idempotency reconciliation found no objective.")
+            return existing[0]
+        for order, spec in enumerate(stages, start=1):
+            stage_id = uuid4()
+            readiness = "ready" if not spec.depends_on else "waiting"
+            status = "ready" if readiness == "ready" else "pending"
+            cursor.execute(
+                """INSERT INTO objective_stages(
+                       stage_id,objective_id,stage_key,sort_order,title,description,status,
+                       readiness,required_evidence,steward_checkpoint,declared_action)
+                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s::jsonb)""",
+                (stage_id, objective_id, spec.key, order, spec.title, spec.description, status,
+                 readiness, json.dumps(list(spec.required_evidence)), spec.steward_checkpoint,
+                 json.dumps(spec.declared_action) if spec.declared_action else None),
+            )
+        for spec in stages:
+            for dependency in spec.depends_on:
+                if dependency not in keys:
+                    raise ValueError(f"RIV-GRC-0002: stage {spec.key!r} depends on unknown stage {dependency!r}.")
+                cursor.execute(
+                    """INSERT INTO objective_stage_dependencies(stage_id,depends_on_stage_id)
+                       SELECT s.stage_id,d.stage_id FROM objective_stages s, objective_stages d
+                       WHERE s.objective_id=%s AND s.stage_key=%s AND d.objective_id=%s AND d.stage_key=%s""",
+                    (objective_id, spec.key, objective_id, dependency),
+                )
+        self._append_event(cursor, RiverEvent(
+            event_type="objective.created", aggregate_type="objective", aggregate_id=objective_id,
+            correlation_id=correlation, idempotency_key=f"objective.created:{objective_key}",
+            classification=Classification.RIVER, payload={"objective_key": objective_key, "stage_count": len(stages)},
+        ))
+        return objective_id
+
     def load(self, objective_key: str) -> dict[str, Any]:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(

@@ -79,12 +79,15 @@ class StewardSeedStore:
             raise PermissionError("RIV-0085-0002: only the Steward may promote a seed draft.")
         with connect() as connection, connection.cursor() as cursor:
             if idempotency_key:
-                cursor.execute("SELECT seed_id,objective_id,actor FROM steward_seed_promotion_requests WHERE idempotency_key=%s", (idempotency_key,))
+                cursor.execute("SELECT request_id,seed_id,objective_id,actor FROM steward_seed_promotion_requests WHERE idempotency_key=%s FOR UPDATE", (idempotency_key,))
                 request = cursor.fetchone()
                 if request:
-                    if request[0] != seed_id or request[2] != confirmer:
-                        raise SeedLifecycleError("RIV-COMMS5-0015", "promotion idempotency key conflicts with an existing promotion", seed_id=seed_id, objective_id=request[1])
-                    return request[1]
+                    if request[1] != seed_id or request[3] != confirmer:
+                        raise SeedLifecycleError("RIV-COMMS5-0015", "promotion idempotency key conflicts with an existing promotion", seed_id=seed_id, objective_id=request[2])
+                    authority_key = f"steward-authority:{idempotency_key}"
+                    cursor.execute("SELECT authority_id FROM steward_authority_grants WHERE idempotency_key=%s", (authority_key,))
+                    if cursor.fetchone():
+                        return request[2]
             cursor.execute(
                 "SELECT correlation_id,seed_text,status,objective_id FROM steward_seed_drafts WHERE seed_id=%s FOR UPDATE",
                 (seed_id,),
@@ -93,12 +96,21 @@ class StewardSeedStore:
             if row is None:
                 raise SeedLifecycleError("RIV-COMMS5-0006", "seed was not found", seed_id=seed_id)
             if row[2] == "promoted" and row[3] is not None:
-                if idempotency_key:
-                    cursor.execute(
-                        """INSERT INTO steward_seed_promotion_requests(request_id,seed_id,objective_id,actor,idempotency_key)
-                           VALUES(%s,%s,%s,%s,%s) ON CONFLICT(idempotency_key) DO NOTHING""",
-                        (uuid4(), seed_id, row[3], confirmer, idempotency_key),
-                    )
+                if not request or not idempotency_key:
+                    raise SeedLifecycleError("RIV-COMMS5-0015", "promotion is incomplete: authority idempotency record is missing", seed_id=seed_id, objective_id=row[3])
+                authority = StewardAuthorityStore().grant_for_promoted_seed_in_transaction(
+                    cursor, seed_id, row[3], correlation_id=row[0],
+                    approval_operation_id=request[0],
+                    idempotency_key=f"steward-authority:{idempotency_key}",
+                )
+                if authority is None:
+                    raise SeedLifecycleError("RIV-GRC-0010", "promoted seed is not bound to an eligible specification", seed_id=seed_id, objective_id=row[3])
+                EventStore().append_in_transaction(cursor, RiverEvent(
+                    event_type="steward.authority.granted", aggregate_type="objective", aggregate_id=row[3],
+                    correlation_id=row[0], causation_id=seed_id,
+                    idempotency_key=f"steward.authority.granted:{authority['authority_id']}", classification=Classification.RIVER,
+                    payload={"authority_id": str(authority["authority_id"]), "specification_id": str(authority["specification_id"]), "objective_id": str(row[3]), "seed_id": str(seed_id)},
+                ))
                 return row[3]
             if row[2] == "cancelled":
                 raise SeedLifecycleError("RIV-COMMS5-0014", "seed is already cancelled", seed_id=seed_id)
@@ -106,39 +118,45 @@ class StewardSeedStore:
                 raise SeedLifecycleError("RIV-COMMS5-0014", "seed is superseded", seed_id=seed_id)
             if row[2] != "draft":
                 raise SeedLifecycleError("RIV-COMMS5-0014", "seed draft is not promotable", seed_id=seed_id)
-            cursor.execute(
-                "UPDATE steward_seed_drafts SET status='confirmed',confirmed_at=now() WHERE seed_id=%s",
-                (seed_id,),
+            objective_id = ObjectiveStore().create_in_transaction(
+                cursor, f"seed:{seed_id}", "Steward seed draft", row[1],
+                [StageSpec("validate", "Validate steward seed", "Grace validates the bounded seed before work formation.", ("seed:confirmed",))],
+                owner_id="grace", requested_by="steward", correlation_id=row[0],
             )
-        objective_id = ObjectiveStore().create(
-            f"seed:{seed_id}",
-            "Steward seed draft",
-            row[1],
-            [StageSpec("validate", "Validate steward seed", "Grace validates the bounded seed before work formation.", ("seed:confirmed",))],
-            owner_id="grace", requested_by="steward", correlation_id=row[0],
-        )
-        with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("UPDATE steward_seed_drafts SET status='promoted',objective_id=%s,promoted_at=now() WHERE seed_id=%s", (objective_id, seed_id))
+            cursor.execute(
+                "UPDATE steward_seed_drafts SET status='confirmed',objective_id=%s,confirmed_at=now() WHERE seed_id=%s",
+                (objective_id, seed_id),
+            )
+            approval_operation_id = None
             if idempotency_key:
                 cursor.execute(
                     """INSERT INTO steward_seed_promotion_requests(request_id,seed_id,objective_id,actor,idempotency_key)
                        VALUES(%s,%s,%s,%s,%s) ON CONFLICT(idempotency_key) DO NOTHING""",
                     (uuid4(), seed_id, objective_id, confirmer, idempotency_key),
                 )
-                cursor.execute("SELECT request_id FROM steward_seed_promotion_requests WHERE idempotency_key=%s", (idempotency_key,))
+                cursor.execute("SELECT request_id FROM steward_seed_promotion_requests WHERE idempotency_key=%s FOR UPDATE", (idempotency_key,))
                 approval_operation_id = cursor.fetchone()[0]
-            else:
-                approval_operation_id = None
-            cursor.execute("SELECT correlation_id FROM steward_seed_drafts WHERE seed_id=%s", (seed_id,))
-            correlation_id = cursor.fetchone()[0]
-        StewardAuthorityStore().grant_for_promoted_seed(seed_id, objective_id, correlation_id=correlation_id, approval_operation_id=approval_operation_id, idempotency_key=f"steward-authority:{idempotency_key or seed_id}")
-        EventStore().append(RiverEvent(
-            event_type="steward.seed.promoted", aggregate_type="objective", aggregate_id=objective_id,
-            correlation_id=row[0], causation_id=seed_id,
-            idempotency_key=f"steward.seed.promoted:{seed_id}", classification=Classification.RIVER,
-            payload={"seed_id": str(seed_id), "objective_id": str(objective_id), "status": "promoted"},
-        ))
-        return objective_id
+            cursor.execute("UPDATE steward_seed_drafts SET status='promoted',objective_id=%s,promoted_at=now() WHERE seed_id=%s", (objective_id, seed_id))
+            authority = StewardAuthorityStore().grant_for_promoted_seed_in_transaction(
+                cursor, seed_id, objective_id, correlation_id=row[0],
+                approval_operation_id=approval_operation_id,
+                idempotency_key=f"steward-authority:{idempotency_key or seed_id}",
+            )
+            if authority is None:
+                raise SeedLifecycleError("RIV-GRC-0010", "promoted seed is not bound to an eligible specification", seed_id=seed_id, objective_id=objective_id)
+            EventStore().append_in_transaction(cursor, RiverEvent(
+                event_type="steward.authority.granted", aggregate_type="objective", aggregate_id=objective_id,
+                correlation_id=row[0], causation_id=seed_id,
+                idempotency_key=f"steward.authority.granted:{authority['authority_id']}", classification=Classification.RIVER,
+                payload={"authority_id": str(authority["authority_id"]), "specification_id": str(authority["specification_id"]), "objective_id": str(objective_id), "seed_id": str(seed_id)},
+            ))
+            EventStore().append_in_transaction(cursor, RiverEvent(
+                event_type="steward.seed.promoted", aggregate_type="objective", aggregate_id=objective_id,
+                correlation_id=row[0], causation_id=seed_id,
+                idempotency_key=f"steward.seed.promoted:{seed_id}", classification=Classification.RIVER,
+                payload={"seed_id": str(seed_id), "objective_id": str(objective_id), "status": "promoted"},
+            ))
+            return objective_id
 
     @staticmethod
     def _lifecycle_retry(cursor, idempotency_key: str, *, transition: str, seed_id: UUID, replacement_seed_id: UUID | None, actor: str, reason: str, classification: str, correlation_id: UUID) -> dict[str, object] | None:

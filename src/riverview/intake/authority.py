@@ -79,12 +79,21 @@ class StewardAuthorityStore:
                    LEFT JOIN comms5_specifications s ON s.specification_id=sd.specification_id
                    JOIN objectives o ON o.objective_id=%s
                    JOIN objective_stages st ON st.objective_id=o.objective_id AND st.stage_key='validate'
-                   WHERE sd.seed_id=%s AND sd.objective_id=%s FOR UPDATE""",
+                   WHERE sd.seed_id=%s AND sd.objective_id=%s
+                   FOR UPDATE OF sd,o,st""",
                 (objective_id, seed_id, objective_id),
             )
             row = cursor.fetchone()
             if row is None or row[0] is None or row[3] is None:
                 return None
+            cursor.execute(
+                "SELECT version,content_sha256,formation_contract FROM comms5_specifications WHERE specification_id=%s FOR UPDATE",
+                (row[0],),
+            )
+            specification = cursor.fetchone()
+            if specification is None:
+                return None
+            row = (row[0], row[1], row[2], specification[0], specification[1], specification[2], row[6], row[7])
             if row[1] != row[3] or row[2] not in {"river", "internal"}:
                 raise StewardAuthorityError("RIV-GRC-0010: seed specification version or classification does not reconcile.")
             cursor.execute("SELECT authority_id,specification_id,specification_sha256,status FROM steward_authority_grants WHERE idempotency_key=%s", (idempotency_key,))
@@ -114,6 +123,62 @@ class StewardAuthorityStore:
             payload={"authority_id": result["authority_id"], "specification_id": result["specification_id"], "specification_version": result["specification_version"], "specification_sha256": result["specification_sha256"], "objective_id": result["objective_id"], "seed_id": result["seed_id"]},
         ))
         return result
+
+    def grant_for_promoted_seed_in_transaction(
+        self,
+        cursor: Any,
+        seed_id: UUID,
+        objective_id: UUID,
+        *,
+        correlation_id: UUID,
+        approval_operation_id: UUID | None = None,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        """Grant promotion authority without opening a second transaction."""
+        cursor.execute(
+            """SELECT sd.specification_id,sd.specification_version,sd.classification,
+                      s.version,s.content_sha256,s.formation_contract,o.objective_id,st.stage_id
+               FROM steward_seed_drafts sd
+               LEFT JOIN comms5_specifications s ON s.specification_id=sd.specification_id
+               JOIN objectives o ON o.objective_id=%s
+               JOIN objective_stages st ON st.objective_id=o.objective_id AND st.stage_key='validate'
+               WHERE sd.seed_id=%s AND sd.objective_id=%s
+               FOR UPDATE OF sd,o,st""",
+            (objective_id, seed_id, objective_id),
+        )
+        row = cursor.fetchone()
+        if row is None or row[0] is None or row[3] is None:
+            return None
+        cursor.execute(
+            "SELECT version,content_sha256,formation_contract FROM comms5_specifications WHERE specification_id=%s FOR UPDATE",
+            (row[0],),
+        )
+        specification = cursor.fetchone()
+        if specification is None:
+            return None
+        row = (row[0], row[1], row[2], specification[0], specification[1], specification[2], row[6], row[7])
+        if row[1] != row[3] or row[2] not in {"river", "internal"}:
+            raise StewardAuthorityError("RIV-GRC-0010: seed specification version or classification does not reconcile.")
+        cursor.execute("SELECT authority_id,specification_id,specification_sha256,status FROM steward_authority_grants WHERE idempotency_key=%s FOR UPDATE", (idempotency_key,))
+        existing = cursor.fetchone()
+        if existing:
+            if existing[1] != row[0] or existing[2] != row[4]:
+                raise StewardAuthorityError("RIV-GRC-0010: authority idempotency key conflicts with approved scope.")
+            return self.load(existing[0], cursor=cursor)
+        authority_id = uuid4()
+        contract = self._contract(row[5])
+        capabilities = [] if not contract else [str(contract.get("capability_name", ""))]
+        scope = {"formation_contract_present": contract is not None, "contract": contract or {}}
+        cursor.execute(
+            """INSERT INTO steward_authority_grants
+               (authority_id,specification_id,specification_version,specification_sha256,seed_id,objective_id,stage_id,
+                approving_principal,classification,correlation_id,causation_id,approval_operation_id,idempotency_key,
+                scope,permitted_capabilities,status)
+               VALUES(%s,%s,%s,%s,%s,%s,%s,'steward',%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,'active')""",
+            (authority_id, row[0], row[1], row[4], seed_id, objective_id, row[7], row[2], correlation_id,
+             seed_id, approval_operation_id, idempotency_key, json.dumps(scope), json.dumps(capabilities)),
+        )
+        return self.load(authority_id, cursor=cursor)
 
     def grant_for_existing_specification(
         self, specification_id: UUID, *, seed_id: UUID, objective_id: UUID, stage_id: UUID,
