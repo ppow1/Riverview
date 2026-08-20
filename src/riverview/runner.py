@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import threading
@@ -56,8 +57,16 @@ class RestrictedRunner:
             command = self._command(work, definition)
             return self._execute(work, command)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
-            self._fail(work.work_order_id, "RIV-RUN-0001", str(exc), timed_out=False)
-            return {"status": "failed", "checkpoint_id": "RIV-RUN-0001"}
+            checkpoint = self._checkpoint_from_error(str(exc))
+            self._fail(work.work_order_id, checkpoint, str(exc), timed_out=checkpoint == "RIV-EXE-0003")
+            return {"status": "failed", "checkpoint_id": checkpoint}
+
+    @staticmethod
+    def _checkpoint_from_error(reason: str) -> str:
+        """Preserve the most specific stable checkpoint surfaced by a seam."""
+
+        match = re.search(r"\b(RIV-[A-Z0-9]+-\d{4})\b", reason)
+        return match.group(1) if match else "RIV-RUN-0001"
 
     def _execute_codex(self, work: ClaimedWork) -> dict[str, Any]:
         intent_id = UUID(str(work.parameters.get("engineering_intent_id", "")))
@@ -110,6 +119,8 @@ class RestrictedRunner:
                 ("execution:authoritative-verification-failed",),
                 f"execution.reconciliation.checkpoint:{execution}",
             )
+            if result.result_category != "succeeded" and result.checkpoint_refs:
+                raise RuntimeError(f"{result.checkpoint_refs[0]}: {result.bounded_summary}") from exc
             raise
         ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
         observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=envelope.repository_root, text=True).strip()
