@@ -1,4 +1,4 @@
-<!-- Version: 0.4.0 -->
+<!-- Version: 0.5.0 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -35,6 +35,8 @@ Rules:
 - Do not expose Undercurrent or sensitive data through ordinary River paths.
 - A capability is not complete until its failure behavior is diagnosable and recovery is verifiable.
 - Follow the Engineering Interaction and Delivery Contract for versioned artifacts, complete PowerShell files, self-installation, durable reports, clipboard capture, Cookbook-first diagnostics, bounded scope, staged publication, and evidence terminology.
+- Preserve valuable but uncommitted ideas in `docs/operations/boards/parking_lot.md`; substantial parked ideas use `docs/operations/parking_lot/PL-####-slug.md`. Parking does not authorize implementation.
+- Use `docs/operations/boards/ready_bench.md` only for Steward-committed work that has been sufficiently elaborated into durable specification, roadmap/execution sequence, bounded work packages, dependencies, acceptance criteria, and scope boundaries. Read `docs/operations/PARKING_LOT_AND_READY_BENCH.md` before promoting work between these states.
 
 For governed external-AI ingress and progress queries, first discover the
 separate `Riverview_Comms_5` surface using `comms5_help`. Local clients may use
