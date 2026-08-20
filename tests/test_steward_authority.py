@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 
@@ -14,6 +17,49 @@ def test_promoted_seed_authority_lock_excludes_nullable_specification_join() -> 
     assert "LEFT JOIN comms5_specifications s" in sql
     assert "FOR UPDATE OF sd,o,st" in sql
     assert "objective_id=%s FOR UPDATE\"\"\"" not in sql
+
+
+def test_for_stage_uses_transaction_context_manager_for_runtime_recovery() -> None:
+    class Cursor:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            self.closed = True
+
+        def execute(self, *_args) -> None:
+            return None
+
+        def fetchone(self):
+            return None
+
+    class Connection:
+        def __init__(self) -> None:
+            self.cursor_instance = Cursor()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def cursor(self):
+            return self.cursor_instance
+
+    connection = Connection()
+
+    @contextmanager
+    def fake_connect():
+        yield connection
+
+    with patch("riverview.intake.authority.connect", fake_connect):
+        result = StewardAuthorityStore().for_stage(uuid4(), uuid4())
+
+    assert result is None
+    assert connection.cursor_instance.closed is True
 
 
 def _contract() -> dict[str, object]:

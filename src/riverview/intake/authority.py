@@ -231,15 +231,18 @@ class StewardAuthorityStore:
             return self.load(authority_id, cursor=db_cursor)
 
     def for_stage(self, objective_id: UUID, stage_id: UUID, *, cursor: Any | None = None) -> dict[str, Any] | None:
-        own = cursor is None
-        if own:
-            connection = connect(); cursor = connection.cursor()
-        cursor.execute("SELECT authority_id FROM steward_authority_grants WHERE objective_id=%s AND stage_id=%s AND status='active' ORDER BY approved_at DESC LIMIT 1", (objective_id, stage_id))
-        row = cursor.fetchone()
-        result = self.load(row[0], cursor=cursor) if row else None
-        if own:
-            cursor.close(); connection.close()
-        return result
+        if cursor is not None:
+            cursor.execute("SELECT authority_id FROM steward_authority_grants WHERE objective_id=%s AND stage_id=%s AND status='active' ORDER BY approved_at DESC LIMIT 1", (objective_id, stage_id))
+            row = cursor.fetchone()
+            return self.load(row[0], cursor=cursor) if row else None
+
+        # ``connect`` is a transaction context manager, not a connection
+        # object. Keep the lookup transaction-scoped so startup recovery can
+        # safely re-read persisted authority without leaving a live session.
+        with connect() as connection, connection.cursor() as db_cursor:
+            db_cursor.execute("SELECT authority_id FROM steward_authority_grants WHERE objective_id=%s AND stage_id=%s AND status='active' ORDER BY approved_at DESC LIMIT 1", (objective_id, stage_id))
+            row = db_cursor.fetchone()
+            return self.load(row[0], cursor=db_cursor) if row else None
 
     @staticmethod
     def intent_from_contract(authority: dict[str, Any]) -> EngineeringIntent:
