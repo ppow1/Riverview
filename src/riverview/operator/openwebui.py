@@ -320,7 +320,7 @@ class RiverviewOpenWebUIService:
                     self._send(HTTPStatus.OK, {"residents": service.resident_gateway.residents()})
                 elif self.path == "/api/residents":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
-                elif self.path == "/api/cme/status" and self._auth():
+                elif urlsplit(self.path).path == "/api/cme/status" and self._auth():
                     try:
                         status = CMEStatusStore().read()
                         if status is None:
@@ -329,7 +329,7 @@ class RiverviewOpenWebUIService:
                             self._send(HTTPStatus.OK, status)
                     except (RuntimeError, OSError, TypeError, ValueError):
                         self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cme_status_unavailable", "checkpoint": "RIV-GRC-0008"})
-                elif self.path == "/api/cme/status":
+                elif urlsplit(self.path).path == "/api/cme/status":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif urlsplit(self.path).path == "/api/events" and self._auth():
                     try:
