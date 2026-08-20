@@ -78,6 +78,7 @@ class StewardSeedStore:
         if confirmer != "steward":
             raise PermissionError("RIV-0085-0002: only the Steward may promote a seed draft.")
         with connect() as connection, connection.cursor() as cursor:
+            request = None
             if idempotency_key:
                 cursor.execute("SELECT request_id,seed_id,objective_id,actor FROM steward_seed_promotion_requests WHERE idempotency_key=%s FOR UPDATE", (idempotency_key,))
                 request = cursor.fetchone()
