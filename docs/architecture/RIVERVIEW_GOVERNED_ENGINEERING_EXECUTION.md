@@ -25,6 +25,23 @@ SHA, invalid policy, missing evidence, out-of-scope path, failed acceptance, or
 failed reconciliation is fail-closed. Publication remains a separate canonical
 step and may claim a commit or remote SHA only after independent verification.
 
+## Stale approved bases
+
+`RIV-EXE-0008` is an execution checkpoint, not permission to silently rewrite
+an Engineering Intent. Riverview may assess the Git ancestry and bounded diff
+from the approved base to the current repository head. A descendant with no
+change to the allowed paths or execution dependencies may be revalidated; a
+change to governance/ingress code requires Pat's narrow confirmation of the
+new base binding. Scope, capability, action, policy, instruction, criteria,
+evidence requirements, repository identity, and authority lineage remain
+immutable. Material scope or execution drift fails closed for a new
+specification version or renewed approval.
+
+An approved revalidation creates a successor work-order attempt and a fresh
+execution envelope bound to the new verified base. The failed order and its
+execution evidence remain immutable and visible. Revalidation never runs
+Codex, bypasses Grace or Relay, or lets a client choose a base SHA.
+
 The named adapter uses Codex CLI's `read-only` sandbox for inspection and
 `workspace-write` sandbox for `bounded_write`; it never accepts shell text from
 PostgreSQL or exposes a generic execution operation through MCP.

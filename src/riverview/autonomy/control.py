@@ -454,6 +454,23 @@ class ExecutionStore:
             if cursor.rowcount != 1:
                 raise RuntimeError("RIV-EXE-0006: execution is not queued or does not exist.")
 
+    def fail(self, execution_id: UUID, checkpoint: str, reason: str) -> None:
+        """Close an adapter-start failure without rewriting its evidence."""
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE execution_envelopes SET status='failed',finished_at=now(),updated_at=now() WHERE execution_id=%s AND status='running'",
+                (execution_id,),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-EXE-0006: failed execution envelope is not running.")
+            cursor.execute(
+                """INSERT INTO grace_checkpoints(checkpoint_id,checkpoint_code,subject_type,subject_id,correlation_id,reason,required_action,state,idempotency_key)
+                   SELECT %s,%s,'execution',execution_id,correlation_id,%s,%s,'open',%s
+                   FROM execution_envelopes WHERE execution_id=%s
+                   ON CONFLICT(idempotency_key) DO NOTHING""",
+                (uuid4(), checkpoint, reason, "Prepare governed stale-base revalidation or route the execution checkpoint.", f"execution.failure:{execution_id}:{checkpoint}", execution_id),
+            )
+
 
 class RetryPolicy:
     """Bounded retry decision based on the registered action, never recursion."""

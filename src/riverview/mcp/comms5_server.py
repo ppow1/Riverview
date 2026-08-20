@@ -228,6 +228,41 @@ def comms5_confirm_and_promote_seed(
     }, transport_principal=_transport_principal(ctx))
 
 
+@mcp.tool(title="Revalidate approved work base", annotations=_GOVERNED_MUTATION_HINTS)
+def comms5_revalidate_and_queue_work(
+    work_order_id: Annotated[str, Field(description="Exact preserved failed work order with RIV-EXE-0008 stale-base evidence.")],
+    idempotency_key: Annotated[str, Field(description="Stable retry key for this one base revalidation and successor attempt.")],
+    explicit_steward_confirmation: Annotated[bool, Field(description="Pat's narrow confirmation of the verified new base binding; must be true.")],
+    client_id: Annotated[str, Field(description="Calling client provenance; not an authority claim.")],
+    client_type: Annotated[str, Field(description="Calling client provenance; not an authority claim.")],
+    client_name: Annotated[str, Field(description="Calling client provenance; not an authority claim.")],
+    ctx: Context,
+    client_version: str = "",
+    protocol_version: str = CONTRACT_VERSION,
+    correlation_id: str = "",
+    classification: str = "river",
+) -> Any:
+    """Revalidate one stale approved base and queue one bounded successor.
+
+    This preserves the original failed attempt and exact authority scope. It
+    never widens paths, changes the capability, or executes Codex; material
+    repository drift fails closed for renewed specification approval.
+    """
+    return _invoke(service.revalidate_and_queue_work, {
+        "work_order_id": work_order_id,
+        "idempotency_key": idempotency_key,
+        "explicit_steward_confirmation": explicit_steward_confirmation,
+        "client_id": client_id,
+        "client_type": client_type,
+        "client_name": client_name,
+        "authenticated_principal": "untrusted-client-provenance",
+        "client_version": client_version,
+        "protocol_version": protocol_version,
+        "correlation_id": correlation_id,
+        "classification": classification,
+    }, transport_principal=_transport_principal(ctx))
+
+
 @mcp.tool(title="Cancel draft with Steward confirmation", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_cancel_draft(
     seed_id: str,

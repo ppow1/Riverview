@@ -164,7 +164,7 @@ ENTRIES = [
         "A bounded execution envelope cannot start, times out, exits unsuccessfully, or fails independent reconciliation.",
         ["configuration", "base-sha", "path-scope", "transport", "provider-failure", "timeout", "reconciliation"],
         ["Inspect execution_envelopes and execution_results; verify the fixed local codex.cmd entry point, base SHA, allowed paths, and deadline."],
-        "Use the smallest bounded executable, repository, or evidence repair; retry only registered retry-safe failures once.",
+        "For RIV-EXE-0008, preserve the failed attempt, assess verified descendant drift, and use only the governed stale-base revalidation path; material drift requires renewed specification approval. Never rewrite an intent base or retry by changing keys blindly.",
         "Re-run the bounded acceptance and verify typed result, changed paths, validation evidence, and reconciled status.",
         "docs/operations/troubleshooting/checkpoints/RIV-EXE-0001_AUTONOMOUS_CONTROL_PLANE.md",
     ),

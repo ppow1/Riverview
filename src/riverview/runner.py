@@ -21,6 +21,7 @@ from riverview.autonomy.control import (
     ExecutionStore,
     ResultReconciler,
 )
+from riverview.autonomy.stale_base import StaleBaseRecoveryStore
 from riverview.database import connect
 from riverview.intake import EngineeringIntentStore
 from riverview.relay import ClaimedWork, RelayStore
@@ -65,20 +66,29 @@ class RestrictedRunner:
             raise RuntimeError("RIV-EXE-0002: engineering intent is missing.")
         if not record["authority_id"] or record["approved_by"] != "steward":
             raise PermissionError("RIV-GRC-0004: execution requires a durable Steward authority grant.")
+        refreshed_base = record["expected_base_sha"]
+        revalidation_id = work.parameters.get("stale_base_revalidation_id")
+        if revalidation_id:
+            refreshed_base = StaleBaseRecoveryStore().execution_base_for(work.work_order_id, UUID(str(revalidation_id)), intent_id)
         envelope = ExecutionEnvelope(
             execution_id=uuid4(), work_order_id=work.work_order_id, objective_id=record["objective_id"],
             stage_id=record["stage_id"], correlation_id=record["correlation_id"], causation_id=record["causation_id"],
             capability_name=record["capability_name"], repository_identity=record["repository_identity"],
-            repository_root=Path(record["repository_root"]), expected_base_sha=record["expected_base_sha"],
+            repository_root=Path(record["repository_root"]), expected_base_sha=refreshed_base,
             bounded_instruction=record["bounded_instruction"], allowed_paths=tuple(record["allowed_paths"]),
             acceptance_criteria=tuple(record["acceptance_criteria"]), evidence_requirements=tuple(record["evidence_requirements"]),
-            timeout_seconds=record["timeout_seconds"], retry_key=f"execution:{intent_id}",
+            timeout_seconds=record["timeout_seconds"], retry_key=f"execution:{work.work_order_id}",
             classification=record["classification"], write_policy=record["write_policy"],
         )
         baseline = self._working_paths(envelope.repository_root)
         execution = ExecutionStore().persist(envelope)
         ExecutionStore().start(execution)
-        result = CodexCliAdapter().run(envelope)
+        try:
+            result = CodexCliAdapter().run(envelope)
+        except RuntimeError as exc:
+            checkpoint = "RIV-EXE-0008" if str(exc).startswith("RIV-EXE-0008:") else "RIV-EXE-0001"
+            ExecutionStore().fail(execution, checkpoint, str(exc))
+            raise
         ResultReconciler().persist(result)
         reconciled = ResultReconciler().reconcile_repository(execution, envelope.repository_root, envelope.allowed_paths, baseline)
         ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
