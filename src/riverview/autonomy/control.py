@@ -526,6 +526,9 @@ class CodexCliAdapter:
         changed: tuple[str, ...] = ()
         commit_sha: str | None = None
         remote_verified_sha: str | None = None
+        stdout = ""
+        stderr = ""
+        provider_output = ""
         try:
             process = subprocess.Popen(
                 command,
@@ -587,8 +590,19 @@ class CodexCliAdapter:
             changed = timeout_paths
             category, exit_state, checkpoint = "timed_out", "timeout", ("RIV-EXE-0003",)
         except RuntimeError as exc:
-            category, exit_state, summary = "failed", "adapter_error", str(exc)[:500]
-            checkpoint = ("RIV-EXE-0007" if str(exc).startswith("RIV-EXE-0007") else "RIV-EXE-0010",)
+            message = str(exc)
+            category, exit_state = "failed", "adapter_error"
+            summary = self._adapter_error_summary(
+                error=message,
+                execution_root=execution_root,
+                worktree=worktree,
+                allowed_paths=envelope.allowed_paths,
+                changed_paths=changed,
+                provider_output=provider_output,
+                stdout=stdout,
+                stderr=stderr,
+            )
+            checkpoint = (self._checkpoint_for_error(message),)
         finally:
             output_path.unlink(missing_ok=True)
             if worktree is not None:
@@ -660,9 +674,61 @@ class CodexCliAdapter:
         }
         return _json(payload)
 
+    @classmethod
+    def _adapter_error_summary(
+        cls,
+        *,
+        error: str,
+        execution_root: Path,
+        worktree: Path | None,
+        allowed_paths: tuple[str, ...],
+        changed_paths: tuple[str, ...],
+        provider_output: str,
+        stdout: str,
+        stderr: str,
+    ) -> str:
+        """Retain bounded evidence for post-provider adapter failures."""
+
+        git_status = ""
+        try:
+            git_status = subprocess.check_output(
+                ["git", "status", "--porcelain", "--untracked-files=all"],
+                cwd=execution_root,
+                text=True,
+                stderr=subprocess.STDOUT,
+            )
+        except (OSError, subprocess.SubprocessError):
+            git_status = "<unavailable>"
+        target_state = {
+            path: (execution_root / path).is_file()
+            for path in allowed_paths
+        }
+        payload = {
+            "checkpoint": "adapter_error",
+            "error": error[:500],
+            "execution_root": str(execution_root),
+            "temporary_worktree": str(worktree) if worktree is not None else None,
+            "changed_paths": list(changed_paths),
+            "allowed_path_state": target_state,
+            "git_status": cls._safe_diagnostic_tail(git_status),
+            "provider_output_tail": cls._safe_diagnostic_tail(provider_output),
+            "stdout_tail": cls._safe_diagnostic_tail(stdout),
+            "stderr_tail": cls._safe_diagnostic_tail(stderr),
+        }
+        return _json(payload)
+
+    @staticmethod
+    def _checkpoint_for_error(message: str) -> str:
+        """Keep recovery routing aligned with the demonstrated failure class."""
+
+        for prefix in ("RIV-EXE-0007", "RIV-EXE-0010", "RIV-REC-"):
+            if message.startswith(prefix):
+                return message.split(":", 1)[0]
+        return "RIV-EXE-0010"
+
     @staticmethod
     def _requires_commit(evidence_requirements: tuple[str, ...]) -> bool:
-        return any("resulting commit" in item.lower() for item in evidence_requirements)
+        return any("commit" in item.lower() for item in evidence_requirements)
 
     @staticmethod
     def _requires_publication(evidence_requirements: tuple[str, ...]) -> bool:

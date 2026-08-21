@@ -1,5 +1,6 @@
 """Pure contract tests for the bounded autonomous control plane."""
 
+import json
 import subprocess
 from pathlib import Path
 from uuid import uuid4
@@ -123,6 +124,43 @@ def test_codex_adapter_materializes_a_real_bounded_write(monkeypatch: pytest.Mon
     assert (repository / target).read_text(encoding="utf-8") == "bounded result"
     assert commands[0][commands[0].index("--sandbox") + 1] == "workspace-write"
     assert popen_kwargs["stdin"] is subprocess.DEVNULL
+
+
+def test_worktree_paths_sees_a_new_markdown_file(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "--quiet", str(repository)], check=True, capture_output=True)
+    target = repository / "docs" / "accepted.md"
+    target.parent.mkdir()
+    target.write_text("bounded result", encoding="utf-8")
+    assert CodexCliAdapter._worktree_paths(repository) == ("docs/accepted.md",)
+
+
+def test_commit_sha_evidence_requirement_triggers_commit_phase() -> None:
+    assert CodexCliAdapter._requires_commit(("commit SHA",)) is True
+    assert CodexCliAdapter._requires_commit(("publication evidence",)) is False
+
+
+def test_adapter_error_preserves_bounded_worktree_evidence() -> None:
+    summary = CodexCliAdapter._adapter_error_summary(
+        error="RIV-REC-0004: publication requires a verified commit.",
+        execution_root=Path("A:/Riverview/repo"),
+        worktree=Path("C:/Temp/riverview-codex-worktree-example"),
+        allowed_paths=("docs/result.md",),
+        changed_paths=("docs/result.md",),
+        provider_output="provider claimed completion",
+        stdout='{"type":"turn.completed"}',
+        stderr="",
+    )
+    evidence = json.loads(summary)
+    assert evidence["temporary_worktree"].replace("\\", "/") == "C:/Temp/riverview-codex-worktree-example"
+    assert evidence["changed_paths"] == ["docs/result.md"]
+    assert evidence["provider_output_tail"] == "provider claimed completion"
+
+
+def test_adapter_error_checkpoint_preserves_reconciliation_class() -> None:
+    assert CodexCliAdapter._checkpoint_for_error("RIV-REC-0004: commit missing") == "RIV-REC-0004"
+    assert CodexCliAdapter._checkpoint_for_error("RIV-EXE-0010: empty write") == "RIV-EXE-0010"
 
 
 def test_timeout_diagnostics_are_bounded_redacted_and_phase_oriented() -> None:
