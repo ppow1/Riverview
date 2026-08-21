@@ -16,6 +16,7 @@ from riverview.river.store import EventStore
 
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 _MATERIAL_PREFIXES = (
+    "src/riverview/autonomy/stale_base.py",
     "src/riverview/runner.py",
     "src/riverview/autonomy/control.py",
     "src/riverview/relay/",
@@ -31,6 +32,40 @@ _REVIEW_PREFIXES = (
     "src/riverview/mcp/",
     "config/",
 )
+
+# Recovery is an explicit allow-list.  A failed execution is not itself proof
+# that retrying is safe, and a checkpoint must never be inferred from a
+# provider narrative.
+RECOVERABLE_FAILURE_CHECKPOINTS = frozenset({
+    "RIV-EXE-0003",  # bounded execution timeout
+    "RIV-EXE-0008",  # stale approved base
+    "RIV-EXE-0010",  # authoritative execution/reconciliation defect
+})
+RECOVERABLE_FAILURE_PREFIXES = ("RIV-REC-",)
+
+
+def is_recoverable_failure(checkpoint: str) -> bool:
+    """Return whether a durable failure checkpoint is explicitly retryable."""
+
+    return checkpoint in RECOVERABLE_FAILURE_CHECKPOINTS or any(
+        checkpoint.startswith(prefix) for prefix in RECOVERABLE_FAILURE_PREFIXES
+    )
+
+
+def immutable_contract_matches(authority_scope: dict[str, Any], intent_contract: dict[str, Any], permitted_capabilities: list[str], capability_name: str) -> bool:
+    """Verify that recovery cannot silently change the authorized job."""
+
+    contract = authority_scope.get("contract", {}) if isinstance(authority_scope, dict) else {}
+    if not isinstance(contract, dict):
+        return False
+    required = (
+        "repository_identity", "repository_root", "expected_base_sha", "bounded_instruction",
+        "allowed_paths", "acceptance_criteria", "evidence_requirements", "capability_name",
+        "action_type", "write_policy",
+    )
+    if any(contract.get(key) != intent_contract.get(key) for key in required):
+        return False
+    return permitted_capabilities == [capability_name]
 
 
 def _under(path: str, roots: tuple[str, ...]) -> bool:
@@ -48,6 +83,7 @@ class DriftAssessment:
     repository_is_descendant: bool
     decision: str
     reason: str
+    infrastructure_repair_evidence: dict[str, Any] | None = None
 
     @property
     def safe_to_revalidate(self) -> bool:
@@ -63,6 +99,7 @@ class DriftAssessment:
             "repository_is_descendant": self.repository_is_descendant,
             "decision": self.decision,
             "reason": self.reason,
+            "infrastructure_repair_evidence": self.infrastructure_repair_evidence or {},
         }
 
 
@@ -76,6 +113,7 @@ class RepositoryDriftAnalyzer:
         allowed_paths: tuple[str, ...],
         dependency_paths: tuple[str, ...] = (),
         proposed_base_sha: str | None = None,
+        infrastructure_repair_evidence: dict[str, Any] | None = None,
     ) -> DriftAssessment:
         if not _SHA.fullmatch(approved_base_sha):
             raise ValueError("RIV-EXE-0008: approved base SHA is invalid.")
@@ -88,13 +126,35 @@ class RepositoryDriftAnalyzer:
         changed = tuple(self._git(repository, "diff", "--name-only", f"{approved_base_sha}..{proposed}").splitlines())
         material = tuple(path for path in changed if _under(path, allowed_paths + dependency_paths) or _under(path, _MATERIAL_PREFIXES))
         review = tuple(path for path in changed if path not in material and _under(path, _REVIEW_PREFIXES))
-        if material:
+        infra = tuple(path for path in material if _under(path, _MATERIAL_PREFIXES))
+        if material and set(material) == set(infra) and infrastructure_repair_evidence:
+            required = {
+                "repository_identity_unchanged",
+                "allowed_paths_unchanged",
+                "capability_unchanged",
+                "action_unchanged",
+                "write_policy_unchanged",
+                "instruction_unchanged",
+                "reconciliation_not_weakened",
+                "authority_not_weakened",
+                "target_requirements_unchanged",
+                "descendant_of_approved_base",
+                "tests_passed",
+            }
+            missing = sorted(key for key in required if infrastructure_repair_evidence.get(key) is not True)
+            if not missing:
+                decision = "infrastructure_repair_revalidation"
+                reason = "only execution/reconciliation infrastructure changed, and bounded repair evidence proves the authorized contract is unchanged."
+            else:
+                decision = "material_drift"
+                reason = f"infrastructure repair evidence is incomplete: {', '.join(missing)}."
+        elif material:
             decision, reason = "material_drift", "the repository diff touches the approved scope or execution dependencies."
         elif review:
             decision, reason = "narrow_steward_confirmation", "scope is unchanged, but governance/ingress changes require Pat's narrow confirmation of the new base."
         else:
             decision, reason = "safe_revalidation", "the repository diff is outside the approved scope and execution dependencies."
-        return DriftAssessment(approved_base_sha, proposed, changed, material, review, True, decision, reason)
+        return DriftAssessment(approved_base_sha, proposed, changed, material, review, True, decision, reason, infrastructure_repair_evidence)
 
     @staticmethod
     def _git(repository: Path, *args: str) -> str:
@@ -114,28 +174,43 @@ class StaleBaseRecoveryStore:
         *,
         repository: Path | None = None,
         idempotency_key: str,
+        infrastructure_repair_evidence: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """SELECT w.status,w.error_checkpoint,w.parameters,w.action_type,w.action_version,
                           w.requested_by,w.correlation_id,w.expected_duration_seconds,w.hard_timeout_seconds,
                           i.intent_id,i.authority_id,i.objective_id,i.repository_root,i.expected_base_sha,
-                          i.allowed_paths,a.status
+                          i.allowed_paths,i.acceptance_criteria,i.evidence_requirements,i.bounded_instruction,
+                          i.capability_name,i.action_type,i.write_policy,i.repository_identity,
+                          a.status,a.scope,a.permitted_capabilities,o.status
                    FROM work_orders w JOIN engineering_intents i ON (w.parameters->>'engineering_intent_id')=i.intent_id::text
                    JOIN steward_authority_grants a ON a.authority_id=i.authority_id
+                   JOIN objectives o ON o.objective_id=i.objective_id
                    WHERE w.work_order_id=%s FOR UPDATE""",
                 (failed_work_order_id,),
             )
             row = cursor.fetchone()
-            if row is None or row[0] != "failed" or row[1] != "RIV-EXE-0008":
-                raise RuntimeError("RIV-EXE-0008: only the preserved stale-base failure is revalidatable.")
-            if row[15] not in {"active", "consumed"}:
+            if row is None or row[0] != "failed" or not is_recoverable_failure(row[1]):
+                raise RuntimeError("RIV-GRC-0007: failure checkpoint is not explicitly recoverable.")
+            if row[25] in {"completed", "cancelled"}:
+                raise RuntimeError("RIV-GRC-0007: completed objective cannot create a successor.")
+            if row[22] not in {"active", "consumed"}:
                 raise RuntimeError("RIV-GRC-0010: authority lineage is not available for revalidation.")
+            expected_contract = {
+                "repository_identity": row[21], "repository_root": str(row[12]).replace("\\", "/"),
+                "expected_base_sha": row[13], "bounded_instruction": row[17],
+                "allowed_paths": list(row[14]), "acceptance_criteria": list(row[15]),
+                "evidence_requirements": list(row[16]), "capability_name": row[18],
+                "action_type": row[19], "write_policy": row[20],
+            }
+            if not immutable_contract_matches(row[23], expected_contract, row[24], row[18]):
+                raise RuntimeError("RIV-GRC-0010: authority capability scope no longer matches the intent.")
             root = Path(row[12])
             repository = (repository or root).resolve()
             if repository != root.resolve():
                 raise PermissionError("RIV-GRC-0010: repository root does not match the bound engineering intent.")
-            assessment = RepositoryDriftAnalyzer().assess(repository, row[13], tuple(row[14]))
+            assessment = RepositoryDriftAnalyzer().assess(repository, row[13], tuple(row[14]), infrastructure_repair_evidence=infrastructure_repair_evidence)
             evidence = {**assessment.as_dict(), "allowed_paths": list(row[14]), "correlation_id": str(row[6]), "repository_root": str(root)}
             cursor.execute(
                 """INSERT INTO execution_base_revalidations(
@@ -153,6 +228,15 @@ class StaleBaseRecoveryStore:
             result = dict(zip(names, cursor.fetchone(), strict=True))
             if result["failed_work_order_id"] != failed_work_order_id:
                 raise ValueError("RIV-COMMS5-0015: revalidation idempotency key conflicts with another work order.")
+            cursor.execute(
+                """SELECT 1 FROM work_order_successor_lineage
+                   WHERE failed_work_order_id=%s
+                   UNION ALL
+                   SELECT 1 FROM work_order_retry_lineage WHERE failed_work_order_id=%s LIMIT 1""",
+                (failed_work_order_id, failed_work_order_id),
+            )
+            if cursor.fetchone():
+                raise RuntimeError("RIV-GRC-0007: a successful or active successor already exists for this failed work order.")
             return result
 
     def approve_and_queue(
@@ -163,8 +247,8 @@ class StaleBaseRecoveryStore:
         transport_principal: str | None,
         repository: Path | None = None,
     ) -> dict[str, Any]:
-        if transport_principal != "steward" or not explicit_steward_confirmation:
-            raise PermissionError("RIV-GRC-0010: narrow Steward base confirmation is required.")
+        if transport_principal != "steward":
+            raise PermissionError("RIV-GRC-0010: recovery approval must be performed by the Steward principal.")
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT * FROM execution_base_revalidations WHERE revalidation_id=%s FOR UPDATE", (revalidation_id,))
             row = cursor.fetchone()
@@ -175,11 +259,17 @@ class StaleBaseRecoveryStore:
             if record["status"] == "approved":
                 return {"revalidation_id": str(revalidation_id), "successor_work_order_id": str(record["successor_work_order_id"]), "idempotent_replay": True}
             evidence = record["evidence"] if isinstance(record["evidence"], dict) else json.loads(record["evidence"])
+            # A qualified infrastructure repair is governed by the explicit
+            # evidence contract below; it is not a second approval.  Only
+            # governance/ingress drift asks Pat for a narrow base confirmation.
+            confirmation_required = record["decision"] == "narrow_steward_confirmation"
+            if confirmation_required and not explicit_steward_confirmation:
+                raise PermissionError("RIV-GRC-0010: narrow Steward base confirmation is required for this drift class.")
             repository = (repository or Path(evidence["repository_root"])).resolve()
             assessment = RepositoryDriftAnalyzer().assess(repository, record["approved_base_sha"], tuple(evidence.get("allowed_paths", [])))
             if assessment.proposed_base_sha != record["proposed_base_sha"]:
                 raise RuntimeError("RIV-EXE-0008: repository moved after revalidation; prepare a new evidence record.")
-            if record["decision"] not in {"safe_revalidation", "narrow_steward_confirmation"}:
+            if record["decision"] not in {"safe_revalidation", "narrow_steward_confirmation", "infrastructure_repair_revalidation"}:
                 raise RuntimeError("RIV-GRC-0010: material repository drift requires renewed specification approval.")
             cursor.execute("SELECT action_type,action_version,parameters,requested_by,correlation_id,expected_duration_seconds,hard_timeout_seconds FROM work_orders WHERE work_order_id=%s FOR UPDATE", (record["failed_work_order_id"],))
             original = cursor.fetchone()

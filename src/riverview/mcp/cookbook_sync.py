@@ -179,6 +179,16 @@ ENTRIES = [
         "docs/operations/troubleshooting/checkpoints/RIV-MCP-0010_STEWARD_SEED_SCHEMA.md",
     ),
     (
+        "RIV-EXE-0011",
+        "Same-lineage recovery after infrastructure repair",
+        "An approved work order failed for a recoverable reason and a Riverview repair made its approved base stale before the same authorized job could retry.",
+        ["recoverable-failure", "repair-self-drift", "successor-duplicate", "scope-mutation", "residue"],
+        ["Inspect the immutable failed work order/execution, objective status, exact authority contract, current HEAD, approved base, and any local residue."],
+        "Use the generic recovery gate, then assess base drift independently. Qualify infrastructure-repair drift only with evidence that authority, scope, capability, action, write policy, reconciliation, and tests are unchanged. Preserve the original records and quarantine residue before the successor.",
+        ["Run legacy stale-base, infrastructure-repair, mutation, duplicate-successor, and append-only recovery acceptance; verify the successor binds to the assessed current base."],
+        "docs/operations/troubleshooting/checkpoints/RIV-EXE-0011_SAME_LINEAGE_RECOVERY_AFTER_REPAIR.md",
+    ),
+    (
         "RIV-EXE-0010",
         "Codex completion versus authoritative repository state",
         "Codex reports completion while the required artifact, bounded change, commit, or publication is absent from authoritative Riverview state.",
