@@ -5,4 +5,9 @@
 
 Each waypoint defines identity, parent, order, status, dependencies, acceptance criteria, scope boundary, Steward checkpoint, and governing references. Later implementation details may be expanded near execution, but a new conversation must not change mission, dependencies, boundary, or acceptance by guessing. Any necessary change becomes a reviewed roadmap revision.
 
-Current sequence after the published Steward Status slice: `RV-004.4` read-only MCP Relay, then `RV-008.1` MCP resources and the remaining Relay/Grace path according to recorded dependencies.
+The roadmap projection is reconciled to the PostgreSQL transition ledger. The
+first unfinished dependency-ready leaf is `RV-016.5` performance and presence
+acceptance. Its machine-side spatial evidence exists, but real Quest/3D,
+comfort, frame-time, reconnect, and Steward experiential acceptance do not.
+The `ready_bench.md` board remains intentionally empty until Pat commits a
+sufficiently designed next task under the Ready Bench rules.
