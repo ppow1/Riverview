@@ -14,6 +14,7 @@ def test_runtime_registry_has_one_ordered_owner_and_required_services():
     assert ids == {"operator", "cme-supervisor", "comms5-http", "comms5-transport", "relay-worker"}
     assert registry.specs["relay-worker"].dependencies == ("cme-supervisor",)
     assert registry.specs["comms5-transport"].dependencies == ("comms5-http",)
+    assert registry.specs["comms5-http"].environment == {"RIVERVIEW_COMMS5_TRANSPORT_DIAGNOSTICS": "1"}
     assert registry.specs["cme-supervisor"].process_match == "riverview.autonomy.live_service"
 
 
@@ -95,6 +96,16 @@ def test_relay_service_recycle_is_allowed(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(supervisor, "_terminate_process_tree", lambda _pid: active.clear())
     result = supervisor._recycle_service("relay-worker")
     assert result["service_id"] == "relay-worker"
+
+
+def test_comms5_http_service_recycle_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
+    active = [{"pid": 123, "ppid": 1, "cmdline": "comms5", "executable": "python"}]
+    monkeypatch.setattr(supervisor, "_processes", lambda: list(active))
+    monkeypatch.setattr(supervisor, "_process_matches", lambda _spec, _process: True)
+    monkeypatch.setattr(supervisor, "_terminate_process_tree", lambda _pid: active.clear())
+    result = supervisor._recycle_service("comms5-http")
+    assert result["service_id"] == "comms5-http"
 
 
 def test_launcher_child_tree_is_one_managed_owner(monkeypatch: pytest.MonkeyPatch) -> None:

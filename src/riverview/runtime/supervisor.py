@@ -39,6 +39,7 @@ class ServiceSpec:
     process_match: str = ""
     secret_file: str | None = None
     secret_env: str | None = None
+    environment: dict[str, str] = field(default_factory=dict)
     restart: bool = True
     startup_timeout: float = 8.0
 
@@ -220,7 +221,6 @@ class RuntimeSupervisor:
             state.last_change = _now()
             return True
         if roots:
-            root_pid = int(roots[0]["pid"])
             state.pid = int(roots[0]["pid"])
             state.adopted = True
             state.status = "running"
@@ -244,8 +244,8 @@ class RuntimeSupervisor:
         state = self.states.get(service_id)
         if state is None:
             raise ValueError("RIV-RUN-0001: unknown managed service.")
-        if service_id not in {"cme-supervisor", "relay-worker", "operator"}:
-            raise ValueError("RIV-RUN-0001: only CME, Relay, or Operator service recycle is enabled.")
+        if service_id not in {"cme-supervisor", "relay-worker", "operator", "comms5-http", "comms5-transport"}:
+            raise ValueError("RIV-RUN-0001: only registered production service recycle is enabled.")
         matches = [p for p in self._processes() if self._process_matches(state.spec, p)]
         match_pids = {int(process["pid"]) for process in matches}
         roots = [process for process in matches if int(process.get("ppid") or 0) not in match_pids]
@@ -355,6 +355,7 @@ class RuntimeSupervisor:
             if not secret:
                 raise RuntimeError(f"RIV-RUN-0003: credential source empty for {spec.service_id}.")
             environment[spec.secret_env] = secret
+        environment.update(spec.environment)
         return environment
 
     def _spawn(self, state: ServiceState) -> None:

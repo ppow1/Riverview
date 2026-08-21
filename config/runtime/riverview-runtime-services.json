@@ -29,6 +29,7 @@
       "port": 11826,
       "health_url": null,
       "process_match": "riverview.mcp.comms5_http_server",
+      "environment": {"RIVERVIEW_COMMS5_TRANSPORT_DIAGNOSTICS": "1"},
       "restart": true,
       "startup_timeout": 8.0
     },

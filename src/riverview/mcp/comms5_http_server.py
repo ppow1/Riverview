@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 
 from riverview.mcp.comms5_server import mcp
+from riverview.mcp.transport_diagnostics import TransportDiagnosticsMiddleware
 
 APPLICATION_NAME = "Riverview Comms5"
 APPLICATION_VERSION = "5.0"
@@ -35,7 +36,27 @@ def main() -> None:
     mcp.settings.host = host
     mcp.settings.port = _port()
     mcp.settings.streamable_http_path = "/mcp"
-    mcp.run(transport="streamable-http")
+    app = mcp.streamable_http_app()
+    app.add_middleware(TransportDiagnosticsMiddleware)
+    _run_app(app)
+
+
+def _run_app(app: object) -> None:
+    """Run the instrumented FastMCP Starlette app with the existing settings."""
+
+    import anyio
+    import uvicorn
+
+    async def serve() -> None:
+        config = uvicorn.Config(
+            app,
+            host=mcp.settings.host,
+            port=mcp.settings.port,
+            log_level=mcp.settings.log_level.lower(),
+        )
+        await uvicorn.Server(config).serve()
+
+    anyio.run(serve)
 
 
 if __name__ == "__main__":
