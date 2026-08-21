@@ -302,8 +302,14 @@ class Comms5Service:
         formation_gap = authority["status"] == "not_created" or not (authority.get("scope") or {}).get("formation_contract_present", False)
         return {"objective": status, "authority": authority, "engineering_intent": intent, "cme": cme, "work_orders": _json(work), "steward_attention_required": any(stage.get("steward_checkpoint") for stage in status["stages"]) or (formation_gap and intent["status"] == "not_created")}
 
-    def cme_status(self) -> dict[str, Any] | None:
-        return CMEStatusStore().read()
+    def cme_status(self, server_request_id: str = "") -> dict[str, Any] | None:
+        started = time.perf_counter()
+        if server_request_id:
+            record("db.start", server_request_id, started=started, operation="cme_status", phase="acquisition")
+        result = CMEStatusStore().read()
+        if server_request_id:
+            record("db.complete", server_request_id, started=started, operation="cme_status", phase="query")
+        return result
 
     def recent_steward_submissions(self, limit: int = 20) -> dict[str, Any]:
         with connect() as connection, connection.cursor() as cursor:

@@ -7,6 +7,7 @@ stdio by default; deployment/connector registration remains an explicit step.
 from __future__ import annotations
 
 import json
+import time
 from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -14,6 +15,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from riverview.mcp.comms5 import CONTRACT_VERSION, Comms5Error, Comms5Service
+from riverview.mcp.transport_diagnostics import record
 
 SERVER_NAME = "Riverview Comms5"
 mcp = FastMCP(SERVER_NAME)
@@ -81,9 +83,14 @@ def _server_request_id(context: Context) -> str:
 
 
 @mcp.tool()
-def comms5_contract_info() -> Any:
+def comms5_contract_info(ctx: Context) -> Any:
     """Return the versioned Comms5 contract identity."""
-    return _safe(service.contract_info())
+    request_id = _server_request_id(ctx)
+    started = time.perf_counter()
+    record("mcp.dispatch", request_id, started=started, operation="contract_info", phase="dispatch")
+    result = _safe(service.contract_info())
+    record("mcp.complete", request_id, started=started, operation="contract_info", phase="tool")
+    return result
 
 
 @mcp.tool()
@@ -184,9 +191,14 @@ def comms5_objective_status(objective_id: str) -> Any:
 
 
 @mcp.tool()
-def comms5_cme_status() -> Any:
+def comms5_cme_status(ctx: Context) -> Any:
     """Return the authoritative CME runtime projection."""
-    return _safe(service.cme_status())
+    request_id = _server_request_id(ctx)
+    started = time.perf_counter()
+    record("mcp.dispatch", request_id, started=started, operation="cme_status", phase="dispatch")
+    result = _safe(service.cme_status(request_id))
+    record("mcp.complete", request_id, started=started, operation="cme_status", phase="tool")
+    return result
 
 
 @mcp.tool()

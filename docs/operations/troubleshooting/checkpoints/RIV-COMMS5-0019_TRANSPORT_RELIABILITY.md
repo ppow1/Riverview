@@ -40,6 +40,30 @@ local evidence before retrying. Do not immediately retry with another ID. If a
 retry is necessary, use a new attempt ID and retain both records. Run only a
 bounded sequence of approximately ten probes, then stop if no failure occurs.
 
+## Ordinary-read fallback
+
+If OpenAI intercepts `comms5_transport_probe` before connector execution, record
+the separate class `OPENAI_PRE_CONNECTOR_INTERCEPTION`; that event has no
+Riverview request. Do not bypass the safety gate. Use the already-allowed
+`comms5_cme_status` or `comms5_contract_info` operation instead. Record Pat's
+local attempt time and operation name, then query the bounded event window:
+
+```powershell
+.venv\Scripts\python.exe tools\diagnostics\query_comms5_transport_window.py `
+  --start 2026-08-21T03:10:00+00:00 `
+  --end 2026-08-21T03:11:00+00:00 `
+  --operation cme_status
+```
+
+Classify only from evidence: `REQUEST_NEVER_REACHED_CADDY` when an allowed
+attempt has no matching ingress record; `CADDY_RECEIVED_BACKEND_INCOMPLETE`
+when HTTP receipt exists without MCP dispatch; `COMMS5_RECEIVED_DB_INCOMPLETE`
+when database start lacks completion; `SERVER_COMPLETED_CLIENT_CANCELED`
+when MCP completion exists without HTTP send; and
+`SERVER_COMPLETED_CHATGPT_REPORTED_TIMEOUT` when server and HTTP completion
+exist but ChatGPT reports a timeout. A missing record for a blocked tool is
+`OPENAI_PRE_CONNECTOR_INTERCEPTION`, not a Riverview transport failure.
+
 ## Evidence interpretation
 
 The original client timeout is independent of server rejection. A request in
