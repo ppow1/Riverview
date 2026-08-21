@@ -44,11 +44,21 @@ RECOVERABLE_FAILURE_CHECKPOINTS = frozenset({
 RECOVERABLE_FAILURE_PREFIXES = ("RIV-REC-",)
 
 
-def is_recoverable_failure(checkpoint: str) -> bool:
+def is_recoverable_failure(checkpoint: str, failure_evidence: object | None = None) -> bool:
     """Return whether a durable failure checkpoint is explicitly retryable."""
 
-    return checkpoint in RECOVERABLE_FAILURE_CHECKPOINTS or any(
-        checkpoint.startswith(prefix) for prefix in RECOVERABLE_FAILURE_PREFIXES
+    if checkpoint in RECOVERABLE_FAILURE_CHECKPOINTS or any(checkpoint.startswith(prefix) for prefix in RECOVERABLE_FAILURE_PREFIXES):
+        return True
+    evidence = failure_evidence if isinstance(failure_evidence, dict) else {}
+    reason = str(evidence.get("reason", ""))
+    # These two historical records are retryable only with their exact,
+    # already-audited defect evidence.  The broad checkpoints remain closed.
+    return (checkpoint == "RIV-DB-0004" and "execution_results_bounded_summary_check" in reason) or (
+        checkpoint == "RIV-RUN-0001" and "expected string or bytes-like object" in reason
+    ) or (
+        checkpoint == "RIV-WRK-0004" and evidence.get("status") == "timed_out"
+    ) or (
+        checkpoint == "RIV-EXE-0007" and "changed path escaped envelope" in reason
     )
 
 
@@ -127,7 +137,8 @@ class RepositoryDriftAnalyzer:
         material = tuple(path for path in changed if _under(path, allowed_paths + dependency_paths) or _under(path, _MATERIAL_PREFIXES))
         review = tuple(path for path in changed if path not in material and _under(path, _REVIEW_PREFIXES))
         infra = tuple(path for path in material if _under(path, _MATERIAL_PREFIXES))
-        if material and set(material) == set(infra) and infrastructure_repair_evidence:
+        approved_material = tuple(path for path in material if _under(path, allowed_paths))
+        if material and set(material) == set(infra).union(approved_material) and infrastructure_repair_evidence:
             required = {
                 "repository_identity_unchanged",
                 "allowed_paths_unchanged",
@@ -144,7 +155,7 @@ class RepositoryDriftAnalyzer:
             missing = sorted(key for key in required if infrastructure_repair_evidence.get(key) is not True)
             if not missing:
                 decision = "infrastructure_repair_revalidation"
-                reason = "only execution/reconciliation infrastructure changed, and bounded repair evidence proves the authorized contract is unchanged."
+                reason = "execution/reconciliation infrastructure and the approved bounded feature paths changed; repair evidence proves the authorized contract is unchanged."
             else:
                 decision = "material_drift"
                 reason = f"infrastructure repair evidence is incomplete: {', '.join(missing)}."
@@ -183,7 +194,7 @@ class StaleBaseRecoveryStore:
                           i.intent_id,i.authority_id,i.objective_id,i.repository_root,i.expected_base_sha,
                           i.allowed_paths,i.acceptance_criteria,i.evidence_requirements,i.bounded_instruction,
                           i.capability_name,i.action_type,i.write_policy,i.repository_identity,
-                          a.status,a.scope,a.permitted_capabilities,o.status
+                          a.status,a.scope,a.permitted_capabilities,o.status,w.result_report
                    FROM work_orders w JOIN engineering_intents i ON (w.parameters->>'engineering_intent_id')=i.intent_id::text
                    JOIN steward_authority_grants a ON a.authority_id=i.authority_id
                    JOIN objectives o ON o.objective_id=i.objective_id
@@ -191,7 +202,8 @@ class StaleBaseRecoveryStore:
                 (failed_work_order_id,),
             )
             row = cursor.fetchone()
-            if row is None or row[0] != "failed" or not is_recoverable_failure(row[1]):
+            failure_evidence = row[26] if row is not None and isinstance(row[26], dict) else {"status": row[0]} if row is not None else {}
+            if row is None or row[0] not in {"failed", "timed_out"} or not is_recoverable_failure(row[1], failure_evidence):
                 raise RuntimeError("RIV-GRC-0007: failure checkpoint is not explicitly recoverable.")
             if row[25] in {"completed", "cancelled"}:
                 raise RuntimeError("RIV-GRC-0007: completed objective cannot create a successor.")
@@ -212,17 +224,32 @@ class StaleBaseRecoveryStore:
                 raise PermissionError("RIV-GRC-0010: repository root does not match the bound engineering intent.")
             assessment = RepositoryDriftAnalyzer().assess(repository, row[13], tuple(row[14]), infrastructure_repair_evidence=infrastructure_repair_evidence)
             evidence = {**assessment.as_dict(), "allowed_paths": list(row[14]), "correlation_id": str(row[6]), "repository_root": str(root)}
-            cursor.execute(
-                """INSERT INTO execution_base_revalidations(
+            cursor.execute("SELECT revalidation_id,status,successor_work_order_id FROM execution_base_revalidations WHERE failed_work_order_id=%s FOR UPDATE", (failed_work_order_id,))
+            existing_revalidation = cursor.fetchone()
+            if existing_revalidation and existing_revalidation[1] == "approved":
+                return {"revalidation_id": existing_revalidation[0], "failed_work_order_id": failed_work_order_id, "successor_work_order_id": existing_revalidation[2], "status": "approved"}
+            if existing_revalidation:
+                cursor.execute(
+                    """UPDATE execution_base_revalidations
+                       SET approved_base_sha=%s,proposed_base_sha=%s,changed_paths=%s::jsonb,material_paths=%s::jsonb,
+                           review_paths=%s::jsonb,evidence=%s::jsonb,decision=%s,status='pending',idempotency_key=%s,updated_at=now()
+                       WHERE revalidation_id=%s""",
+                    (assessment.approved_base_sha, assessment.proposed_base_sha, json.dumps(assessment.changed_paths),
+                     json.dumps(assessment.material_paths), json.dumps(assessment.review_paths), json.dumps(evidence),
+                     assessment.decision, idempotency_key, existing_revalidation[0]),
+                )
+            else:
+                cursor.execute(
+                    """INSERT INTO execution_base_revalidations(
                     revalidation_id,failed_work_order_id,intent_id,objective_id,authority_id,
                     approved_base_sha,proposed_base_sha,changed_paths,material_paths,review_paths,evidence,
                     decision,status,idempotency_key)
                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s::jsonb,%s,'pending',%s)
                    ON CONFLICT(idempotency_key) DO NOTHING""",
-                (uuid4(), failed_work_order_id, row[9], row[11], row[10], assessment.approved_base_sha,
-                 assessment.proposed_base_sha, json.dumps(assessment.changed_paths), json.dumps(assessment.material_paths),
-                 json.dumps(assessment.review_paths), json.dumps(evidence), assessment.decision, idempotency_key),
-            )
+                    (uuid4(), failed_work_order_id, row[9], row[11], row[10], assessment.approved_base_sha,
+                     assessment.proposed_base_sha, json.dumps(assessment.changed_paths), json.dumps(assessment.material_paths),
+                     json.dumps(assessment.review_paths), json.dumps(evidence), assessment.decision, idempotency_key),
+                )
             cursor.execute("SELECT * FROM execution_base_revalidations WHERE idempotency_key=%s", (idempotency_key,))
             names = [column.name for column in cursor.description]
             result = dict(zip(names, cursor.fetchone(), strict=True))
@@ -304,3 +331,19 @@ class StaleBaseRecoveryStore:
         if row is None:
             raise PermissionError("RIV-GRC-0010: refreshed base binding is not approved for this exact work lineage.")
         return str(row[0])
+
+    def refresh_approved_successor_base(self, revalidation_id: UUID, repository: Path) -> str:
+        """Refresh a queued successor's verified descendant base before start."""
+
+        current = RepositoryDriftAnalyzer._git(repository.resolve(), "rev-parse", "HEAD")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """UPDATE execution_base_revalidations
+                   SET proposed_base_sha=%s,updated_at=now()
+                   WHERE revalidation_id=%s AND status='approved'
+                     AND successor_work_order_id IN (SELECT work_order_id FROM work_orders WHERE status IN ('queued','claimed'))""",
+                (current, revalidation_id),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-EXE-0008: approved successor is not queued or claimable.")
+        return current

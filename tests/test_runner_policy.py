@@ -22,6 +22,22 @@ def test_runner_preserves_specific_execution_checkpoint() -> None:
         "RIV-EXE-0003: Codex CLI exceeded the bounded execution deadline."
     ) == "RIV-EXE-0003"
     assert RestrictedRunner._checkpoint_from_error("unclassified runner failure") == "RIV-RUN-0001"
+    assert RestrictedRunner._checkpoint_from_error(None) == "RIV-RUN-0001"
+
+
+def test_result_summary_is_bounded_without_removing_the_database_guard() -> None:
+    from riverview.autonomy.control import ResultReconciler
+
+    summary = ResultReconciler._bounded_persisted_summary("x" * 5000)
+    assert len(summary) <= 4000
+    assert "bounded summary truncated" in summary
+    assert ResultReconciler._bounded_persisted_summary(None)
+
+
+def test_diagnostic_tail_accepts_absent_provider_output() -> None:
+    from riverview.autonomy.control import CodexCliAdapter
+
+    assert CodexCliAdapter._safe_diagnostic_tail(None) == ""
 
 
 def test_failed_provider_result_cannot_enter_accepted_reconciliation(monkeypatch, tmp_path: Path) -> None:

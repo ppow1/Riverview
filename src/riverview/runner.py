@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import threading
+from time import monotonic
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -62,9 +63,11 @@ class RestrictedRunner:
             return {"status": "failed", "checkpoint_id": checkpoint}
 
     @staticmethod
-    def _checkpoint_from_error(reason: str) -> str:
+    def _checkpoint_from_error(reason: object) -> str:
         """Preserve the most specific stable checkpoint surfaced by a seam."""
 
+        if not isinstance(reason, str):
+            reason = "" if reason is None else str(reason)
         match = re.search(r"\b(RIV-[A-Z0-9]+-\d{4})\b", reason)
         return match.group(1) if match else "RIV-RUN-0001"
 
@@ -190,11 +193,16 @@ class RestrictedRunner:
         )
         stopped = threading.Event()
         heartbeat_error: list[str] = []
+        last_progress = monotonic()
 
         def heartbeat() -> None:
+            nonlocal last_progress
             while not stopped.wait(self.heartbeat_seconds):
                 try:
                     self.store.heartbeat(work.work_order_id, self.worker_id, 10)
+                    if monotonic() - last_progress >= 120:
+                        self.store.progress(work.work_order_id, self.worker_id, phase="testing", progress_percent=50, summary="Restricted runner heartbeat observed.")
+                        last_progress = monotonic()
                 except RuntimeError as exc:
                     heartbeat_error.append(str(exc))
                     return

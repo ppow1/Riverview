@@ -464,6 +464,8 @@ class ExecutionStore:
             )
             if cursor.rowcount != 1:
                 raise RuntimeError("RIV-EXE-0006: failed execution envelope is not running.")
+            cursor.execute("SELECT correlation_id FROM execution_envelopes WHERE execution_id=%s", (execution_id,))
+            correlation_id = cursor.fetchone()[0]
             cursor.execute(
                 """INSERT INTO grace_checkpoints(checkpoint_id,checkpoint_code,subject_type,subject_id,correlation_id,reason,required_action,state,idempotency_key)
                    SELECT %s,%s,'execution',execution_id,correlation_id,%s,%s,'open',%s
@@ -471,6 +473,12 @@ class ExecutionStore:
                    ON CONFLICT(idempotency_key) DO NOTHING""",
                 (uuid4(), checkpoint, reason, "Prepare governed stale-base revalidation or route the execution checkpoint.", f"execution.failure:{execution_id}:{checkpoint}", execution_id),
             )
+        EventStore().append(RiverEvent(
+            event_type="execution.failure.recorded", aggregate_type="execution", aggregate_id=execution_id,
+            correlation_id=correlation_id, causation_id=execution_id,
+            idempotency_key=f"execution.failure.recorded:{execution_id}:{checkpoint}", classification=Classification.RIVER,
+            payload={"execution_id": str(execution_id), "checkpoint": checkpoint, "status": "failed", "reason": reason[:500]},
+        ))
 
 
 class RetryPolicy:
@@ -535,6 +543,8 @@ class CodexCliAdapter:
                 cwd=execution_root,
                 stdin=subprocess.DEVNULL,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 shell=False,
@@ -627,9 +637,11 @@ class CodexCliAdapter:
             process.kill()
 
     @staticmethod
-    def _safe_diagnostic_tail(value: str, limit: int = 2000) -> str:
+    def _safe_diagnostic_tail(value: object, limit: int = 2000) -> str:
         """Keep timeout diagnostics bounded and redact common credential-shaped values."""
 
+        if not isinstance(value, str):
+            value = "" if value is None else str(value)
         redacted = re.sub(
             r"(?i)(authorization|password|secret|token|api[_-]?key)(?:[\"']?\s*[:=]\s*[\"']?)[^\"'\s,}]+",
             r"\1=[REDACTED]",
@@ -875,12 +887,13 @@ class ResultReconciler:
     def persist(self, result: ExecutionResult) -> None:
         if result.remote_verified_sha and not result.commit_sha:
             raise ValueError("RIV-EXE-0005: remote verification cannot exist without a commit SHA.")
+        bounded_summary = self._bounded_persisted_summary(result.bounded_summary)
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """INSERT INTO execution_results(result_id,execution_id,correlation_id,provider_id,result_category,exit_state,changed_paths,validation_evidence,commit_sha,remote_verified_sha,checkpoint_refs,artifact_refs,bounded_summary,started_at,finished_at)
                    VALUES(%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s,%s::jsonb,%s::jsonb,%s,%s,%s)
                    ON CONFLICT(execution_id) DO NOTHING""",
-                (result.result_id, result.execution_id, result.correlation_id, result.provider_id, result.result_category, result.exit_state, _json(result.changed_paths), _json(result.validation_evidence), result.commit_sha, result.remote_verified_sha, _json(result.checkpoint_refs), _json(result.artifact_refs), result.bounded_summary, result.started_at, result.finished_at),
+                (result.result_id, result.execution_id, result.correlation_id, result.provider_id, result.result_category, result.exit_state, _json(result.changed_paths), _json(result.validation_evidence), result.commit_sha, result.remote_verified_sha, _json(result.checkpoint_refs), _json(result.artifact_refs), bounded_summary, result.started_at, result.finished_at),
             )
             cursor.execute("UPDATE execution_envelopes SET status=%s,finished_at=%s,updated_at=now() WHERE execution_id=%s", (result.result_category, result.finished_at, result.execution_id))
             if result.result_category != "succeeded":
@@ -900,6 +913,17 @@ class ResultReconciler:
             idempotency_key=f"execution.result.recorded:{result.execution_id}", classification=Classification.RIVER,
             payload={"execution_id": str(result.execution_id), "result_category": result.result_category},
         ))
+
+    @staticmethod
+    def _bounded_persisted_summary(value: Any) -> str:
+        """Guarantee the database invariant without weakening its safety bound."""
+
+        text = value if isinstance(value, str) else str(value or "No bounded execution summary was supplied.")
+        text = text.strip()
+        if not text:
+            text = "No bounded execution summary was supplied."
+        suffix = "… [bounded summary truncated]"
+        return text if len(text) <= 4000 else f"{text[:4000 - len(suffix)]}{suffix}"
 
     def reconcile_repository(self, execution_id: UUID, repository_root: Path, allowed_paths: tuple[str, ...], baseline_paths: tuple[str, ...] = (), *, expected_base_sha: str | None = None, acceptance_criteria: tuple[str, ...] = (), evidence_requirements: tuple[str, ...] = (), write_policy: str = READ_ONLY_POLICY) -> dict[str, Any]:
         """Independently verify changed paths and close only a bounded result."""

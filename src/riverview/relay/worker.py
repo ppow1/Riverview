@@ -40,6 +40,8 @@ class RelayWorker:
         self.poll_seconds = poll_seconds
         self.runner = RestrictedRunner(self.repository, worker_id)
         self.statistics = WorkerStatistics()
+        self.progress_interval_seconds = 120.0
+        self._last_progress_at = 0.0
 
     def _record(self, state: str, work_order_id: Any = None) -> None:
         with connect() as connection, connection.cursor() as cursor:
@@ -73,6 +75,7 @@ class RelayWorker:
                 self._record("idle")
                 break
             self._record_result(result)
+            self._last_progress_at = monotonic()
             processed += 1
         return processed
 

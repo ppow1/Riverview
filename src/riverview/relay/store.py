@@ -113,6 +113,23 @@ class RelayStore:
             cursor.execute("UPDATE work_orders SET status='running',last_heartbeat_at=now(),lease_expires_at=now()+make_interval(secs=>%s),updated_at=now() WHERE work_order_id=%s AND lease_owner=%s AND status IN ('claimed','running')", (lease_seconds, work_order_id, worker_id))
             if cursor.rowcount != 1: raise RuntimeError("RIV-WRK-0002: Heartbeat did not own an active lease.")
 
+    def progress(self, work_order_id: UUID, worker_id: str, *, phase: str, progress_percent: int | None = None, summary: str = "") -> None:
+        """Record one bounded human-visible progress pulse without changing lifecycle state."""
+
+        bounded_percent = None if progress_percent is None else max(0, min(int(progress_percent), 100))
+        with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """UPDATE work_orders
+                   SET last_heartbeat_at=now(),updated_at=now(),result_report=COALESCE(result_report,'{}'::jsonb) || %s::jsonb
+                   WHERE work_order_id=%s AND lease_owner=%s AND status IN ('claimed','running')""",
+                (json.dumps({"phase": phase[:120], "progress_percent": bounded_percent, "last_activity": summary[:240]}), work_order_id, worker_id),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-WRK-0002: Progress did not own an active lease.")
+            cursor.execute("SELECT correlation_id FROM work_orders WHERE work_order_id=%s", (work_order_id,))
+            correlation_id = cursor.fetchone()[0]
+            self._append_event(cursor, event_type="work.order.progress", work_order_id=work_order_id, correlation_id=correlation_id, payload={"status": "running", "phase": phase[:120], "progress_percent": bounded_percent, "summary": summary[:240]})
+
     def complete(self, work_order_id: UUID, worker_id: str, result: dict[str, Any]) -> None:
         with connect(self._config) as connection, connection.cursor() as cursor:
             cursor.execute("UPDATE work_orders SET status='succeeded',result_report=%s::jsonb,finished_at=now(),lease_expires_at=NULL,updated_at=now() WHERE work_order_id=%s AND lease_owner=%s AND status IN ('claimed','running') RETURNING correlation_id", (json.dumps(result), work_order_id, worker_id))

@@ -1,28 +1,27 @@
-"""Minimal bounded WebXR-capable spatial prototype surface.
+"""Bounded Quest/WebXR Spatial Test Room 001."""
 
-This is a real browser-renderable prototype scaffold, not evidence of Quest
-hardware acceptance. It keeps operational state read-only and labels
-placeholder/proposed geometry honestly.
-"""
-
-WEBXR_PROTOTYPE_HTML = """<!doctype html>
-<html lang="en"><meta charset="utf-8"><title>Riverview Spatial Prototype</title>
-<style>body{background:#10131a;color:#e7eefc;font:16px sans-serif;margin:2rem}canvas{border:1px solid #65718a;max-width:100%}button{padding:.6rem;margin:.5rem 0}</style>
-<h1>Riverview Spatial Prototype</h1>
-<p id="state">Read-only logical scene. Geometry and resident visuals are marked proposed.</p>
-<button id="enter">Enter immersive VR when a compatible headset is available</button>
-<canvas id="scene" width="960" height="540" aria-label="Riverview logical spatial scene"></canvas>
+WEBXR_PROTOTYPE_HTML = r'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Riverview Spatial Test Room 001</title>
+<style>body{margin:0;background:#10131a;color:#e7eefc;font:16px system-ui,sans-serif}#hud{position:fixed;z-index:2;left:1rem;top:1rem;max-width:32rem;padding:1rem;background:#182235dd;border:1px solid #65718a;border-radius:.75rem}button{padding:.6rem .8rem;margin:.25rem 0;background:#263653;color:#fff;border:1px solid #7ca6d8;border-radius:.4rem}canvas{display:block;width:100vw;height:100vh}#leverState{color:#80e0ba;font-weight:700}</style></head>
+<body><section id="hud" aria-live="polite"><strong>SPATIAL TEST ROOM 001</strong><p id="state">Desktop fallback. Quest/WebXR is available when a compatible headset and HTTPS are present.</p><p>Fixed room geometry, depth references, and one adult female test resident. The scene is not PROPOSED; it is a bounded local test surface.</p><p>Local test lever: <span id="leverState">OFF</span></p><button id="enter">Enter immersive VR</button><button id="localLever" aria-label="Activate local test lever">Activate local test lever</button><small>Operational Riverview controls remain disabled; operational controls remain disabled; this lever is local test-only.</small></section><canvas id="scene" aria-label="Riverview Spatial Test Room 001"></canvas>
 <script>
-const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
-ctx.fillStyle='#182235';ctx.fillRect(0,0,canvas.width,canvas.height);
-ctx.strokeStyle='#5cc8ff';ctx.strokeRect(140,120,680,300);
-ctx.fillStyle='#e7eefc';ctx.font='24px sans-serif';ctx.fillText('Riverview logical room (PROPOSED)',180,170);
-ctx.font='18px sans-serif';ctx.fillText('Resident references: read-only',180,215);ctx.fillText('Operational ownership: PostgreSQL/Riverview',180,250);
-document.getElementById('enter').onclick=async()=>{if(!navigator.xr){document.getElementById('state').textContent='WebXR unavailable; no headset session started.';return;}try{const session=await navigator.xr.requestSession('immersive-vr');document.getElementById('state').textContent='WebXR session active; operational controls remain disabled.';session.addEventListener('end',()=>document.getElementById('state').textContent='WebXR session ended.');}catch(error){document.getElementById('state').textContent='WebXR session unavailable: '+error.name;}};
-</script></html>"""
+const canvas=document.getElementById('scene'),stateEl=document.getElementById('state'),leverEl=document.getElementById('leverState');let leverOn=false,session=null,gl=null,program=null,pb=null,cb=null;
+const V='attribute vec3 p;attribute vec3 c;uniform mat4 mvp;varying vec3 vc;void main(){gl_Position=mvp*vec4(p,1.0);vc=c;}';const F='precision mediump float;varying vec3 vc;void main(){gl_FragColor=vec4(vc,1.0);}';
+const I=()=>[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],M=(a,b)=>{const r=new Array(16).fill(0);for(let c=0;c<4;c++)for(let y=0;y<4;y++)for(let k=0;k<4;k++)r[c*4+y]+=a[k*4+y]*b[c*4+k];return r},T=(x,y,z)=>{const m=I();m[12]=x;m[13]=y;m[14]=z;return m},S=(x,y,z)=>{const m=I();m[0]=x;m[5]=y;m[10]=z;return m};
+function P(f,a,n,z){const q=1/Math.tan(f/2),d=1/(n-z);return[q/a,0,0,0,0,q,0,0,0,0,(z+n)*d,-1,0,0,2*z*n*d,0]}
+function Vw(x,y,z){const q=Math.hypot(x,y,z),zz=[x/q,y/q,z/q],xx=[zz[2],0,-zz[0]],qx=Math.hypot(...xx),xv=xx.map(v=>v/qx),yv=[zz[1]*xv[2]-zz[2]*xv[1],zz[2]*xv[0]-zz[0]*xv[2],zz[0]*xv[1]-zz[1]*xv[0]];return[xv[0],yv[0],zz[0],0,xv[1],yv[1],zz[1],0,xv[2],yv[2],zz[2],0,-xv[0]*x-xv[1]*y-xv[2]*z,-yv[0]*x-yv[1]*y-yv[2]*z,-zz[0]*x-zz[1]*y-zz[2]*z,1]}
+const verts=[-1,-1,-1,1,-1,-1,1,1,-1,-1,1,-1,-1,-1,1,1,-1,1,1,1,1,-1,1,1,-1,-1,-1,-1,1,-1,-1,1,1,-1,1,1,-1,-1,-1,1,-1,-1,1,1,1,1,1,-1,-1,-1,-1,1,-1,1,1,1,1,-1,1,1];
+function box(vp,x,y,z,s,c){const col=[];for(let i=0;i<24;i++)col.push(...c);gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STREAM_DRAW);let p=gl.getAttribLocation(program,'p');gl.vertexAttribPointer(p,3,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(p);gl.bindBuffer(gl.ARRAY_BUFFER,cb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(col),gl.STREAM_DRAW);let a=gl.getAttribLocation(program,'c');gl.vertexAttribPointer(a,3,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(a);gl.uniformMatrix4fv(gl.getUniformLocation(program,'mvp'),false,M(vp,M(T(x,y,z),S(...s))));for(let i=0;i<6;i++)gl.drawArrays(gl.TRIANGLE_FAN,i*4,4)}
+function draw(view,projection){gl.clearColor(.035,.05,.08,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);const vp=M(projection,view),b=(x,y,z,s,c)=>box(vp,x,y,z,s,c);b(0,-.08,-3,[4,.08,4],[.25,.32,.43]);b(0,2,-7,[4,.08,4],[.25,.32,.43]);b(-4,1.5,-3,[.08,1.5,4],[.22,.3,.42]);b(4,1.5,-3,[.08,1.5,4],[.22,.3,.42]);b(0,1.5,-7,[4,1.5,.08],[.22,.3,.42]);b(0,.65,-2.2,[1.4,.08,.7],[.48,.3,.16]);b(0,1.15,-2.2,[.08,.5,.08],[.48,.3,.16]);const lc=leverOn?[.2,.8,.35]:[.75,.2,.18];b(.35,1.72,-2.2,[.08,.08,.08],lc);b(.35,1.95,-2.2,[.07,.35,.07],lc);
+// Fixed human-scale adult female test resident: torso, legs, arms, face and hair.
+b(-1.4,.65,-3.3,[.25,.65,.18],[.62,.24,.35]);b(-1.55,-.05,-3.3,[.12,.35,.12],[.26,.35,.6]);b(-1.25,-.05,-3.3,[.12,.35,.12],[.26,.35,.6]);b(-1.82,.65,-3.3,[.09,.5,.09],[.8,.56,.5]);b(-.98,.65,-3.3,[.09,.5,.09],[.8,.56,.5]);b(-1.4,1.55,-3.3,[.3,.3,.3],[.8,.56,.5]);b(-1.4,1.78,-3.3,[.33,.12,.33],[.12,.06,.08])}
+function shader(){gl=canvas.getContext('webgl2',{xrCompatible:true})||canvas.getContext('webgl',{xrCompatible:true});if(!gl)throw Error('WebGL unavailable');const c=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);return x};program=gl.createProgram();gl.attachShader(program,c(gl.VERTEX_SHADER,V));gl.attachShader(program,c(gl.FRAGMENT_SHADER,F));gl.linkProgram(program);gl.useProgram(program);pb=gl.createBuffer();cb=gl.createBuffer()}
+function fallback(){shader();canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;draw(Vw(0,1.5,2),P(1.1,canvas.width/canvas.height,.05,50))}
+async function enterVR(){try{if(!navigator.xr){stateEl.textContent='WebXR unavailable; desktop room remains available.';return}shader();session=await navigator.xr.requestSession('immersive-vr',{requiredFeatures:['local-floor']});const layer=new XRWebGLLayer(session,gl);session.updateRenderState({baseLayer:layer});const ref=await session.requestReferenceSpace('local-floor');session.addEventListener('select',()=>{leverOn=!leverOn;leverEl.textContent=leverOn?'ON':'OFF'});stateEl.textContent='WebXR active: 6DoF local-floor reference space; local test lever only.';session.requestAnimationFrame(function frame(t,fr){const pose=fr.getViewerPose(ref);if(pose){gl.bindFramebuffer(gl.FRAMEBUFFER,layer.framebuffer);for(const v of pose.views){gl.viewport(v.viewport.x,v.viewport.y,v.viewport.width,v.viewport.height);draw(v.transform.inverse.matrix,v.projectionMatrix)}}session.requestAnimationFrame(frame)})}catch(e){stateEl.textContent='WebXR session unavailable: '+(e.name||e.message)}}
+document.getElementById('enter').onclick=enterVR;document.getElementById('localLever').onclick=()=>{leverOn=!leverOn;leverEl.textContent=leverOn?'ON':'OFF'};window.addEventListener('resize',()=>{if(!session)fallback()});fallback();
+</script></body></html>'''
 
 
 def prototype_html() -> str:
-    """Return the bounded renderable prototype without operational controls."""
-
     return WEBXR_PROTOTYPE_HTML
