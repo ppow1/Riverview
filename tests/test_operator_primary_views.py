@@ -31,7 +31,7 @@ def test_clean_operator_template_owns_mutually_exclusive_primary_views() -> None
         assert "data-primary-view" in html
         assert "recentPrimaryMutations" in html
         assert "function mountPrimary(" in html
-        assert "MutationObserver" not in html
+        assert "settingsObserver=new MutationObserver" in html
         assert "function renderSettingsView(generation=state.viewGeneration)" in html
     finally:
         service.stop()

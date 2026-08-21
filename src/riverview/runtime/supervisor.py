@@ -58,6 +58,7 @@ class ServiceState:
     stdout_handle: Any | None = None
     stderr_handle: Any | None = None
     started_monotonic: float = 0.0
+    enabled: bool = True
 
 
 class ServiceRegistry:
@@ -194,7 +195,7 @@ class RuntimeSupervisor:
         return result
 
     def _adopt(self, state: ServiceState) -> bool:
-        if state.spec.port is not None and self._healthy(state.spec):
+        if state.spec.port is not None and state.spec.service_id != "spatial" and self._healthy(state.spec):
             listener_pids = self._listener_pids(state.spec.port)
             if len(listener_pids) > 1:
                 state.status = "failed"
@@ -244,7 +245,7 @@ class RuntimeSupervisor:
         state = self.states.get(service_id)
         if state is None:
             raise ValueError("RIV-RUN-0001: unknown managed service.")
-        if service_id not in {"cme-supervisor", "relay-worker", "operator", "comms5-http", "comms5-transport"}:
+        if service_id not in self.states:
             raise ValueError("RIV-RUN-0001: only registered production service recycle is enabled.")
         matches = [p for p in self._processes() if self._process_matches(state.spec, p)]
         match_pids = {int(process["pid"]) for process in matches}
@@ -268,6 +269,17 @@ class RuntimeSupervisor:
         state.backoff_until = 0.0
         return {"service_id": service_id, "status": "stopped", "old_owner_pid": owner}
 
+    def _set_service_enabled(self, service_id: str, enabled: bool) -> dict[str, Any]:
+        state = self.states.get(service_id)
+        if state is None:
+            raise ValueError("RIV-RUN-0001: unknown managed service.")
+        if not enabled:
+            self._recycle_service(service_id)
+        state.enabled = enabled
+        state.status = "stopped" if not enabled else "stopped"
+        state.backoff_until = 0.0
+        return {"service_id": service_id, "status": state.status, "enabled": enabled}
+
     def _process_control_requests(self) -> None:
         request_dir = self.repository / "runtime" / "riverview-supervisor" / "requests"
         result_dir = request_dir / "results"
@@ -279,9 +291,13 @@ class RuntimeSupervisor:
                 # that encoding marker while keeping the operation allow-list
                 # and service identity checks below authoritative.
                 payload = json.loads(request.read_text(encoding="utf-8-sig"))
-                if payload.get("operation") != "reload_service":
+                if payload.get("operation") not in {"reload_service", "start_service", "stop_service"}:
                     raise ValueError("RIV-RUN-0001: unsupported supervisor operation.")
-                response = {"ok": True, **self._recycle_service(str(payload.get("service_id", "")))}
+                service_id = str(payload.get("service_id", ""))
+                if payload["operation"] == "reload_service":
+                    response = {"ok": True, **self._recycle_service(service_id)}
+                else:
+                    response = {"ok": True, **self._set_service_enabled(service_id, payload["operation"] == "start_service")}
             except (OSError, TypeError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
                 response = {"ok": False, "error": str(exc)[:500]}
             (result_dir / request.name).write_text(json.dumps(response), encoding="utf-8")
@@ -328,8 +344,9 @@ class RuntimeSupervisor:
 
             with socket.socket() as sock:
                 sock.settimeout(0.5)
+                host = "192.168.1.88" if spec.service_id == "spatial" else "127.0.0.1"
                 try:
-                    sock.connect(("127.0.0.1", spec.port))
+                    sock.connect((host, spec.port))
                 except OSError:
                     return False
         if spec.health_url:
@@ -483,7 +500,7 @@ class RuntimeSupervisor:
             if any(self.states[item].status != "running" for item in state.spec.dependencies):
                 state.status = "waiting_dependency"
                 continue
-            if (
+            if state.enabled and (
                 state.status in {"stopped", "failed", "waiting_dependency"}
                 and time.monotonic() >= state.backoff_until
             ):
@@ -503,6 +520,7 @@ class RuntimeSupervisor:
             "services": {
                 service_id: {
                     "status": state.status,
+                    "enabled": state.enabled,
                     "pid": state.pid,
                     "adopted": state.adopted,
                     "restart_count": state.restart_count,

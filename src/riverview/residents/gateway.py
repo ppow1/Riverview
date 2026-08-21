@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from riverview.characters import CharacterStore, ContinuityStore
+from riverview.database import connect
 from riverview.intake.policy import ENGINEERING_ACTION, ENGINEERING_CAPABILITY, ENGINEERING_POLICIES
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 
@@ -149,6 +150,26 @@ class ResidentConversationGateway:
             for row in payload["records"]
         ]
         profiles.append(ResidentProfile("grace", "Grace", "Director of Operations", "riverview://grace", "riverview://grace", is_grace=True))
+        # Reconcile already-accepted durable residents into the Operator
+        # discovery surface.  This reads existing authority; it does not
+        # create, rename, or promote resident records.
+        try:
+            with connect() as connection, connection.cursor() as cursor:
+                cursor.execute("""SELECT o.occupant_id,o.display_name,COALESCE(c.value_text,''),o.canonical_anchor_ref,
+                                         CASE WHEN b.binding_id IS NOT NULL THEN 'operational' ELSE o.classification END
+                                  FROM resident_occupants o
+                                  LEFT JOIN resident_claims c ON c.subject_id=o.occupant_id
+                                    AND c.claim_key LIKE 'jessica:title' AND c.status='accepted'
+                                  LEFT JOIN resident_implementation_bindings b ON b.occupant_id=o.occupant_id
+                                    AND b.status='active'
+                                  WHERE o.lifecycle_status='active' AND o.retired_at IS NULL""")
+                for occupant_id, name, role, anchor, classification in cursor.fetchall():
+                    resident_id = str(occupant_id)
+                    if resident_id in {profile.resident_id for profile in profiles}:
+                        continue
+                    profiles.append(ResidentProfile(resident_id, name, role or "Riverview resident", f"riverview://occupant/{resident_id}", str(anchor or "durable resident state"), classification or "operational", certainty="verified"))
+        except (RuntimeError, OSError, TypeError, ValueError):
+            pass
         return cls(tuple(profiles))
 
     def residents(self) -> tuple[dict[str, Any], ...]:

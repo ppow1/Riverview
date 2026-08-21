@@ -149,6 +149,13 @@ class ActivityProjection:
             base_summary = _summary(str(row["event_type"]), str(row["aggregate_type"]), payload)
             summary = f"{title} · {base_summary}" if title else base_summary
             status = str(context.get("status", payload.get("state") or payload.get("status") or "observed"))
+            event_state = payload.get("state") or payload.get("status")
+            if not event_state:
+                event_state = {
+                    "work.order.queued": "QUEUED", "work.order.claimed": "CLAIMED",
+                    "work.order.progress": "PROGRESS", "work.order.completed": "COMPLETED",
+                    "work.order.failed": "FAILED", "execution.failure.recorded": "FAILED",
+                }.get(str(row["event_type"]), "OBSERVED")
             heartbeat = context.get("last_heartbeat_at")
             now = datetime.now(UTC)
             heartbeat_age = max(0, int((now - heartbeat).total_seconds())) if isinstance(heartbeat, datetime) else None
@@ -178,8 +185,10 @@ class ActivityProjection:
                     "codex_worker": context.get("worker_id"), "phase": phase,
                     "last_concrete_activity": report.get("last_activity") or base_summary,
                     "last_progress_at": _iso(heartbeat), "elapsed_seconds": elapsed,
+                    "work_elapsed_seconds": elapsed,
                     "heartbeat_age_seconds": heartbeat_age, "blocked": liveness == "WAITING",
                     "estimated_progress_percent": progress, "liveness_state": liveness,
+                    "current_lineage_state": liveness,
                     "accent_identity": _ACCENTS[int(hashlib.sha256(str(row["correlation_id"]).encode()).hexdigest()[:8], 16) % len(_ACCENTS)],
                 })
             items.append(
@@ -191,7 +200,7 @@ class ActivityProjection:
                     "category": event_category,
                     "event_type": row["event_type"],
                     "summary": summary,
-                    "state": liveness if context else payload.get("state") or payload.get("status") or "observed",
+                    "state": str(event_state),
                     "source": row["aggregate_type"],
                     "correlation_id": str(row["correlation_id"]) if row["correlation_id"] else None,
                     "causation_id": str(row["causation_id"]) if row["causation_id"] else None,

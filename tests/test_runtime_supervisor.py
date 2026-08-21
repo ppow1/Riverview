@@ -11,7 +11,8 @@ ROOT = Path(__file__).parents[1]
 def test_runtime_registry_has_one_ordered_owner_and_required_services():
     registry = ServiceRegistry.from_file(ROOT / "config/runtime/riverview-runtime-services.json")
     ids = {spec.service_id for spec in registry.ordered()}
-    assert ids == {"operator", "cme-supervisor", "comms5-http", "comms5-transport", "relay-worker"}
+    assert ids == {"operator", "spatial", "cme-supervisor", "comms5-http", "comms5-transport", "relay-worker"}
+    assert registry.specs["spatial"].process_match == "riverview.operator.lan_spatial_service"
     assert registry.specs["relay-worker"].dependencies == ("cme-supervisor",)
     assert registry.specs["comms5-transport"].dependencies == ("comms5-http",)
     assert registry.specs["comms5-http"].environment == {"RIVERVIEW_COMMS5_TRANSPORT_DIAGNOSTICS": "1"}

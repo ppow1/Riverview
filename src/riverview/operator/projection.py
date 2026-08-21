@@ -27,6 +27,33 @@ class OperatorProjection:
             rows = cursor.fetchall()
             return [self._conversation(cursor, row) for row in rows]
 
+    def list_summaries(self, *, include_archived: bool = False, limit: int = 24, offset: int = 0) -> dict[str, Any]:
+        """Return a bounded conversation window without hydrating message bodies."""
+        bounded_limit = max(1, min(int(limit), 50))
+        bounded_offset = max(0, int(offset))
+        if not self.available:
+            values = [self._summary(item) for item in self.memory.values() if include_archived or not item.get("archived")]
+            page = values[bounded_offset:bounded_offset + bounded_limit]
+            return {"conversations": page, "offset": bounded_offset, "limit": bounded_limit, "has_more": len(values) > bounded_offset + len(page)}
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""SELECT conversation_id,resident_id,room_id,kind,title,classification,archived_at,
+                                      source_conversation_id,inherited_context_window,inherited_message_count,participants_added
+                               FROM operator_conversations
+                               WHERE (%s OR archived_at IS NULL)
+                               ORDER BY updated_at DESC LIMIT %s OFFSET %s""", (include_archived, bounded_limit + 1, bounded_offset))
+            rows = cursor.fetchall()
+        page = [self._summary_row(row) for row in rows[:bounded_limit]]
+        return {"conversations": page, "offset": bounded_offset, "limit": bounded_limit, "has_more": len(rows) > bounded_limit}
+
+    @staticmethod
+    def _summary(value: dict[str, Any]) -> dict[str, Any]:
+        messages = value.get("messages", [])
+        return {key: value.get(key, "") for key in ("id", "resident_id", "resident_name", "room_id", "kind", "title", "classification", "archived", "unread", "source_conversation_id", "inherited_context_window", "inherited_message_count", "participants_added")} | {"preview": value.get("preview", messages[-1].get("text", "")[:180] if messages else ""), "message_count": len(messages), "messages": []}
+
+    def _summary_row(self, row: Any) -> dict[str, Any]:
+        conversation_id, resident_id, room_id, kind, title, classification, archived_at, source_id, context_window, inherited_count, participants_added = row
+        return {"id": str(conversation_id), "resident_id": resident_id or "", "resident_name": "", "room_id": str(room_id) if room_id else "", "kind": kind, "title": title, "classification": classification, "messages": [], "preview": "", "unread": False, "archived": bool(archived_at), "source_conversation_id": str(source_id) if source_id else "", "inherited_context_window": context_window or "", "inherited_message_count": inherited_count or 0, "participants_added": participants_added or [], "message_count": 0}
+
     def search(self, query: str, *, limit: int = 25, include_archived: bool = True) -> list[dict[str, Any]]:
         """Search durable conversation/message bodies without loading history into the browser."""
         term = query.strip()

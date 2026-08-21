@@ -3,6 +3,16 @@
   "top_level_owner": "riverview.runtime.supervisor",
   "services": [
     {
+      "service_id": "spatial",
+      "command": [".venv/Scripts/python.exe", "-m", "riverview.operator.lan_spatial_service"],
+      "dependencies": [],
+      "port": 18443,
+      "health_url": null,
+      "process_match": "riverview.operator.lan_spatial_service",
+      "restart": true,
+      "startup_timeout": 15.0
+    },
+    {
       "service_id": "operator",
       "command": [".venv/Scripts/python.exe", "-m", "riverview.operator.live_service"],
       "dependencies": [],

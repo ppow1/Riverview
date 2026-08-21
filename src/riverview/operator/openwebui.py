@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
+from pathlib import Path
 
 from psycopg import Error as PostgresError
 
@@ -312,6 +313,14 @@ class RiverviewOpenWebUIService:
                     except (OSError, subprocess.SubprocessError):
                         source_sha = "unknown"
                     self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity, "operator_shell": "v1", "source_sha": source_sha})
+                elif urlsplit(self.path).path == "/api/runtime/status" and self._auth():
+                    try:
+                        status_path = Path(__file__).resolve().parents[3] / "runtime" / "riverview-supervisor" / "status.json"
+                        self._send(HTTPStatus.OK, json.loads(status_path.read_text(encoding="utf-8")))
+                    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                        self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "runtime_status_unavailable", "checkpoint": "RIV-RUN-0001"})
+                elif urlsplit(self.path).path == "/api/runtime/status":
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif urlsplit(self.path).path == "/api/models" and self._auth():
                     self._send(HTTPStatus.OK, {"data": [{"id": "riverview-provider-neutral"}]})
                 elif urlsplit(self.path).path == "/api/models":
@@ -370,7 +379,13 @@ class RiverviewOpenWebUIService:
                 elif urlsplit(self.path).path == "/api/conversations" and self._auth():
                     query = parse_qs(urlsplit(self.path).query)
                     include_archived = query.get("archived", ["active"])[0] in {"all", "true", "archived"}
-                    conversations = service.projection.list(include_archived=include_archived)
+                    try:
+                        page_limit = int(query.get("limit", ["24"])[0])
+                        page_offset = int(query.get("offset", ["0"])[0])
+                    except ValueError:
+                        page_limit, page_offset = 24, 0
+                    result = service.projection.list_summaries(include_archived=include_archived, limit=page_limit, offset=page_offset)
+                    conversations = result["conversations"]
                     for item in conversations:
                         if item.get("kind") == "room" and item.get("title", "").startswith("Room · RES-"):
                             ids = [part for part in item.get("resident_id", "").removeprefix("room:").split(",") if part]
@@ -380,7 +395,7 @@ class RiverviewOpenWebUIService:
                             except LookupError:
                                 pass
                         item["archived"] = bool(include_archived and item.get("archived"))
-                    self._send(HTTPStatus.OK, {"conversations": conversations})
+                    self._send(HTTPStatus.OK, {**result, "conversations": conversations})
                 elif urlsplit(self.path).path == "/api/conversations/search" and self._auth():
                     query = parse_qs(urlsplit(self.path).query)
                     term = query.get("q", [""])[0]
@@ -461,6 +476,34 @@ class RiverviewOpenWebUIService:
                     except (RuntimeError, ValueError):
                         diagnostic("RIV-UI-0015", "microphone_capture", "microphone_worker_failure", "Bounded local microphone capture failed.")
                         self._send(HTTPStatus.BAD_GATEWAY, {"error": "local_transcription_unavailable", "checkpoint": "RIV-UI-0015"})
+                    return
+                if urlsplit(self.path).path == "/api/runtime/control":
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length))
+                        operation = str(payload.get("operation", ""))
+                        service_id = str(payload.get("service_id", ""))
+                        if operation not in {"start_service", "stop_service", "reload_service"} or service_id != "spatial":
+                            raise ValueError("RIV-RUN-0001: only bounded Spatial lifecycle controls are exposed.")
+                        root = Path(__file__).resolve().parents[3] / "runtime" / "riverview-supervisor"
+                        request_dir = root / "requests"
+                        request_dir.mkdir(parents=True, exist_ok=True)
+                        name = f"operator-{uuid4()}.json"
+                        (request_dir / name).write_text(json.dumps({"operation": operation, "service_id": service_id}), encoding="utf-8")
+                        result_path = request_dir / "results" / name
+                        deadline = time.monotonic() + 12
+                        while time.monotonic() < deadline and not result_path.exists():
+                            time.sleep(0.15)
+                        if not result_path.exists():
+                            raise TimeoutError("runtime supervisor control timed out")
+                        result = json.loads(result_path.read_text(encoding="utf-8"))
+                        result_path.unlink(missing_ok=True)
+                        self._send(HTTPStatus.OK if result.get("ok") else HTTPStatus.BAD_GATEWAY, result)
+                    except (OSError, TypeError, ValueError, json.JSONDecodeError, TimeoutError) as exc:
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "runtime_control_rejected", "checkpoint": "RIV-RUN-0001", "reason": str(exc)[:240]})
                     return
                 if self.path == "/snapshot":
                     if not self._auth():

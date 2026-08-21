@@ -64,6 +64,13 @@ class DiagnosticStore:
                         record["cookbook_entry"], record["recovery_state"], record["occurred_at"],
                     ),
                 )
+                if record["severity"] in {"error", "critical"} or record["recovery_state"] == "escalated":
+                    notification_type = "critical_failure" if record["severity"] == "critical" else "steward_checkpoint"
+                    cursor.execute(
+                        """INSERT INTO steward_notifications(notification_id,idempotency_key,notification_type,checkpoint_id,summary,evidence_refs,state)
+                           VALUES(%s,%s,%s,%s,%s,%s::jsonb,'queued') ON CONFLICT(idempotency_key) DO NOTHING""",
+                        (uuid4(), f"diagnostic:{record['event_id']}", notification_type, record["checkpoint_id"], record["summary"][:1000], json.dumps([record["event_id"], *record["evidence_refs"]])),
+                    )
             return PersistenceResult("postgresql", record["event_id"], record["checkpoint_id"])
         except (RuntimeError, OSError, TypeError, ValueError) as database_error:
             return self._spool(event, database_error)
