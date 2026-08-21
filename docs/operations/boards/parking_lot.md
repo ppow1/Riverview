@@ -1,4 +1,4 @@
-<!-- Version: 1.1.0 | Date: 2026-08-20 | Status: Active -->
+<!-- Version: 1.2.0 | Date: 2026-08-20 | Status: Active -->
 # Riverview Parking Lot
 
 The Parking Lot preserves valuable ideas without committing Riverview to implementation or interrupting current execution.
@@ -11,5 +11,6 @@ This is not a backlog and not an execution queue. Capturing an item does not aut
 |---|---|---|---|---|---|---|---|
 | PL-0001 | Resident Autonomic Cognition and Cognitive Resource Scheduling | Resident Architecture / Local AI | Strategic | Steward | 2026-08-20 | CAPTURED | Promote for elaboration when Jessica's current migration exposes a concrete requirement that existing resident runtime cannot satisfy, or when Tranche I/J makes event-driven multi-resident cognition/resource scheduling a direct dependency. |
 | PL-0002 | Alternative Local AI Inference Runtime Paths | Local AI / Resident Runtime Architecture | Strategic | Steward | 2026-08-20 | CAPTURED | Promote for elaboration after Jessica's onboarding is stable, when the current provider path demonstrably blocks required resident capability, when multi-resident operation makes runtime choice a direct dependency, or upon explicit Steward direction. |
+| PL-0003 | Eight-P100 SXM2 Server for 32B Inference Capacity | Local AI / Compute Capacity / Resident Runtime Architecture | Strategic | Steward | 2026-08-20 | CAPTURED | Promote when actively considering the 8x P100 SXM2 server or similar hardware, when local GPU capacity becomes a direct blocker, when benchmark engineering capacity is available, or upon explicit Steward direction. |
 
 For substantial entries, read the corresponding detailed artifact under `docs/operations/parking_lot/` before acting.
