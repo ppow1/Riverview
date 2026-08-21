@@ -46,7 +46,8 @@ def record(event: str, request_id: str, *, started: float | None = None, **field
     if started is not None:
         payload["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 3)
     payload.update({key: value for key, value in fields.items() if key in {
-        "method", "path", "status", "content_type", "session_id", "error"
+        "method", "path", "status", "content_type", "session_id", "error",
+        "probe_id", "operation", "phase",
     }})
     line = json.dumps(payload, separators=(",", ":"), ensure_ascii=True) + "\n"
     destination = _path()
@@ -73,7 +74,8 @@ class TransportDiagnosticsMiddleware:
             await self.app(scope, receive, send)
             return
         headers = {key.decode("latin-1").lower(): value.decode("latin-1") for key, value in scope.get("headers", [])}
-        request_id = headers.get("x-riverview-request-id", "")
+        request_id = headers.get("x-riverview-request-id", "") or f"http-{uuid4()}"
+        scope["riverview_request_id"] = request_id
         started = time.perf_counter()
         record("http.received", request_id, started=started, method=scope.get("method"), path=scope.get("path"))
         response_started = False

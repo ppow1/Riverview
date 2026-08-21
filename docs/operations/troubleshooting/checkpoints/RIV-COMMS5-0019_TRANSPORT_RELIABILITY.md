@@ -14,6 +14,32 @@ the authenticated Caddy route separately. Preserve the request ID and
 timestamps; never record bearer values or MCP bodies. Review Caddy upstream
 cancellation/error records and Comms5 diagnostic JSONL events together.
 
+## External / ChatGPT correlation procedure
+
+Use the read-only `comms5_transport_probe` operation with a fresh opaque
+`probe_id`, for example `chatgpt-20260820-230000-001`. The caller does not need
+to set an HTTP header. Comms5 creates the server request ID at HTTP receipt,
+associates it with the supplied probe ID, performs `SELECT 1`, and records
+dispatch, database, tool-completion, response-serialization, and response-send
+events. Query afterward with:
+
+```powershell
+.venv\Scripts\python.exe tools\diagnostics\query_comms5_transport_probe.py <probe_id>
+```
+
+Interpretation:
+
+- no server record: the request probably failed before Comms5;
+- receipt without completion: investigate Comms5/backend execution;
+- server completion with Caddy cancellation: client/return-path disconnect;
+- Caddy completion with a ChatGPT timeout: external/client session or
+  interpretation issue remains likely.
+
+When ChatGPT reports a timeout, preserve that exact probe ID and query the
+local evidence before retrying. Do not immediately retry with another ID. If a
+retry is necessary, use a new attempt ID and retain both records. Run only a
+bounded sequence of approximately ten probes, then stop if no failure occurs.
+
 ## Evidence interpretation
 
 The original client timeout is independent of server rejection. A request in

@@ -27,6 +27,7 @@ def test_comms5_tools_have_chatgpt_discoverable_schemas() -> None:
         "comms5_describe_operation", "comms5_examples", "comms5_submit_steward_seed",
         "comms5_store_specification", "comms5_seed_status", "comms5_seed_lineage",
         "comms5_objective_status", "comms5_cme_status", "comms5_recent_steward_submissions",
+        "comms5_transport_probe",
         "comms5_confirm_and_promote_seed", "comms5_revalidate_and_queue_work", "comms5_cancel_draft", "comms5_supersede_seed",
     }
     assert {tool.name for tool in tools} == expected

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import time
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
@@ -20,6 +22,7 @@ from riverview.database import connect
 from riverview.grace.objectives import ObjectiveStore
 from riverview.grace.seeds import MAX_SEED_BYTES, SeedLifecycleError, StewardSeedStore
 from riverview.intake.authority import StewardAuthorityError, StewardAuthorityStore
+from riverview.mcp.transport_diagnostics import record
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
@@ -28,6 +31,7 @@ MAX_SPECIFICATION_BYTES = 4 * 1024 * 1024
 MAX_SUMMARY_BYTES = 2_000
 MAX_PAGE_SIZE = 50
 ALLOWED_CLASSIFICATIONS = frozenset(("river", "internal"))
+_PROBE_ID = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 
 
 class Comms5Error(ValueError):
@@ -122,6 +126,7 @@ OPERATIONS: dict[str, dict[str, Any]] = {
     "objective_status": {"authorization": "READ_ONLY", "required": ["objective_id"], "description": "Return bounded objective, stages, CME, work, and checkpoint state."},
     "cme_status": {"authorization": "READ_ONLY", "required": [], "description": "Return the authoritative CME runtime projection."},
     "recent_steward_submissions": {"authorization": "READ_ONLY", "required": [], "description": "Rediscover recent bounded governed submissions."},
+    "transport_probe": {"authorization": "READ_ONLY", "required": ["probe_id"], "description": "Run one bounded read-only transport correlation probe and return its opaque probe ID and server request ID."},
     "confirm_and_promote_seed": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "explicit_steward_confirmation", "idempotency_key", "client context"], "description": "Record Pat's explicit approval from the authenticated Steward-controlled Comms5 connector for one eligible exact specification-backed draft, bind durable bounded Steward authority to its exact specification version/hash, and create the canonical objective. Grace and downstream stages consume this state without repeated human approval; this operation does not execute work or bypass downstream gates. Client identity and body-supplied principal are not authority."},
     "revalidate_and_queue_work": {"authorization": "STEWARD-GATED_WRITE", "required": ["work_order_id", "explicit_steward_confirmation", "idempotency_key", "client context"], "description": "Revalidate one preserved RIV-EXE-0008 stale-base failure and queue one successor attempt against the current verified descendant base. It preserves the original scope, authority, failed attempt, and exact work lineage; material drift remains blocked and requires renewed specification approval. This operation does not execute Codex."},
     "cancel_draft": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client context"], "description": "Append-only cancellation of a draft; it never cancels an objective or work order."},
@@ -148,10 +153,33 @@ class Comms5Service:
         formation_contract = {"repository_identity": "ppow1/Riverview", "repository_root": "A:/Riverview/repo", "expected_base_sha": "0" * 40, "bounded_instruction": "Perform bounded read-only inspection.", "allowed_paths": ["AI_HINTS.md"], "acceptance_criteria": ["return structured evidence"], "evidence_requirements": ["exact Git HEAD"], "capability_name": "codex.engineering.v1", "action_type": "codex.engineering.v1", "timeout_seconds": 300, "write_policy": "read_only"}
         bounded_write_formation_contract = {**formation_contract, "bounded_instruction": "Create only docs/engineering-pipeline-smoke-test.md with the approved note; do not change any other path.", "allowed_paths": ["docs/engineering-pipeline-smoke-test.md"], "acceptance_criteria": ["the one approved file exists and no other path changes"], "evidence_requirements": ["base SHA, changed paths, validation result, reconciliation record"], "write_policy": "bounded_write"}
         draft = {**context, "seed_text": "Bounded intent; see specification_id for full acceptance criteria.", "idempotency_key": "example-seed-1"}
-        return {"submit_steward_seed": draft, "store_specification": {**context, "summary": "Bounded specification summary", "content": "Full authoritative specification content", "idempotency_key": "example-spec-1", "formation_contract": formation_contract}, "bounded_write_store_specification": {**context, "summary": "Steward-approved bounded write example", "content": "Create the one approved smoke-test document after explicit Steward approval.", "idempotency_key": "example-spec-bounded-write-1", "formation_contract": bounded_write_formation_contract}, "seed_status": {"seed_id": "00000000-0000-4000-8000-000000000002"}, "seed_lineage": {"seed_id": "00000000-0000-4000-8000-000000000002"}, "objective_status": {"objective_id": "00000000-0000-4000-8000-000000000003"}, "confirm_and_promote_seed": {**context, "seed_id": "00000000-0000-4000-8000-000000000002", "idempotency_key": "example-promotion-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "revalidate_and_queue_work": {**context, "work_order_id": "00000000-0000-4000-8000-000000000005", "idempotency_key": "example-stale-base-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "cancel_draft": {**context, "seed_id": "00000000-0000-4000-8000-000000000002", "reason": "Replaced by a reviewed draft", "idempotency_key": "example-cancel-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "supersede_seed": {**context, "seed_id": "00000000-0000-4000-8000-000000000002", "replacement_seed_id": "00000000-0000-4000-8000-000000000004", "reason": "Reviewed replacement draft", "idempotency_key": "example-supersede-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "steward_attention": {"operation": "seed_lineage", "field": "steward_attention_required", "meaning": "true means do not self-promote or bypass the checkpoint"}}
+        return {"submit_steward_seed": draft, "store_specification": {**context, "summary": "Bounded specification summary", "content": "Full authoritative specification content", "idempotency_key": "example-spec-1", "formation_contract": formation_contract}, "bounded_write_store_specification": {**context, "summary": "Steward-approved bounded write example", "content": "Create the one approved smoke-test document after explicit Steward approval.", "idempotency_key": "example-spec-bounded-write-1", "formation_contract": bounded_write_formation_contract}, "transport_probe": {"probe_id": "chatgpt-20260820-230000-001"}, "seed_status": {"seed_id": "00000000-0000-4000-8000-000000000002"}, "seed_lineage": {"seed_id": "00000000-0000-4000-8000-000000000002"}, "objective_status": {"objective_id": "00000000-0000-4000-8000-000000000003"}, "confirm_and_promote_seed": {**context, "seed_id": "00000000-0000-4000-8000-000000000002", "idempotency_key": "example-promotion-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "revalidate_and_queue_work": {**context, "work_order_id": "00000000-0000-4000-8000-000000000005", "idempotency_key": "example-stale-base-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "cancel_draft": {**context, "seed_id": "00000000-0000-4000-8000-000000000002", "reason": "Replaced by a reviewed draft", "idempotency_key": "example-cancel-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "supersede_seed": {**context, "seed_id": "00000000-0000-4000-8000-000000000002", "replacement_seed_id": "00000000-0000-4000-8000-000000000004", "reason": "Reviewed replacement draft", "idempotency_key": "example-supersede-1", "explicit_steward_confirmation": True, "authenticated_principal": "steward"}, "steward_attention": {"operation": "seed_lineage", "field": "steward_attention_required", "meaning": "true means do not self-promote or bypass the checkpoint"}}
 
     def help(self) -> dict[str, Any]:
         return {"contract": self.contract_info(), "capabilities": self.capabilities(), "operations": {name: self.describe_operation(name) for name in OPERATIONS}, "examples": self.examples(), "errors": ["RIV-COMMS5-0001", "RIV-COMMS5-0002", "RIV-COMMS5-0003", "RIV-COMMS5-0004", "RIV-COMMS5-0005", "RIV-COMMS5-0006", "RIV-COMMS5-0007", "RIV-COMMS5-0009", "RIV-COMMS5-0014", "RIV-COMMS5-0015", "RIV-EXE-0008", "RIV-SEC-0001"], "do_not": ["directly mutate PostgreSQL", "bypass Steward confirmation", "treat client identity as authority", "invent objective/work state", "retry mutations with a new idempotency key blindly", "expose protected payloads", "treat provider completion as global completion", "cancel objectives or work through draft lifecycle operations", "modify Comms/MCP authorization through ordinary ingress"]}
+
+    def transport_probe(self, probe_id: str, server_request_id: str) -> dict[str, Any]:
+        """Run a bounded read-only probe across Comms5 and PostgreSQL."""
+
+        operation = "transport_probe"
+        probe = str(probe_id or "").strip()
+        if not _PROBE_ID.fullmatch(probe):
+            raise Comms5Error("RIV-COMMS5-0003", "probe_id must be 1-128 opaque ASCII token characters", operation, retry_safe=True, checkpoint="RIV-COMMS5-0019")
+        request_id = str(server_request_id or "")[:128]
+        started = time.perf_counter()
+        record("mcp.dispatch", request_id, started=started, probe_id=probe, operation=operation, phase="dispatch")
+        db_started = time.perf_counter()
+        record("db.start", request_id, started=started, probe_id=probe, operation=operation, phase="acquisition")
+        try:
+            with connect() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+        except Exception as exc:
+            record("db.error", request_id, started=started, probe_id=probe, operation=operation, phase=type(exc).__name__)
+            raise
+        record("db.complete", request_id, started=db_started, probe_id=probe, operation=operation, phase="query")
+        record("mcp.complete", request_id, started=started, probe_id=probe, operation=operation, phase="tool")
+        return {"probe_id": probe, "server_request_id": request_id, "database": "completed", "operation": operation}
 
     def store_specification(self, request: dict[str, Any]) -> dict[str, Any]:
         operation = "store_specification"

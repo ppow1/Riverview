@@ -73,6 +73,13 @@ def _transport_principal(context: Context) -> str | None:
     return "steward" if marker == "1" and principal == "steward" else None
 
 
+def _server_request_id(context: Context) -> str:
+    request_context = getattr(context, "request_context", None)
+    request = getattr(request_context, "request", None)
+    scope = getattr(request, "scope", {}) or {}
+    return str(scope.get("riverview_request_id", ""))
+
+
 @mcp.tool()
 def comms5_contract_info() -> Any:
     """Return the versioned Comms5 contract identity."""
@@ -186,6 +193,12 @@ def comms5_cme_status() -> Any:
 def comms5_recent_steward_submissions(limit: int = 20) -> Any:
     """Return bounded recent submission metadata."""
     return _safe(service.recent_steward_submissions(limit))
+
+
+@mcp.tool()
+def comms5_transport_probe(probe_id: str, ctx: Context) -> Any:
+    """Run one read-only end-to-end transport correlation probe."""
+    return _safe(service.transport_probe(probe_id, _server_request_id(ctx)))
 
 
 @mcp.tool(title="Confirm Steward-approved draft", annotations=_GOVERNED_MUTATION_HINTS)
