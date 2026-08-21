@@ -24,3 +24,18 @@ def test_riverview_openwebui_isolated_and_correlated() -> None:
         assert payload["response"]["correlation_id"] == str(correlation)
     finally:
         service.stop()
+
+
+def test_riverview_openwebui_accepts_cache_busted_model_discovery() -> None:
+    service = RiverviewOpenWebUIService(OpenWebUIConfig(port=18083, bearer_token="synthetic-token"), lambda model, request: None)
+    service.start()
+    try:
+        request = Request(
+            "http://127.0.0.1:18083/api/models?_rv=123",
+            headers={"Authorization": "Bearer synthetic-token"},
+        )
+        with urlopen(request) as response:
+            payload = json.load(response)
+        assert payload == {"data": [{"id": "riverview-provider-neutral"}]}
+    finally:
+        service.stop()

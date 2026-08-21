@@ -312,13 +312,13 @@ class RiverviewOpenWebUIService:
                     except (OSError, subprocess.SubprocessError):
                         source_sha = "unknown"
                     self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity, "operator_shell": "v1", "source_sha": source_sha})
-                elif self.path == "/api/models" and self._auth():
+                elif urlsplit(self.path).path == "/api/models" and self._auth():
                     self._send(HTTPStatus.OK, {"data": [{"id": "riverview-provider-neutral"}]})
-                elif self.path == "/api/models":
+                elif urlsplit(self.path).path == "/api/models":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
-                elif self.path == "/api/residents" and self._auth():
+                elif urlsplit(self.path).path == "/api/residents" and self._auth():
                     self._send(HTTPStatus.OK, {"residents": service.resident_gateway.residents()})
-                elif self.path == "/api/residents":
+                elif urlsplit(self.path).path == "/api/residents":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif urlsplit(self.path).path == "/api/cme/status" and self._auth():
                     try:
@@ -395,13 +395,13 @@ class RiverviewOpenWebUIService:
                         self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "conversation_search_unavailable", "checkpoint": "RIV-UI-0025"})
                     else:
                         self._send(HTTPStatus.OK, {"query": term, "results": results})
-                elif self.path == "/api/architecture" and self._auth():
+                elif urlsplit(self.path).path == "/api/architecture" and self._auth():
                     root = __import__("pathlib").Path(__file__).resolve().parents[3] / "docs" / "architecture" / "graph_views"
                     views = []
                     for source in sorted(root.glob("*.mmd")):
                         views.append({"id": source.stem, "title": source.stem.split("_", 1)[-1].replace("_", " ").title(), "source": source.read_text(encoding="utf-8")})
                     self._send(HTTPStatus.OK, {"views": views})
-                elif self.path == "/api/notifications" and self._auth():
+                elif urlsplit(self.path).path == "/api/notifications" and self._auth():
                     try:
                         with connect() as connection, connection.cursor() as cursor:
                             cursor.execute("""SELECT notification_id,notification_type,checkpoint_id,summary,state,created_at
