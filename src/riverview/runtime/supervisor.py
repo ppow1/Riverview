@@ -244,8 +244,8 @@ class RuntimeSupervisor:
         state = self.states.get(service_id)
         if state is None:
             raise ValueError("RIV-RUN-0001: unknown managed service.")
-        if service_id not in {"cme-supervisor", "operator"}:
-            raise ValueError("RIV-RUN-0001: only CME or Operator service recycle is enabled.")
+        if service_id not in {"cme-supervisor", "relay-worker", "operator"}:
+            raise ValueError("RIV-RUN-0001: only CME, Relay, or Operator service recycle is enabled.")
         matches = [p for p in self._processes() if self._process_matches(state.spec, p)]
         match_pids = {int(process["pid"]) for process in matches}
         roots = [process for process in matches if int(process.get("ppid") or 0) not in match_pids]

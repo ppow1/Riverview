@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('cme-supervisor', 'operator')]
+    [ValidateSet('cme-supervisor', 'relay-worker', 'operator')]
     [string]$ServiceId = 'cme-supervisor',
     [string]$RepositoryPath = 'A:\Riverview\repo',
     [int]$TimeoutSeconds = 30

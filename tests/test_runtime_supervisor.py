@@ -87,6 +87,16 @@ def test_process_adoption_does_not_match_diagnostic_command_text() -> None:
     assert RuntimeSupervisor._process_matches(spec, actual) is True
 
 
+def test_relay_service_recycle_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
+    active = [{"pid": 123, "ppid": 1, "cmdline": "relay", "executable": "python"}]
+    monkeypatch.setattr(supervisor, "_processes", lambda: list(active))
+    monkeypatch.setattr(supervisor, "_process_matches", lambda _spec, _process: True)
+    monkeypatch.setattr(supervisor, "_terminate_process_tree", lambda _pid: active.clear())
+    result = supervisor._recycle_service("relay-worker")
+    assert result["service_id"] == "relay-worker"
+
+
 def test_launcher_child_tree_is_one_managed_owner(monkeypatch: pytest.MonkeyPatch) -> None:
     supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
     state = supervisor.states["cme-supervisor"]
