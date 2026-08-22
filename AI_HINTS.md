@@ -39,6 +39,12 @@ Rules:
 - Preserve valuable but uncommitted ideas in `docs/operations/boards/parking_lot.md`; substantial parked ideas use `docs/operations/parking_lot/PL-####-slug.md`. Parking does not authorize implementation.
 - Use `docs/operations/boards/ready_bench.md` only for Steward-committed work that has been sufficiently elaborated into durable specification, roadmap/execution sequence, bounded work packages, dependencies, acceptance criteria, and scope boundaries. Read `docs/operations/PARKING_LOT_AND_READY_BENCH.md` before promoting work between these states.
 
+## QUEST / WEBXR / SPATIAL WORK
+
+If a Steward request mentions Quest, Quest 2, VR, WebXR, Spatial, immersive room, headset testing, teleport, scrcpy, ADB mirror, or Evelyn in VR, read **`docs/operations/roadmap/evidence/RV-016.5_QUEST_WEBXR_SPATIAL_IMMERSIVE_OBSERVABILITY_SCREEN_MIRROR_CHECKPOINT.md`** before modifying or diagnosing the system.
+
+That authoritative checkpoint contains the current accepted state, unresolved teleport/input work, Quest observability and scrcpy procedure, Spatial URLs and build verification, stereo-rendering lessons, immersive GLB status, known failures, and the next-session resume point.
+
 For governed external-AI ingress and progress queries, first discover the
 separate `Riverview_Comms_5` surface using `comms5_help`. Local clients may use
 `python -m riverview.mcp.comms5_server` over STDIO; external clients must use
