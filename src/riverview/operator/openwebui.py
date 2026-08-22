@@ -505,6 +505,26 @@ class RiverviewOpenWebUIService:
                     except (OSError, TypeError, ValueError, json.JSONDecodeError, TimeoutError) as exc:
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "runtime_control_rejected", "checkpoint": "RIV-RUN-0001", "reason": str(exc)[:240]})
                     return
+                if urlsplit(self.path).path.startswith("/api/notifications/"):
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        notification_id = UUID(urlsplit(self.path).path.rsplit("/", 1)[1])
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length)) if length else {}
+                        if payload.get("operation") != "acknowledge":
+                            raise ValueError("notification operation is closed")
+                        with connect() as connection, connection.cursor() as cursor:
+                            cursor.execute("""UPDATE steward_notifications
+                                             SET state='acknowledged', acknowledged_at=COALESCE(acknowledged_at,now())
+                                             WHERE notification_id=%s AND state IN('queued','delivered')""", (notification_id,))
+                            if cursor.rowcount != 1:
+                                raise KeyError(notification_id)
+                        self._send(HTTPStatus.OK, {"notification_id": str(notification_id), "state": "acknowledged"})
+                    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "notification_acknowledge_rejected", "checkpoint": "RIV-NOT-0001"})
+                    return
                 if self.path == "/snapshot":
                     if not self._auth():
                         self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})

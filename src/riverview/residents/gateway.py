@@ -162,7 +162,8 @@ class ResidentConversationGateway:
                                     AND c.claim_key LIKE 'jessica:title' AND c.status='accepted'
                                   LEFT JOIN resident_implementation_bindings b ON b.occupant_id=o.occupant_id
                                     AND b.status='active'
-                                  WHERE o.lifecycle_status='active' AND o.retired_at IS NULL""")
+                                  WHERE o.lifecycle_status='active' AND o.retired_at IS NULL
+                                    AND COALESCE(o.classification,'') <> 'test_fixture'""")
                 for occupant_id, name, role, anchor, classification in cursor.fetchall():
                     resident_id = str(occupant_id)
                     if resident_id in {profile.resident_id for profile in profiles}:
