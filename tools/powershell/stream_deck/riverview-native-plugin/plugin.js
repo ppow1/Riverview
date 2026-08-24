@@ -101,7 +101,7 @@ async function questStatus() {
     const serial = quest.split(/\s+/)[0];
     const wireless = serial.includes(":") || serial.includes("_adb-tls");
     if (await questMirrorRunning()) return { value: "LIVE", color: "green" };
-    return { value: wireless ? "ADB" : "USB", color: wireless ? "green" : "yellow" };
+    return { value: wireless ? "ADB" : "USB", color: "yellow" };
   } catch { return { value: "OFF", color: "red" }; }
 }
 
