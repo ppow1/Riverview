@@ -1,0 +1,45 @@
+import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PROFILE = ROOT / "config/stream_deck/Riverview-Initial-Operator-Profile.json"
+ACTION = ROOT / "tools/powershell/stream_deck/Invoke-RiverviewStreamDeckControl.ps1"
+
+
+def test_profile_has_exactly_three_bounded_controls():
+    data = json.loads(PROFILE.read_text(encoding="utf-8"))
+    assert [key["control"] for key in data["keys"]] == ["runtime", "quest-dev", "quest-cast"]
+    assert len(data["keys"]) == 3
+    assert data["version"] == "1.0.0"
+
+
+def test_each_control_maps_all_gestures_to_same_bounded_action():
+    data = json.loads(PROFILE.read_text(encoding="utf-8"))
+    for key in data["keys"]:
+        for gesture in ("single_tap", "double_tap", "long_press"):
+            args = key[gesture]
+            assert args[0:2] == ["-Control", key["control"]]
+            expected = gesture.removesuffix("_tap").removesuffix("_press")
+            assert args[2:4] == ["-Gesture", expected]
+
+
+def test_action_layer_contains_required_boundaries_without_transient_endpoint():
+    text = ACTION.read_text(encoding="utf-8")
+    assert "Start-RiverviewRuntimeSupervisor.ps1" in text
+    assert "Start-ScheduledTask" in text
+    assert "QuestMirror" in text
+    assert "mdns services" in text
+    assert "tcpip 5555" in text
+    assert "Meta Quest Developer Hub" in text
+    assert "adb-1WMHHB67ZF1473" not in text
+    assert "192.168.1.159" not in text
+
+
+def test_cast_and_dev_paths_are_independent():
+    text = ACTION.read_text(encoding="utf-8")
+    cast = text[text.index("function Invoke-QuestCast"):]
+    dev = text[text.index("function Invoke-QuestDev"):text.index("function Invoke-QuestCast")]
+    assert "adb" not in cast.lower()
+    assert "QuestMirror" in dev
+    assert "Invoke-QuestCast" not in dev

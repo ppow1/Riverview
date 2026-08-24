@@ -1,0 +1,36 @@
+{
+  "schema_version": "riverview-stream-deck-profile-v1",
+  "profile_id": "riverview.initial.operator",
+  "profile_name": "Riverview Initial Operator",
+  "version": "1.0.0",
+  "purpose": "Three bounded Riverview controls; Estate Stream Deck remains separate.",
+  "launcher": "A:\\Riverview\\repo\\tools\\powershell\\stream_deck\\Invoke-RiverviewStreamDeckControl.ps1",
+  "stream_deck_action": "external-command",
+  "gesture_support": "The selected Stream Deck action/plugin must map single, double, and long events to the listed gesture arguments.",
+  "keys": [
+    {
+      "position": [0, 0],
+      "label": "RIVERVIEW\nRUNTIME",
+      "control": "runtime",
+      "single_tap": ["-Control", "runtime", "-Gesture", "single"],
+      "double_tap": ["-Control", "runtime", "-Gesture", "double"],
+      "long_press": ["-Control", "runtime", "-Gesture", "long"]
+    },
+    {
+      "position": [1, 0],
+      "label": "QUEST\nDEV",
+      "control": "quest-dev",
+      "single_tap": ["-Control", "quest-dev", "-Gesture", "single"],
+      "double_tap": ["-Control", "quest-dev", "-Gesture", "double"],
+      "long_press": ["-Control", "quest-dev", "-Gesture", "long"]
+    },
+    {
+      "position": [2, 0],
+      "label": "QUEST\nCAST",
+      "control": "quest-cast",
+      "single_tap": ["-Control", "quest-cast", "-Gesture", "single"],
+      "double_tap": ["-Control", "quest-cast", "-Gesture", "double"],
+      "long_press": ["-Control", "quest-cast", "-Gesture", "long"]
+    }
+  ]
+}
