@@ -74,7 +74,13 @@ async function runtimeStatus() {
     const response = await fetch("http://127.0.0.1:18082/health", { signal: AbortSignal.timeout(1500) });
     if (response.ok) return { value: "RUNNING", color: "green" };
     return { value: "ERROR", color: "yellow" };
-  } catch { return { value: "STOPPED", color: "red" }; }
+  } catch {
+    try {
+      const result = await command(POWERSHELL, ["-NoProfile", "-Command", "@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '-m\\s+riverview\\.operator\\.live_service(?:\\s|$)' }).Count"]);
+      if (Number.parseInt(result.stdout.trim(), 10) > 0) return { value: "STARTING", color: "yellow" };
+    } catch { /* a missing process probe is treated as stopped */ }
+    return { value: "STOPPED", color: "red" };
+  }
 }
 
 async function questMirrorRunning() {

@@ -98,3 +98,4 @@ def test_native_plugin_uses_verified_execution_and_live_status_sources():
     assert 'async function questMirrorRunning()' in plugin
     assert 'value: "LIVE"' in plugin
     assert 'value: "RUNNING"' in plugin
+    assert 'value: "STARTING"' in plugin
