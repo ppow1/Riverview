@@ -40,6 +40,12 @@ def test_action_layer_contains_required_boundaries_without_transient_endpoint():
     assert "C:\\Program Files\\PowerShell\\7\\pwsh.exe" in text
 
 
+def test_runtime_supervisor_task_action_is_hidden_without_changing_target():
+    install = (ROOT / "tools/powershell/runtime/Install-RiverviewRuntimeSupervisor.ps1").read_text(encoding="utf-8")
+    assert "-WindowStyle Hidden" in install
+    assert "Start-RiverviewRuntimeSupervisor.ps1" in install
+
+
 def test_cast_and_dev_paths_are_independent():
     text = ACTION.read_text(encoding="utf-8")
     cast = text[text.index("function Invoke-QuestCast"):]

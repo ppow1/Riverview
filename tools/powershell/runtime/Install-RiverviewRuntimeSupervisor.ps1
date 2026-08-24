@@ -14,7 +14,7 @@ $StartScript = Join-Path $RepositoryPath 'tools\powershell\runtime\Start-Rivervi
 if (-not (Test-Path $StartScript -PathType Leaf)) { throw 'RIV-RUN-0001: supervisor launcher not found.' }
 
 $taskName = 'Riverview Runtime Supervisor'
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$StartScript`" -RepositoryPath `"$RepositoryPath`""
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$StartScript`" -RepositoryPath `"$RepositoryPath`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
