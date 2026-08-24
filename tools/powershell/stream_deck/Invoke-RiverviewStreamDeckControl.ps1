@@ -231,7 +231,7 @@ function Invoke-QuestDev {
         return Write-Result @{ state = 'ready'; transport = $transport.transport; serial = $transport.serial; live_view = 'raised'; process_id = $existing[0].Id; executable = $PowerShell7 }
     }
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = $PowerShell7; $psi.UseShellExecute = $true; $psi.WindowStyle = 'Normal'
+    $psi.FileName = $PowerShell7; $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
     foreach ($arg in @('-NoProfile','-ExecutionPolicy','Bypass','-File',$QuestMirror,'-Serial',$transport.serial)) { [void]$psi.ArgumentList.Add($arg) }
     [void][System.Diagnostics.Process]::Start($psi)
     Start-Sleep -Seconds 3

@@ -38,6 +38,8 @@ def test_action_layer_contains_required_boundaries_without_transient_endpoint():
     assert "adb-1WMHHB67ZF1473" not in text
     assert "192.168.1.159" not in text
     assert "C:\\Program Files\\PowerShell\\7\\pwsh.exe" in text
+    assert "$psi.UseShellExecute = $false" in text
+    assert "$psi.CreateNoWindow = $true" in text
 
 
 def test_runtime_supervisor_task_action_is_hidden_without_changing_target():
