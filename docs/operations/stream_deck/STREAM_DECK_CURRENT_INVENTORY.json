@@ -1,0 +1,2178 @@
+{
+  "capture_timestamp": "2026-08-24T10:09:49-04:00",
+  "streamdeck_version": "7.5.1.22901",
+  "installed_root": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck",
+  "profiles_root": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3",
+  "backup_root": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck-Backups",
+  "physical_device_model": "20GAT9902",
+  "physical_device_uuid": "@(1)[4057/143/A00NA32533KHWX]",
+  "profiles": [
+    {
+      "name": "Windows Shutdown Menu XL",
+      "uuid": "09a1eef6-a278-4adb-8a88-4b78702db3ee",
+      "directory": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3\\09A1EEF6-A278-4ADB-8A88-4B78702DB3EE.sdProfile",
+      "device": {
+        "Model": "20GAT9902",
+        "UUID": "@(1)[4057/143/A00NA32533KHWX]"
+      },
+      "version": "3.0",
+      "active_page_ids": [
+        "95b37824-35a0-4391-9891-b90fc32620b9"
+      ],
+      "current_page": "95b37824-35a0-4391-9891-b90fc32620b9",
+      "default_page": "83286001-c4c2-49c3-93b5-a88cf8d239b4",
+      "page_count": 1,
+      "pages": [
+        {
+          "id": "95b37824-35a0-4391-9891-b90fc32620b9",
+          "name": "",
+          "key_count": 9,
+          "keys": [
+            {
+              "position": "3,1",
+              "title": "Confirm",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "4,0",
+              "title": "Lock",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "4,1",
+              "title": "Shut\nDown\nMenu",
+              "action_uuid": "com.elgato.streamdeck.system.hotkey",
+              "plugin_uuid": "com.elgato.streamdeck.system.hotkey",
+              "settings": {}
+            },
+            {
+              "position": "4,2",
+              "title": "Reboot",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "5,1",
+              "title": "Cancel",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Sleep",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Sign Out",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "d4abffcd-7bde-4db7-856b-b26823e1780b"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Default Profile",
+      "uuid": "3733aa16-1f06-4c1b-913c-2b6cf44d653b",
+      "directory": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3\\3733AA16-1F06-4C1B-913C-2B6CF44D653B.sdProfile",
+      "device": {
+        "Model": "AI Stream Deck",
+        "UUID": "b8d0a9f0-3786-4905-89a1-6dd73208131c"
+      },
+      "version": "3.0",
+      "active_page_ids": [
+        "25082b33-9860-4486-99d4-537f1be87a0b"
+      ],
+      "current_page": "25082b33-9860-4486-99d4-537f1be87a0b",
+      "default_page": "228be1c3-3436-43ff-bf99-7b955d0f13a1",
+      "page_count": 1,
+      "pages": [
+        {
+          "id": "25082b33-9860-4486-99d4-537f1be87a0b",
+          "name": "",
+          "key_count": 0,
+          "keys": []
+        }
+      ]
+    },
+    {
+      "name": "Riverview",
+      "uuid": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1",
+      "directory": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3\\7C0C9D36-8B7F-4D71-9D45-2B6B1C05D0A1.sdProfile",
+      "device": {
+        "Model": "20GAT9902",
+        "UUID": "@(1)[4057/143/A00NA32533KHWX]"
+      },
+      "version": "3.0",
+      "active_page_ids": [
+        "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1"
+      ],
+      "current_page": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1",
+      "default_page": "22b4d8d9-9c70-4799-aa9b-6155e697e401",
+      "page_count": 1,
+      "pages": [
+        {
+          "id": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1",
+          "name": "Riverview",
+          "key_count": 7,
+          "keys": [
+            {
+              "position": "0,0",
+              "title": "RIVERVIEW\nRUNTIME",
+              "action_uuid": "com.riverview.operator.runtime",
+              "plugin_uuid": "com.riverview.operator",
+              "settings": {
+                "control": "runtime"
+              }
+            },
+            {
+              "position": "1,0",
+              "title": "QUEST\nDEV",
+              "action_uuid": "com.riverview.operator.quest-dev",
+              "plugin_uuid": "com.riverview.operator",
+              "settings": {
+                "control": "quest-dev"
+              }
+            },
+            {
+              "position": "2,0",
+              "title": "QUEST\nCAST",
+              "action_uuid": "com.riverview.operator.quest-cast",
+              "plugin_uuid": "com.riverview.operator",
+              "settings": {
+                "control": "quest-cast"
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "d4abffcd-7bde-4db7-856b-b26823e1780b"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Roku2",
+      "uuid": "9c576814-c3e0-4d5b-9b5d-dda437f9a89a",
+      "directory": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3\\9C576814-C3E0-4D5B-9B5D-DDA437F9A89A.sdProfile",
+      "device": {
+        "Model": "20GAT9902",
+        "UUID": "@(1)[4057/143/A00NA32533KHWX]"
+      },
+      "version": "3.0",
+      "active_page_ids": [
+        "b9a23f77-64be-4b84-885b-7715bd89b421",
+        "6f8d0d99-26f2-4912-bde2-2ddce28e5017",
+        "5d1d0b05-de3c-472a-aeac-e37730e3df6a",
+        "cadecac0-1555-4170-a5d7-64b5ba83c8ef",
+        "58bdd141-6aba-4f83-90d2-a11d1896b898",
+        "1b95aa5d-dad3-457b-9cbe-61591b813446",
+        "7cf5b04b-0d96-4bfb-b781-f458a57b9e2f",
+        "5d4175eb-c85a-4aa6-9d29-226f00ea3660",
+        "652d9c7c-722a-4f0e-bfc7-d139da8f71d6",
+        "77eb0147-f6ca-48f6-9587-a6b8ebea047a"
+      ],
+      "current_page": "b9a23f77-64be-4b84-885b-7715bd89b421",
+      "default_page": "dfdae24c-586c-44b9-8f5e-e66534cdb7a0",
+      "page_count": 10,
+      "pages": [
+        {
+          "id": "b9a23f77-64be-4b84-885b-7715bd89b421",
+          "name": "",
+          "key_count": 30,
+          "keys": [
+            {
+              "position": "0,0",
+              "title": "DeepFLive\nBanana",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"E:\\df\\DeepFaceLive_NVIDIA\\DeepFaceLive.bat\" Menu\\Programs\\VB Audio\\VoiceMeeter\\Voicemeeter Banana x64.LNK\""
+              }
+            },
+            {
+              "position": "0,1",
+              "title": "cam\n",
+              "action_uuid": "com.elgato.obsstudio.transitionstudio",
+              "plugin_uuid": "com.elgato.obsstudio",
+              "settings": {}
+            },
+            {
+              "position": "0,2",
+              "title": "center",
+              "action_uuid": "com.vivremotion.mousecontrol.plugin",
+              "plugin_uuid": "com.vivremotion.mousecontrol",
+              "settings": {}
+            },
+            {
+              "position": "0,3",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "1,0",
+              "title": "OBS\nBanana",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe\" Menu\\Programs\\VB Audio\\VoiceMeeter\\Voicemeeter Banana x64.LNK\""
+              }
+            },
+            {
+              "position": "1,1",
+              "title": "Start\n",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "1,3",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "2,0",
+              "title": "Voicemeet.\nBanana",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VB Audio\\VoiceMeeter\\Voicemeeter Banana x64.LNK\""
+              }
+            },
+            {
+              "position": "2,1",
+              "title": "Stop\n",
+              "action_uuid": "com.elgato.streamdeck.multiactions.routine",
+              "plugin_uuid": "com.elgato.streamdeck.multiactions",
+              "settings": {}
+            },
+            {
+              "position": "2,2",
+              "title": "Alor",
+              "action_uuid": "com.funky.rokuremotejs.app",
+              "plugin_uuid": "com.funky.rokuremotejs",
+              "settings": {}
+            },
+            {
+              "position": "3,0",
+              "title": "\n                                               \nEQ\n",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VB Audio\\VoiceMeeter\\15 Bands Graphic EQ.LNK\""
+              }
+            },
+            {
+              "position": "3,1",
+              "title": "Modify Setting",
+              "action_uuid": "com.barraider.vmmodify",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "3,2",
+              "title": "RST",
+              "action_uuid": "com.barraider.wintools.shutdown",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "3,3",
+              "title": "Shutdown/Restart Computer",
+              "action_uuid": "com.barraider.wintools.shutdown",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "4,0",
+              "title": "Recording\n(68)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (68).m4a"
+              }
+            },
+            {
+              "position": "4,1",
+              "title": "grab\n",
+              "action_uuid": "com.elgato.obsstudio.screenshot",
+              "plugin_uuid": "com.elgato.obsstudio",
+              "settings": {}
+            },
+            {
+              "position": "4,2",
+              "title": "Google\nChrome",
+              "action_uuid": "com.elgato.streamdeck.system.close",
+              "plugin_uuid": "com.elgato.streamdeck.system.close",
+              "settings": {
+                "path": "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+              }
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,0",
+              "title": "Recording\n(88)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (88).m4a"
+              }
+            },
+            {
+              "position": "5,1",
+              "title": "on\n",
+              "action_uuid": "com.funky.rokuremotejs.poweron",
+              "plugin_uuid": "com.funky.rokuremotejs",
+              "settings": {}
+            },
+            {
+              "position": "5,2",
+              "title": "Ping",
+              "action_uuid": "com.barraider.wintools.ping",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Recording\n(93)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (93).m4a"
+              }
+            },
+            {
+              "position": "6,1",
+              "title": "off\n",
+              "action_uuid": "com.funky.rokuremotejs.poweroff",
+              "plugin_uuid": "com.funky.rokuremotejs",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,0",
+              "title": "Recording\n(95)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (95).m4a"
+              }
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "6f8d0d99-26f2-4912-bde2-2ddce28e5017",
+          "name": "",
+          "key_count": 8,
+          "keys": [
+            {
+              "position": "1,0",
+              "title": "DeepFaceL.",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"E:\\df\\DeepFaceLive_NVIDIA\\DeepFaceLive.bat\""
+              }
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "5d1d0b05-de3c-472a-aeac-e37730e3df6a",
+          "name": "",
+          "key_count": 10,
+          "keys": [
+            {
+              "position": "1,0",
+              "title": "OBS",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe\""
+              }
+            },
+            {
+              "position": "1,1",
+              "title": "cam\n",
+              "action_uuid": "com.elgato.obsstudio.transitionstudio",
+              "plugin_uuid": "com.elgato.obsstudio",
+              "settings": {}
+            },
+            {
+              "position": "2,1",
+              "title": "grab\n",
+              "action_uuid": "com.elgato.obsstudio.screenshot",
+              "plugin_uuid": "com.elgato.obsstudio",
+              "settings": {}
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "cadecac0-1555-4170-a5d7-64b5ba83c8ef",
+          "name": "",
+          "key_count": 20,
+          "keys": [
+            {
+              "position": "0,2",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "1,0",
+              "title": "Voicemeet.\nBanana",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VB Audio\\VoiceMeeter\\Voicemeeter Banana x64.LNK\""
+              }
+            },
+            {
+              "position": "1,2",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "2,0",
+              "title": "\n                                               \nEQ\n",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VB Audio\\VoiceMeeter\\15 Bands Graphic EQ.LNK\""
+              }
+            },
+            {
+              "position": "3,2",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "4,0",
+              "title": "Recording\n(68)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (68).m4a"
+              }
+            },
+            {
+              "position": "4,2",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,0",
+              "title": "Recording\n(88)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (88).m4a"
+              }
+            },
+            {
+              "position": "5,1",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "5,2",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Recording\n(93)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (93).m4a"
+              }
+            },
+            {
+              "position": "6,1",
+              "title": "Mute/Unmute",
+              "action_uuid": "com.barraider.vmmicrophone",
+              "plugin_uuid": "com.barraider.voicemeeter",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,0",
+              "title": "Recording\n(95)",
+              "action_uuid": "com.elgato.streamdeck.soundboard.playaudio",
+              "plugin_uuid": "com.elgato.streamdeck.soundboard",
+              "settings": {
+                "path": "C:/Users/wille/Documents/Sound recordings/Recording (95).m4a"
+              }
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "58bdd141-6aba-4f83-90d2-a11d1896b898",
+          "name": "",
+          "key_count": 14,
+          "keys": [
+            {
+              "position": "4,0",
+              "title": "Roku \nLVRM",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "4a97b5af-696c-45e8-92b0-032f8a9875c2"
+              }
+            },
+            {
+              "position": "4,1",
+              "title": "Roku6",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "b9f8cc88-b0f2-4311-ad22-4fba235f63aa"
+              }
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,0",
+              "title": "Roku1",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "684f860d-fe7e-40dd-8a4d-9b0f04ae2f46"
+              }
+            },
+            {
+              "position": "5,1",
+              "title": "Roku2\n",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "1a9a9dc4-add8-400c-b32b-bc99cd918b19"
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Roku3",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "73d72917-5fd8-4cc7-b8b7-12aeffae0c22"
+              }
+            },
+            {
+              "position": "6,1",
+              "title": "\nRoku 4\n",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "8873370f-bc64-46c6-b829-a9845a4fec08"
+              }
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,0",
+              "title": "Roku5",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "eea54e9d-fabb-4197-aecb-025761491856"
+              }
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "1b95aa5d-dad3-457b-9cbe-61591b813446",
+          "name": "",
+          "key_count": 7,
+          "keys": [
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "7cf5b04b-0d96-4bfb-b781-f458a57b9e2f",
+          "name": "",
+          "key_count": 7,
+          "keys": [
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "5d4175eb-c85a-4aa6-9d29-226f00ea3660",
+          "name": "",
+          "key_count": 7,
+          "keys": [
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "652d9c7c-722a-4f0e-bfc7-d139da8f71d6",
+          "name": "",
+          "key_count": 7,
+          "keys": [
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        },
+        {
+          "id": "77eb0147-f6ca-48f6-9587-a6b8ebea047a",
+          "name": "",
+          "key_count": 8,
+          "keys": [
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,2",
+              "title": "fold1\n",
+              "action_uuid": "com.elgato.streamdeck.profile.openchild",
+              "plugin_uuid": "com.elgato.streamdeck.profile.openchild",
+              "settings": {
+                "ProfileUUID": "9d49757f-3812-454e-abfe-fca3b2faae10"
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "b5b58f76-aea8-4822-b0d8-f51525c44692"
+              }
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WinToolsXL",
+      "uuid": "b5b58f76-aea8-4822-b0d8-f51525c44692",
+      "directory": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3\\B5B58F76-AEA8-4822-B0D8-F51525C44692.sdProfile",
+      "device": {
+        "Model": "20GAT9902",
+        "UUID": "@(1)[4057/143/A00NA32533KHWX]"
+      },
+      "version": "3.0",
+      "active_page_ids": [
+        "7799adf2-9733-48e7-a3ba-b9caec4d91b8"
+      ],
+      "current_page": "7799adf2-9733-48e7-a3ba-b9caec4d91b8",
+      "default_page": "3bb36499-2b29-499f-9f1e-f9825f850c62",
+      "page_count": 1,
+      "pages": [
+        {
+          "id": "7799adf2-9733-48e7-a3ba-b9caec4d91b8",
+          "name": "",
+          "key_count": 32,
+          "keys": [
+            {
+              "position": "0,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "0,1",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "0,2",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "0,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "1,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "1,1",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "1,2",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "1,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "2,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "2,1",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "2,2",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "2,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "3,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "3,1",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "3,2",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "3,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "4,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "4,1",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "4,2",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "4,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "5,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "5,1",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "5,2",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "5,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "6,1",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "7,0",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "7,3",
+              "title": "Display Action",
+              "action_uuid": "com.barraider.wintools.displayaction",
+              "plugin_uuid": "com.barraider.wintools",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "9c576814-c3e0-4d5b-9b5d-dda437f9a89a"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "09a1eef6-a278-4adb-8a88-4b78702db3ee"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Estate Operations v0.5 Plugin",
+      "uuid": "d4abffcd-7bde-4db7-856b-b26823e1780b",
+      "directory": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3\\D4ABFFCD-7BDE-4DB7-856B-B26823E1780B.sdProfile",
+      "device": {
+        "Model": "20GAT9902",
+        "UUID": "@(1)[4057/143/A00NA32533KHWX]"
+      },
+      "version": "3.0",
+      "active_page_ids": [
+        "6d1d0d91-30ec-4c1f-9861-0b99a784cc75"
+      ],
+      "current_page": "6d1d0d91-30ec-4c1f-9861-0b99a784cc75",
+      "default_page": "6b44804c-9108-45ac-9b35-6fe98351a4c7",
+      "page_count": 1,
+      "pages": [
+        {
+          "id": "6d1d0d91-30ec-4c1f-9861-0b99a784cc75",
+          "name": "Estate Operations",
+          "key_count": 29,
+          "keys": [
+            {
+              "position": "0,0",
+              "title": "Estate Repository Status",
+              "action_uuid": "com.estate.statusbridge.estate",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "0,1",
+              "title": "Start Estate Surfaces",
+              "action_uuid": "com.estate.statusbridge.surfaces.start",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,0",
+              "title": "Estate Safe Sync",
+              "action_uuid": "com.estate.statusbridge.estate.sync",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,1",
+              "title": "Start Resident Gateway",
+              "action_uuid": "com.estate.statusbridge.resident_gateway.start",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,0",
+              "title": "CueMastery Repository Status",
+              "action_uuid": "com.estate.statusbridge.cuemastery",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,1",
+              "title": "Start Office of Steward",
+              "action_uuid": "com.estate.statusbridge.office.start",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,0",
+              "title": "CueMastery Safe Sync",
+              "action_uuid": "com.estate.statusbridge.cuemastery.sync",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,1",
+              "title": "Start Open WebUI",
+              "action_uuid": "com.estate.statusbridge.open_webui.start",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,0",
+              "title": "Work Packages Pending",
+              "action_uuid": "com.estate.statusbridge.workpackages",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,1",
+              "title": "Start SillyTavern",
+              "action_uuid": "com.estate.statusbridge.sillytavern.start",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "5,0",
+              "title": "Validation Status",
+              "action_uuid": "com.estate.statusbridge.validation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "5,1",
+              "title": "Start TextGen",
+              "action_uuid": "com.estate.statusbridge.textgen.start",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Operational Readiness Status",
+              "action_uuid": "com.estate.statusbridge.readiness",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "7,0",
+              "title": "Estate Runtime Status",
+              "action_uuid": "com.estate.statusbridge.runtime",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,1",
+              "title": "Start ComfyUI",
+              "action_uuid": "com.estate.statusbridge.comfyui.start",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "Ã¢â€”â‚¬ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE Ã¢â€“Â¶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "0,2",
+              "title": "CPU",
+              "action_uuid": "com.ez.sho-metrics.cpu",
+              "plugin_uuid": "com.ez.sho-metrics",
+              "settings": {}
+            },
+            {
+              "position": "1,2",
+              "title": "GPU1 Compute and VRAM Status",
+              "action_uuid": "com.estate.statusbridge.gpu.gpu1",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,2",
+              "title": "Stop Estate Surfaces",
+              "action_uuid": "com.estate.statusbridge.surfaces.stop",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,2",
+              "title": "Restart Estate Surfaces",
+              "action_uuid": "com.estate.statusbridge.surfaces.restart",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "5,2",
+              "title": "Estate Service Health",
+              "action_uuid": "com.estate.statusbridge.health",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "0,3",
+              "title": "Memory",
+              "action_uuid": "com.ez.sho-metrics.memory",
+              "plugin_uuid": "com.ez.sho-metrics",
+              "settings": {}
+            },
+            {
+              "position": "1,3",
+              "title": "GPU2 Compute and VRAM Status",
+              "action_uuid": "com.estate.statusbridge.gpu.gpu2",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "09a1eef6-a278-4adb-8a88-4b78702db3ee"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Default Profile",
+      "uuid": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8",
+      "directory": "C:\\Users\\wille\\AppData\\Roaming\\Elgato\\StreamDeck\\ProfilesV3\\F40CBB56-817F-48C5-908F-A9E5F9EEC0A8.sdProfile",
+      "device": {
+        "Model": "20GAT9902",
+        "UUID": "@(1)[4057/143/A00NA32533KHWX]"
+      },
+      "version": "3.0",
+      "active_page_ids": [
+        "a5e504d5-bf3d-4db8-8d15-611a100afafb",
+        "954b847d-05c4-4dc3-ad66-2e586f5bdca2"
+      ],
+      "current_page": "a5e504d5-bf3d-4db8-8d15-611a100afafb",
+      "default_page": "71037a84-9d80-4edb-83b5-8c8a194d7305",
+      "page_count": 2,
+      "pages": [
+        {
+          "id": "a5e504d5-bf3d-4db8-8d15-611a100afafb",
+          "name": "Four Monitor Wall",
+          "key_count": 27,
+          "keys": [
+            {
+              "position": "0,0",
+              "title": "Operator Deck M1 Top Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m1_top_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "0,1",
+              "title": "Operator Deck M1 Bottom Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m1_bottom_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "0,2",
+              "title": "Operator Deck M3 Top Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m3_top_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "0,3",
+              "title": "Operator Deck M3 Bottom Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m3_bottom_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,0",
+              "title": "Operator Deck M1 Top Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m1_top_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,1",
+              "title": "Operator Deck M1 Bottom Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m1_bottom_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,2",
+              "title": "Operator Deck M3 Top Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m3_top_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,3",
+              "title": "Operator Deck M3 Bottom Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m3_bottom_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,0",
+              "title": "Operator Deck M2 Top Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m2_top_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,1",
+              "title": "Operator Deck M2 Bottom Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m2_bottom_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,2",
+              "title": "Operator Deck M4 Top Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m4_top_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,3",
+              "title": "Operator Deck M4 Bottom Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m4_bottom_left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,0",
+              "title": "Operator Deck M2 Top Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m2_top_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,1",
+              "title": "Operator Deck M2 Bottom Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m2_bottom_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,2",
+              "title": "Operator Deck M4 Top Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m4_top_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,3",
+              "title": "Operator Deck M4 Bottom Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.slot.m4_bottom_right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,0",
+              "title": "Operator Deck Undo",
+              "action_uuid": "com.estate.statusbridge.operator_deck.undo",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "5,0",
+              "title": "Operator Deck Clear Selection",
+              "action_uuid": "com.estate.statusbridge.operator_deck.clear_selection",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Operator Deck Select Active",
+              "action_uuid": "com.estate.statusbridge.operator_deck.select_active",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "4,1",
+              "title": "CODEX\nDESK",
+              "action_uuid": "com.estate.statusbridge.operator_deck.codex_desk",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "9c576814-c3e0-4d5b-9b5d-dda437f9a89a"
+              }
+            }
+          ]
+        },
+        {
+          "id": "954b847d-05c4-4dc3-ad66-2e586f5bdca2",
+          "name": "Mixed Placement",
+          "key_count": 21,
+          "keys": [
+            {
+              "position": "0,0",
+              "title": "Operator Deck Shape Full",
+              "action_uuid": "com.estate.statusbridge.operator_deck.shape.full",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "0,1",
+              "title": "Operator Deck Shape Left",
+              "action_uuid": "com.estate.statusbridge.operator_deck.shape.left",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "0,2",
+              "title": "Operator Deck Shape Bottom",
+              "action_uuid": "com.estate.statusbridge.operator_deck.shape.bottom",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,0",
+              "title": "Operator Deck Shape Top",
+              "action_uuid": "com.estate.statusbridge.operator_deck.shape.top",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "1,1",
+              "title": "Operator Deck Shape Right",
+              "action_uuid": "com.estate.statusbridge.operator_deck.shape.right",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,0",
+              "title": "Operator Deck Destination M1",
+              "action_uuid": "com.estate.statusbridge.operator_deck.monitor.m1",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "2,1",
+              "title": "Operator Deck Destination M3",
+              "action_uuid": "com.estate.statusbridge.operator_deck.monitor.m3",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,0",
+              "title": "Operator Deck Destination M2",
+              "action_uuid": "com.estate.statusbridge.operator_deck.monitor.m2",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "3,1",
+              "title": "Operator Deck Destination M4",
+              "action_uuid": "com.estate.statusbridge.operator_deck.monitor.m4",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,0",
+              "title": "Operator Deck Undo",
+              "action_uuid": "com.estate.statusbridge.operator_deck.undo",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "4,3",
+              "title": "HOME",
+              "action_uuid": "com.elgato.streamdeck.page.goto",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {
+                "PageIndex": 1
+              }
+            },
+            {
+              "position": "5,0",
+              "title": "Operator Deck Clear Selection",
+              "action_uuid": "com.estate.statusbridge.operator_deck.clear_selection",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "5,1",
+              "title": "RESTORE\nCODEX",
+              "action_uuid": "com.elgato.streamdeck.system.open",
+              "plugin_uuid": "com.elgato.streamdeck.system.open",
+              "settings": {
+                "path": "\"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -NoProfile -ExecutionPolicy Bypass -File \"A:\\theestate\\tools\\operator-deck\\Restore-CodexWorkEnvironment.ps1\""
+              }
+            },
+            {
+              "position": "5,3",
+              "title": "◀ PAGE",
+              "action_uuid": "com.elgato.streamdeck.page.previous",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "6,0",
+              "title": "Operator Deck Select Active",
+              "action_uuid": "com.estate.statusbridge.operator_deck.select_active",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,2",
+              "title": "Operator Deck Voice Typing",
+              "action_uuid": "com.estate.statusbridge.operator_deck.dictation",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "6,3",
+              "title": "Page Indicator",
+              "action_uuid": "com.elgato.streamdeck.page.indicator",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,0",
+              "title": "Operator Deck Return Promoted Window",
+              "action_uuid": "com.estate.statusbridge.operator_deck.return",
+              "plugin_uuid": "com.estate.statusbridge",
+              "settings": {}
+            },
+            {
+              "position": "7,3",
+              "title": "PAGE ▶",
+              "action_uuid": "com.elgato.streamdeck.page.next",
+              "plugin_uuid": "com.elgato.streamdeck.page",
+              "settings": {}
+            },
+            {
+              "position": "7,1",
+              "title": "◀ PROFILE",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1"
+              }
+            },
+            {
+              "position": "7,2",
+              "title": "PROFILE ▶",
+              "action_uuid": "com.elgato.streamdeck.profile.rotate",
+              "plugin_uuid": "com.elgato.streamdeck.profile.rotate",
+              "settings": {
+                "DeviceUUID": "",
+                "PageIndex": 1,
+                "ProfileUUID": "9c576814-c3e0-4d5b-9b5d-dda437f9a89a"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -39,6 +39,16 @@ Rules:
 - Preserve valuable but uncommitted ideas in `docs/operations/boards/parking_lot.md`; substantial parked ideas use `docs/operations/parking_lot/PL-####-slug.md`. Parking does not authorize implementation.
 - Use `docs/operations/boards/ready_bench.md` only for Steward-committed work that has been sufficiently elaborated into durable specification, roadmap/execution sequence, bounded work packages, dependencies, acceptance criteria, and scope boundaries. Read `docs/operations/PARKING_LOT_AND_READY_BENCH.md` before promoting work between these states.
 
+## STREAM DECK WORK
+
+For Stream Deck profile, button, navigation, Riverview Operator, Quest Dev, or Stream Deck plugin work, read before modifying or diagnosing:
+
+- `docs/operations/stream_deck/STREAM_DECK_CURRENT_INVENTORY.md`
+- `docs/operations/stream_deck/STREAM_DECK_MAINTENANCE_AND_REPAIR_GUIDE.md`
+- `docs/operations/stream_deck/STREAM_DECK_CURRENT_INVENTORY.json`
+
+The installed configuration under the Elgato StreamDeck AppData tree is runtime truth. Re-inventory it before changes if Pat has made manual edits.
+
 ## QUEST / WEBXR / SPATIAL WORK
 
 If a Steward request mentions Quest, Quest 2, VR, WebXR, Spatial, immersive room, headset testing, teleport, scrcpy, ADB mirror, or Evelyn in VR, read **`docs/operations/roadmap/evidence/RV-016.5_QUEST_WEBXR_SPATIAL_IMMERSIVE_OBSERVABILITY_SCREEN_MIRROR_CHECKPOINT.md`** before modifying or diagnosing the system.
