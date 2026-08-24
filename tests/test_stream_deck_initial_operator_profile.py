@@ -78,3 +78,13 @@ def test_native_plugin_preserves_gesture_and_estate_separation():
     assert "DOUBLE_TAP_MS = 400" in plugin
     assert "com.estate" not in plugin
     assert manifest["CodePathWin"] == "RiverviewOperator.cmd"
+
+
+def test_native_plugin_uses_verified_execution_and_live_status_sources():
+    plugin = (NATIVE_PLUGIN / "plugin.js").read_text(encoding="utf-8")
+    assert 'const POWERSHELL = "C:\\\\Program Files\\\\PowerShell\\\\7\\\\pwsh.exe"' in plugin
+    assert 'const ADB = "C:\\\\Users\\\\wille\\\\Downloads\\\\platform-tools-latest-windows\\\\platform-tools\\\\adb.exe"' in plugin
+    assert '"runtime", "riverview-supervisor", "status.json"' in plugin
+    assert 'status control=' in plugin
+    assert 'setInterval(() => refreshVisibleContexts' in plugin
+    assert 'detached: true' not in plugin
