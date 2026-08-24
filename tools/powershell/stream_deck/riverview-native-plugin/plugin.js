@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { appendFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const PLUGIN_UUID = "com.riverview.operator";
 const CONTROL_SCRIPT = "A:\\Riverview\\repo\\tools\\powershell\\stream_deck\\Invoke-RiverviewStreamDeckControl.ps1";
@@ -14,6 +17,12 @@ let socket = null;
 const contexts = new Map();
 const presses = new Map();
 const taps = new Map();
+const LOG_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "riverview-native-events.log");
+
+function diagnostic(message) {
+  try { appendFileSync(LOG_PATH, `${new Date().toISOString()} ${message}\n`, "utf8"); }
+  catch { /* diagnostics must never take down the action plugin */ }
+}
 
 function parseArgs(argv) {
   const result = {};
@@ -88,6 +97,7 @@ function endPress(context) {
 
 function handle(message) {
   const payload = JSON.parse(message.data);
+  diagnostic(`event=${payload.event} action=${payload.action || ""} context=${payload.context || ""}`);
   if (payload.event === "willAppear") {
     const control = ACTIONS[payload.action];
     if (control) { contexts.set(payload.context, control); title(payload.context, control.toUpperCase()); }
@@ -103,11 +113,12 @@ function handle(message) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.port || !args.pluginUUID || !args.registerEvent) throw new Error("RIV-SD-0001: Stream Deck launch arguments missing.");
+  diagnostic(`start port=${args.port} pluginUUID=${args.pluginUUID} registerEvent=${args.registerEvent}`);
   socket = new WebSocket(`ws://127.0.0.1:${args.port}`);
-  socket.addEventListener("open", () => socket.send(JSON.stringify({ event: args.registerEvent, uuid: PLUGIN_UUID })));
+  socket.addEventListener("open", () => { diagnostic("websocket=open registration=send"); socket.send(JSON.stringify({ event: args.registerEvent, uuid: PLUGIN_UUID })); });
   socket.addEventListener("message", handle);
   socket.addEventListener("close", () => process.exit(0));
-  socket.addEventListener("error", (error) => console.error("RIV-SD-0002: Stream Deck plugin socket error", error));
+  socket.addEventListener("error", (error) => { diagnostic(`websocket=error message=${error.message || error}`); console.error("RIV-SD-0002: Stream Deck plugin socket error", error); });
 }
 
 main();

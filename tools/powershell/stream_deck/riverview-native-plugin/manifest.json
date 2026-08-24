@@ -25,7 +25,7 @@
   "SDKVersion": 2,
   "Author": "Project Riverview",
   "CodePath": "plugin.js",
-  "CodePathWin": "plugin.js",
+  "CodePathWin": "RiverviewOperator.cmd",
   "Description": "Riverview-owned Runtime, Quest Dev, and Quest Cast controls.",
   "Name": "Riverview Operator",
   "Category": "Riverview",

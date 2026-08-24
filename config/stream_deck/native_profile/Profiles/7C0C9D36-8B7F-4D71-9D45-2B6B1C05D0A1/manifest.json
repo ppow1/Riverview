@@ -33,6 +33,50 @@
         "State": 0,
         "States": [{"FontFamily": "", "FontSize": 12, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "QUEST\nCAST", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
         "UUID": "com.riverview.operator.quest-cast"
+      },
+      "5,3": {
+        "ActionID": "b3a6cc80-6b1a-4d2a-a49d-6a6f6ea30004",
+        "LinkedTitle": true,
+        "Name": "Previous Page",
+        "Plugin": {"Name": "Pages", "UUID": "com.elgato.streamdeck.page", "Version": "1.0"},
+        "Resources": null,
+        "Settings": {},
+        "State": 0,
+        "States": [{"FontFamily": "", "FontSize": 14, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "◀ PAGE", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
+        "UUID": "com.elgato.streamdeck.page.previous"
+      },
+      "7,1": {
+        "ActionID": "b3a6cc80-6b1a-4d2a-a49d-6a6f6ea30005",
+        "LinkedTitle": true,
+        "Name": "Switch Profile",
+        "Plugin": {"Name": "Switch Profile", "UUID": "com.elgato.streamdeck.profile.rotate", "Version": "1.0"},
+        "Resources": null,
+        "Settings": {"DeviceUUID": "", "PageIndex": 1, "ProfileUUID": "d4abffcd-7bde-4db7-856b-b26823e1780b"},
+        "State": 0,
+        "States": [{"FontFamily": "", "FontSize": 13, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "◀ PROFILE", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
+        "UUID": "com.elgato.streamdeck.profile.rotate"
+      },
+      "7,2": {
+        "ActionID": "b3a6cc80-6b1a-4d2a-a49d-6a6f6ea30006",
+        "LinkedTitle": true,
+        "Name": "Switch Profile",
+        "Plugin": {"Name": "Switch Profile", "UUID": "com.elgato.streamdeck.profile.rotate", "Version": "1.0"},
+        "Resources": null,
+        "Settings": {"DeviceUUID": "", "PageIndex": 1, "ProfileUUID": "9c576814-c3e0-4d5b-9b5d-dda437f9a89a"},
+        "State": 0,
+        "States": [{"FontFamily": "", "FontSize": 13, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "PROFILE ▶", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
+        "UUID": "com.elgato.streamdeck.profile.rotate"
+      },
+      "7,3": {
+        "ActionID": "b3a6cc80-6b1a-4d2a-a49d-6a6f6ea30007",
+        "LinkedTitle": true,
+        "Name": "Next Page",
+        "Plugin": {"Name": "Pages", "UUID": "com.elgato.streamdeck.page", "Version": "1.0"},
+        "Resources": null,
+        "Settings": {},
+        "State": 0,
+        "States": [{"FontFamily": "", "FontSize": 14, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "PAGE ▶", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
+        "UUID": "com.elgato.streamdeck.page.next"
       }
     },
     "Type": "Keypad"

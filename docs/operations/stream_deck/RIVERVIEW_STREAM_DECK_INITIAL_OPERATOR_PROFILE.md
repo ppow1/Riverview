@@ -23,6 +23,9 @@ same single/double/long timing convention locally. It does not reuse or
 modify the Estate plugin. On this workstation the installed native locations
 are `%APPDATA%\Elgato\StreamDeck\ProfilesV3\<Riverview UUID>.sdProfile` and
 `%APPDATA%\Elgato\StreamDeck\Plugins\com.riverview.operator.sdPlugin`.
+The Windows entry point is `RiverviewOperator.cmd`; it deliberately launches
+the verified system Node executable because Stream Deck's bundled Node 20
+does not provide the global `WebSocket` used by this plugin.
 
 After installation, restart Stream Deck and confirm the profile selector shows
 `Riverview` with exactly `RIVERVIEW RUNTIME`, `QUEST DEV`, and `QUEST CAST`.

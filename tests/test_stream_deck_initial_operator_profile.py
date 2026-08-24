@@ -54,12 +54,18 @@ def test_native_profile_is_exactly_three_controls():
     actions = page["Controllers"][0]["Actions"]
     assert root["Name"] == "Riverview"
     assert root["Pages"]["Current"] == root["Pages"]["Default"]
-    assert len(actions) == 3
+    assert len([action for action in actions.values() if action.get("Plugin", {}).get("UUID") == "com.riverview.operator"]) == 3
     assert [actions[key]["UUID"] for key in ("0,0", "1,0", "2,0")] == [
         "com.riverview.operator.runtime",
         "com.riverview.operator.quest-dev",
         "com.riverview.operator.quest-cast",
     ]
+    assert actions["5,3"]["UUID"] == "com.elgato.streamdeck.page.previous"
+    assert actions["7,3"]["UUID"] == "com.elgato.streamdeck.page.next"
+    assert actions["7,1"]["UUID"] == "com.elgato.streamdeck.profile.rotate"
+    assert actions["7,2"]["UUID"] == "com.elgato.streamdeck.profile.rotate"
+    assert actions["7,1"]["Settings"]["ProfileUUID"] == "d4abffcd-7bde-4db7-856b-b26823e1780b"
+    assert actions["7,2"]["Settings"]["ProfileUUID"] == "9c576814-c3e0-4d5b-9b5d-dda437f9a89a"
 
 
 def test_native_plugin_preserves_gesture_and_estate_separation():
@@ -71,3 +77,4 @@ def test_native_plugin_preserves_gesture_and_estate_separation():
     assert "LONG_PRESS_MS = 1250" in plugin
     assert "DOUBLE_TAP_MS = 400" in plugin
     assert "com.estate" not in plugin
+    assert manifest["CodePathWin"] == "RiverviewOperator.cmd"
