@@ -5,6 +5,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = ROOT / "config/stream_deck/Riverview-Initial-Operator-Profile.json"
 ACTION = ROOT / "tools/powershell/stream_deck/Invoke-RiverviewStreamDeckControl.ps1"
+NATIVE_PROFILE = ROOT / "config/stream_deck/native_profile/manifest.json"
+NATIVE_PAGE = ROOT / "config/stream_deck/native_profile/Profiles/7C0C9D36-8B7F-4D71-9D45-2B6B1C05D0A1/manifest.json"
+NATIVE_PLUGIN = ROOT / "tools/powershell/stream_deck/riverview-native-plugin"
 
 
 def test_profile_has_exactly_three_bounded_controls():
@@ -43,3 +46,28 @@ def test_cast_and_dev_paths_are_independent():
     assert "adb" not in cast.lower()
     assert "QuestMirror" in dev
     assert "Invoke-QuestCast" not in dev
+
+
+def test_native_profile_is_exactly_three_controls():
+    root = json.loads(NATIVE_PROFILE.read_text(encoding="utf-8"))
+    page = json.loads(NATIVE_PAGE.read_text(encoding="utf-8"))
+    actions = page["Controllers"][0]["Actions"]
+    assert root["Name"] == "Riverview"
+    assert root["Pages"]["Current"] == root["Pages"]["Default"]
+    assert len(actions) == 3
+    assert [actions[key]["UUID"] for key in ("0,0", "1,0", "2,0")] == [
+        "com.riverview.operator.runtime",
+        "com.riverview.operator.quest-dev",
+        "com.riverview.operator.quest-cast",
+    ]
+
+
+def test_native_plugin_preserves_gesture_and_estate_separation():
+    manifest = json.loads((NATIVE_PLUGIN / "manifest.json").read_text(encoding="utf-8"))
+    plugin = (NATIVE_PLUGIN / "plugin.js").read_text(encoding="utf-8")
+    assert manifest["StreamdeckID"] == "com.riverview.operator"
+    assert manifest["CategoryIcon"] == "images/riverview"
+    assert (NATIVE_PLUGIN / "images/riverview.svg").exists()
+    assert "LONG_PRESS_MS = 1250" in plugin
+    assert "DOUBLE_TAP_MS = 400" in plugin
+    assert "com.estate" not in plugin

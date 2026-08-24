@@ -1,0 +1,42 @@
+{
+  "Controllers": [{
+    "Actions": {
+      "0,0": {
+        "ActionID": "b3a6cc80-6b1a-4d2a-a49d-6a6f6ea30001",
+        "LinkedTitle": true,
+        "Name": "RIVERVIEW RUNTIME",
+        "Plugin": {"Name": "Riverview Operator", "UUID": "com.riverview.operator", "Version": "1.0.0"},
+        "Resources": null,
+        "Settings": {"control": "runtime"},
+        "State": 0,
+        "States": [{"FontFamily": "", "FontSize": 12, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "RIVERVIEW\nRUNTIME", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
+        "UUID": "com.riverview.operator.runtime"
+      },
+      "1,0": {
+        "ActionID": "b3a6cc80-6b1a-4d2a-a49d-6a6f6ea30002",
+        "LinkedTitle": true,
+        "Name": "QUEST DEV",
+        "Plugin": {"Name": "Riverview Operator", "UUID": "com.riverview.operator", "Version": "1.0.0"},
+        "Resources": null,
+        "Settings": {"control": "quest-dev"},
+        "State": 0,
+        "States": [{"FontFamily": "", "FontSize": 12, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "QUEST\nDEV", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
+        "UUID": "com.riverview.operator.quest-dev"
+      },
+      "2,0": {
+        "ActionID": "b3a6cc80-6b1a-4d2a-a49d-6a6f6ea30003",
+        "LinkedTitle": true,
+        "Name": "QUEST CAST",
+        "Plugin": {"Name": "Riverview Operator", "UUID": "com.riverview.operator", "Version": "1.0.0"},
+        "Resources": null,
+        "Settings": {"control": "quest-cast"},
+        "State": 0,
+        "States": [{"FontFamily": "", "FontSize": 12, "FontStyle": "", "FontUnderline": false, "OutlineThickness": 2, "ShowTitle": true, "Title": "QUEST\nCAST", "TitleAlignment": "middle", "TitleColor": "#ffffff"}],
+        "UUID": "com.riverview.operator.quest-cast"
+      }
+    },
+    "Type": "Keypad"
+  }],
+  "Icon": "",
+  "Name": "Riverview"
+}

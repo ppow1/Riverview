@@ -5,6 +5,31 @@
 This is the first Riverview-owned three-control profile. It is separate from
 the Estate Stream Deck profile and does not modify Estate files.
 
+## Native installation
+
+The installed Stream Deck version uses ProfilesV3. A native profile is a
+bare-UUID directory ending in `.sdProfile`, with a root `manifest.json` and a
+page manifest under `Profiles/<page UUID>/manifest.json`. The repository
+source for the installed profile is:
+
+`config/stream_deck/native_profile/`
+
+The Riverview action plugin source is:
+
+`tools/powershell/stream_deck/riverview-native-plugin/`
+
+The native plugin invokes the existing PowerShell wrapper and implements the
+same single/double/long timing convention locally. It does not reuse or
+modify the Estate plugin. On this workstation the installed native locations
+are `%APPDATA%\Elgato\StreamDeck\ProfilesV3\<Riverview UUID>.sdProfile` and
+`%APPDATA%\Elgato\StreamDeck\Plugins\com.riverview.operator.sdPlugin`.
+
+After installation, restart Stream Deck and confirm the profile selector shows
+`Riverview` with exactly `RIVERVIEW RUNTIME`, `QUEST DEV`, and `QUEST CAST`.
+Switching between Estate and Riverview is a required native-app acceptance
+test; repository tests cannot prove physical profile switching or button
+presses.
+
 Definition:
 
 `config/stream_deck/Riverview-Initial-Operator-Profile.json`
@@ -13,10 +38,10 @@ Action layer:
 
 `tools/powershell/stream_deck/Invoke-RiverviewStreamDeckControl.ps1`
 
-The definition maps each key to a bounded PowerShell action. The installed
-Stream Deck action/plugin must provide the timing event and pass `single`,
-`double`, or `long`; this keeps the gesture convention explicit without
-creating a second Riverview plugin in the first slice.
+The definition and native page map each key to a bounded PowerShell action.
+The native plugin passes `single`, `double`, or `long` to the wrapper after
+the established 400 ms double-tap and approximately 1.25 s long-press
+thresholds.
 
 | Key | Single tap | Double tap | Long press (~1.25 s) |
 |---|---|---|---|

@@ -1,0 +1,38 @@
+{
+  "Actions": [
+    {
+      "Icon": "",
+      "Name": "Riverview Runtime",
+      "States": [{"Image": ""}],
+      "Tooltip": "Riverview Runtime Supervisor control",
+      "UUID": "com.riverview.operator.runtime"
+    },
+    {
+      "Icon": "",
+      "Name": "Quest Dev",
+      "States": [{"Image": ""}],
+      "Tooltip": "Quest ADB and engineering mirror control",
+      "UUID": "com.riverview.operator.quest-dev"
+    },
+    {
+      "Icon": "",
+      "Name": "Quest Cast",
+      "States": [{"Image": ""}],
+      "Tooltip": "Meta Quest casting control; reports blocked when unverified",
+      "UUID": "com.riverview.operator.quest-cast"
+    }
+  ],
+  "SDKVersion": 2,
+  "Author": "Project Riverview",
+  "CodePath": "plugin.js",
+  "CodePathWin": "plugin.js",
+  "Description": "Riverview-owned Runtime, Quest Dev, and Quest Cast controls.",
+  "Name": "Riverview Operator",
+  "Category": "Riverview",
+  "CategoryIcon": "images/riverview",
+  "Icon": "images/riverview",
+  "Version": "1.0.0",
+  "OS": [{"Platform": "windows", "MinimumVersion": "10"}],
+  "Software": {"MinimumVersion": "4.1"},
+  "StreamdeckID": "com.riverview.operator"
+}

@@ -1,0 +1,6 @@
+{
+  "Device": {"Model": "20GAT9902", "UUID": "@(1)[4057/143/A00NA32533KHWX]"},
+  "Name": "Riverview",
+  "Pages": {"Current": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1", "Default": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1", "Pages": ["7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1"]},
+  "Version": "3.0"
+}
