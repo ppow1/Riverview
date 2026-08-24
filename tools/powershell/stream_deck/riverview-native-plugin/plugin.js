@@ -69,17 +69,32 @@ function command(command, args, options = {}) {
   }));
 }
 
-function runtimeStatus() {
+async function runtimeStatus() {
   const statusPath = path.join(WORKING_DIRECTORY, "runtime", "riverview-supervisor", "status.json");
   if (!existsSync(statusPath)) return { value: "OFF", color: "red" };
   try {
     const state = JSON.parse(readFileSync(statusPath, "utf8"));
     const services = Object.values(state.services || {}).filter((service) => service.enabled !== false);
     const running = services.filter((service) => service.status === "running").length;
-    if (services.length > 0 && running === services.length) return { value: "RUNNING", color: "green" };
-    if (running > 0) return { value: "DEGRADED", color: "yellow" };
+    const operator = state.services?.operator;
+    let operatorHealthy = false;
+    if (operator?.health_url) {
+      try {
+        const response = await fetch(operator.health_url, { signal: AbortSignal.timeout(1500) });
+        operatorHealthy = response.ok;
+      } catch { operatorHealthy = false; }
+    }
+    if (services.length > 0 && running === services.length && operatorHealthy) return { value: "RUNNING", color: "green" };
+    if (running > 0 || operatorHealthy) return { value: "DEGRADED", color: "yellow" };
     return { value: "STOPPED", color: "red" };
   } catch { return { value: "ERROR", color: "red" }; }
+}
+
+async function questMirrorRunning() {
+  try {
+    const result = await command(POWERSHELL, ["-NoProfile", "-Command", "@(Get-Process -Name scrcpy -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'Riverview Quest Live View' }).Count"]);
+    return Number.parseInt(result.stdout.trim(), 10) > 0;
+  } catch { return false; }
 }
 
 async function questStatus() {
@@ -91,7 +106,9 @@ async function questStatus() {
     if (!quest) return { value: "OFF", color: "red" };
     if (/\bunauthorized\b/.test(quest)) return { value: "BLOCKED", color: "yellow" };
     const serial = quest.split(/\s+/)[0];
-    return { value: serial.includes(":") || serial.includes("_adb-tls") ? "ADB" : "USB", color: serial.includes(":") || serial.includes("_adb-tls") ? "green" : "yellow" };
+    const wireless = serial.includes(":") || serial.includes("_adb-tls");
+    if (await questMirrorRunning()) return { value: "LIVE", color: "green" };
+    return { value: wireless ? "ADB" : "USB", color: wireless ? "green" : "yellow" };
   } catch { return { value: "OFF", color: "red" }; }
 }
 

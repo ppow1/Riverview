@@ -37,6 +37,7 @@ def test_action_layer_contains_required_boundaries_without_transient_endpoint():
     assert "Meta Quest Developer Hub" in text
     assert "adb-1WMHHB67ZF1473" not in text
     assert "192.168.1.159" not in text
+    assert "C:\\Program Files\\PowerShell\\7\\pwsh.exe" in text
 
 
 def test_cast_and_dev_paths_are_independent():
@@ -88,3 +89,6 @@ def test_native_plugin_uses_verified_execution_and_live_status_sources():
     assert 'status control=' in plugin
     assert 'setInterval(() => refreshVisibleContexts' in plugin
     assert 'detached: true' not in plugin
+    assert 'async function questMirrorRunning()' in plugin
+    assert 'value: "LIVE"' in plugin
+    assert 'operatorHealthy' in plugin

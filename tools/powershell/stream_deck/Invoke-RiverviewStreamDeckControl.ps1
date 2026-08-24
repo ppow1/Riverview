@@ -18,6 +18,7 @@ $ReportRoot = Join-Path $env:LOCALAPPDATA 'Riverview\StreamDeck\reports'
 $RuntimeStart = Join-Path $RepositoryPath 'tools\powershell\runtime\Start-RiverviewRuntimeSupervisor.ps1'
 $RuntimeStop = Join-Path $RepositoryPath 'tools\powershell\runtime\Stop-RiverviewRuntimeSupervisor.ps1'
 $QuestMirror = Join-Path $RepositoryPath 'runtime\quest-observability\Quest-LeftEyeMirror.ps1'
+$PowerShell7 = 'C:\Program Files\PowerShell\7\pwsh.exe'
 $AdbCandidates = @(
     'C:\Users\wille\Downloads\platform-tools-latest-windows\platform-tools\adb.exe',
     'adb.exe'
@@ -156,23 +157,27 @@ function Invoke-QuestDev {
         if ($transport.transport -like 'wireless*') { & $transport.adb disconnect $transport.serial | Out-Null }
         return Write-Result @{ state = 'stopped'; transport = $transport.transport; serial = $transport.serial; owned_session = $true }
     }
-    if ($Gesture -eq 'double') {
-        if (-not (Test-Path -LiteralPath $QuestMirror -PathType Leaf)) {
-            return Write-Result @{ state = 'blocked'; failure_class = 'RIV-LIVEVIEW-0001: Quest live-view launcher is unavailable.' }
-        }
-        $existing = @(Get-Process scrcpy -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'Riverview Quest Live View' })
-        if ($existing.Count -gt 0) {
-            try { $shell = New-Object -ComObject WScript.Shell; [void]$shell.AppActivate($existing[0].Id) } catch { }
-            return Write-Result @{ state = 'ready'; transport = $transport.transport; serial = $transport.serial; live_view = 'raised' }
-        }
-        $psi = [System.Diagnostics.ProcessStartInfo]::new()
-        $psi.FileName = 'pwsh.exe'; $psi.UseShellExecute = $true; $psi.WindowStyle = 'Normal'
-        foreach ($arg in @('-NoProfile','-ExecutionPolicy','Bypass','-File',$QuestMirror,'-Serial',$transport.serial)) { [void]$psi.ArgumentList.Add($arg) }
-        [void][System.Diagnostics.Process]::Start($psi)
-        Start-Sleep -Seconds 2
-        return Write-Result @{ state = 'starting'; transport = $transport.transport; serial = $transport.serial; live_view = 'launch_requested' }
+    if (-not (Test-Path -LiteralPath $QuestMirror -PathType Leaf)) {
+        return Write-Result @{ state = 'blocked'; failure_class = 'RIV-LIVEVIEW-0001: Quest live-view launcher is unavailable.' }
     }
-    return Write-Result @{ state = 'ready'; transport = $transport.transport; serial = $transport.serial; live_view = 'unchanged' }
+    if (-not (Test-Path -LiteralPath $PowerShell7 -PathType Leaf)) {
+        return Write-Result @{ state = 'blocked'; failure_class = 'RIV-LIVEVIEW-0002: verified PowerShell 7 executable is unavailable.'; executable = $PowerShell7 }
+    }
+    $existing = @(Get-Process scrcpy -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'Riverview Quest Live View' })
+    if ($existing.Count -gt 0) {
+        try { $shell = New-Object -ComObject WScript.Shell; [void]$shell.AppActivate($existing[0].Id) } catch { }
+        return Write-Result @{ state = 'ready'; transport = $transport.transport; serial = $transport.serial; live_view = 'raised'; process_id = $existing[0].Id; executable = $PowerShell7 }
+    }
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $PowerShell7; $psi.UseShellExecute = $true; $psi.WindowStyle = 'Normal'
+    foreach ($arg in @('-NoProfile','-ExecutionPolicy','Bypass','-File',$QuestMirror,'-Serial',$transport.serial)) { [void]$psi.ArgumentList.Add($arg) }
+    [void][System.Diagnostics.Process]::Start($psi)
+    Start-Sleep -Seconds 3
+    $started = @(Get-Process scrcpy -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'Riverview Quest Live View' })
+    if ($started.Count -gt 0) {
+        return Write-Result @{ state = 'ready'; transport = $transport.transport; serial = $transport.serial; live_view = 'running'; process_id = $started[0].Id; executable = $PowerShell7 }
+    }
+    return Write-Result @{ state = 'degraded'; transport = $transport.transport; serial = $transport.serial; live_view = 'launch_requested'; executable = $PowerShell7; failure_class = 'RIV-LIVEVIEW-0003: mirror launch requested but the owned window was not observed.' }
 }
 
 function Invoke-QuestCast {
