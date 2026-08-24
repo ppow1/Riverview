@@ -17,6 +17,8 @@ $RepositoryPath = (Resolve-Path -LiteralPath $RepositoryPath).Path
 $ReportRoot = Join-Path $env:LOCALAPPDATA 'Riverview\StreamDeck\reports'
 $RuntimeStart = Join-Path $RepositoryPath 'tools\powershell\runtime\Start-RiverviewRuntimeSupervisor.ps1'
 $RuntimeStop = Join-Path $RepositoryPath 'tools\powershell\runtime\Stop-RiverviewRuntimeSupervisor.ps1'
+$OperatorUrl = 'http://127.0.0.1:18082/'
+$OperatorHealthUrl = 'http://127.0.0.1:18082/health'
 $QuestMirror = Join-Path $RepositoryPath 'runtime\quest-observability\Quest-LeftEyeMirror.ps1'
 $PowerShell7 = 'C:\Program Files\PowerShell\7\pwsh.exe'
 $AdbCandidates = @(
@@ -129,23 +131,83 @@ function Ensure-QuestTransport {
     return @{ ok = $false; failure_class = 'RIV-ADB-0004: Quest device discovery failed; wake/connect/authorize the headset.'; adb = $adb }
 }
 
-function Invoke-Runtime {
-    if (-not (Test-Path -LiteralPath $RuntimeStart -PathType Leaf) -or -not (Test-Path -LiteralPath $RuntimeStop -PathType Leaf)) {
-        return Write-Result @{ state = 'blocked'; failure_class = 'RIV-RUN-0001: Riverview Runtime Supervisor launcher is unavailable.' }
+function Test-OperatorHealth {
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $OperatorHealthUrl -TimeoutSec 3
+        return ($response.StatusCode -eq 200)
+    } catch { return $false }
+}
+
+function Wait-OperatorHealth([int]$TimeoutSeconds = 60) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-OperatorHealth) { return $true }
+        Start-Sleep -Milliseconds 500
     }
+    return $false
+}
+
+function Invoke-OperatorSupervisorRequest([string]$Operation, [int]$TimeoutSeconds = 30) {
+    $requestDir = Join-Path $RepositoryPath 'runtime\riverview-supervisor\requests'
+    $resultDir = Join-Path $requestDir 'results'
+    New-Item -ItemType Directory -Path $requestDir,$resultDir -Force | Out-Null
+    $id = [guid]::NewGuid().ToString()
+    $name = "$id.json"
+    $requestPath = Join-Path $requestDir $name
+    $resultPath = Join-Path $resultDir $name
+    $payload = @{ operation = $Operation; service_id = 'operator'; request_id = $id } | ConvertTo-Json -Compress
+    [System.IO.File]::WriteAllText($requestPath, $payload, [System.Text.UTF8Encoding]::new($false))
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $resultPath) {
+            $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+            Remove-Item -LiteralPath $resultPath -Force
+            return $result
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    throw 'RIV-RUN-0004: Operator supervisor request timed out.'
+}
+
+function Get-OperatorProcess {
+    $listener = @(Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 18082 -State Listen -ErrorAction SilentlyContinue)
+    foreach ($connection in $listener) {
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($connection.OwningProcess)" -ErrorAction SilentlyContinue
+        if ($process -and $process.CommandLine -match '-m\s+riverview\.operator\.live_service(?:\s|$)') { return $process }
+    }
+    return $null
+}
+
+function Ensure-Operator {
+    if (Test-OperatorHealth) { return @{ state = 'running'; started = $false; process = (Get-OperatorProcess) } }
     $task = Get-ScheduledTask -TaskName 'Riverview Runtime Supervisor' -ErrorAction SilentlyContinue
+    if (-not $task) { return @{ state = 'blocked'; failure_class = 'RIV-RUN-0002: canonical Operator lifecycle task is not installed.' } }
+    if ($task.State -ne 'Running') { Start-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath }
+    if (Wait-OperatorHealth) { return @{ state = 'running'; started = $true; process = (Get-OperatorProcess) } }
+    return @{ state = 'starting'; started = $true; failure_class = 'RIV-RUN-0003: Operator HTTP health did not converge on port 18082.' }
+}
+
+function Invoke-Runtime {
+    if (-not (Test-Path -LiteralPath $RuntimeStart -PathType Leaf)) {
+        return Write-Result @{ state = 'blocked'; failure_class = 'RIV-RUN-0001: canonical Operator lifecycle launcher is unavailable.' }
+    }
     if ($Gesture -eq 'long') {
-        & $RuntimeStop -RepositoryPath $RepositoryPath
-        return Write-Result @{ state = 'stopped'; owner = 'Riverview Runtime Supervisor' }
+        if (-not (Test-OperatorHealth)) { return Write-Result @{ state = 'stopped'; owner = 'Riverview Operator HTTP server'; port = 18082 } }
+        $task = Get-ScheduledTask -TaskName 'Riverview Runtime Supervisor' -ErrorAction SilentlyContinue
+        if ($task -and $task.State -eq 'Running') {
+            $result = Invoke-OperatorSupervisorRequest -Operation 'stop_service'
+            if (-not $result.ok) { return Write-Result @{ state = 'degraded'; failure_class = [string]$result.error } }
+        } else {
+            $process = Get-OperatorProcess
+            if ($process) { Stop-Process -Id $process.ProcessId -Force }
+        }
+        if (Wait-OperatorHealth 5) { return Write-Result @{ state = 'degraded'; failure_class = 'RIV-RUN-0005: Operator HTTP server did not stop.' } }
+        return Write-Result @{ state = 'stopped'; owner = 'Riverview Operator HTTP server'; port = 18082 }
     }
-    if (-not $task) {
-        return Write-Result @{ state = 'blocked'; failure_class = 'RIV-RUN-0002: unified lifecycle task is not installed.' }
-    }
-    if ($task.State -ne 'Running') { Start-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath; Start-Sleep -Seconds 2 }
-    $state = (Get-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath).State.ToString()
-    if ($state -ne 'Running') { return Write-Result @{ state = 'degraded'; failure_class = 'RIV-RUN-0003: supervisor did not reach Running state.' } }
-    if ($Gesture -eq 'double') { Start-Process 'http://127.0.0.1:18082/' }
-    return Write-Result @{ state = 'ready'; owner = 'Riverview Runtime Supervisor'; operator_ui = ($Gesture -eq 'double') }
+    $result = Ensure-Operator
+    if ($result.state -ne 'running') { return Write-Result $result }
+    if ($Gesture -eq 'double') { Start-Process $OperatorUrl }
+    return Write-Result @{ state = 'ready'; owner = 'Riverview Operator HTTP server'; port = 18082; health_url = $OperatorHealthUrl; process_id = $result.process.ProcessId; operator_ui = ($Gesture -eq 'double') }
 }
 
 function Invoke-QuestDev {

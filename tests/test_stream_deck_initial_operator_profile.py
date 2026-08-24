@@ -85,10 +85,10 @@ def test_native_plugin_uses_verified_execution_and_live_status_sources():
     plugin = (NATIVE_PLUGIN / "plugin.js").read_text(encoding="utf-8")
     assert 'const POWERSHELL = "C:\\\\Program Files\\\\PowerShell\\\\7\\\\pwsh.exe"' in plugin
     assert 'const ADB = "C:\\\\Users\\\\wille\\\\Downloads\\\\platform-tools-latest-windows\\\\platform-tools\\\\adb.exe"' in plugin
-    assert '"runtime", "riverview-supervisor", "status.json"' in plugin
+    assert 'http://127.0.0.1:18082/health' in plugin
     assert 'status control=' in plugin
     assert 'setInterval(() => refreshVisibleContexts' in plugin
     assert 'detached: true' not in plugin
     assert 'async function questMirrorRunning()' in plugin
     assert 'value: "LIVE"' in plugin
-    assert 'operatorHealthy' in plugin
+    assert 'value: "RUNNING"' in plugin

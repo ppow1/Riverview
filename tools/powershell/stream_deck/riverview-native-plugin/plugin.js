@@ -70,24 +70,11 @@ function command(command, args, options = {}) {
 }
 
 async function runtimeStatus() {
-  const statusPath = path.join(WORKING_DIRECTORY, "runtime", "riverview-supervisor", "status.json");
-  if (!existsSync(statusPath)) return { value: "OFF", color: "red" };
   try {
-    const state = JSON.parse(readFileSync(statusPath, "utf8"));
-    const services = Object.values(state.services || {}).filter((service) => service.enabled !== false);
-    const running = services.filter((service) => service.status === "running").length;
-    const operator = state.services?.operator;
-    let operatorHealthy = false;
-    if (operator?.health_url) {
-      try {
-        const response = await fetch(operator.health_url, { signal: AbortSignal.timeout(1500) });
-        operatorHealthy = response.ok;
-      } catch { operatorHealthy = false; }
-    }
-    if (services.length > 0 && running === services.length && operatorHealthy) return { value: "RUNNING", color: "green" };
-    if (running > 0 || operatorHealthy) return { value: "DEGRADED", color: "yellow" };
-    return { value: "STOPPED", color: "red" };
-  } catch { return { value: "ERROR", color: "red" }; }
+    const response = await fetch("http://127.0.0.1:18082/health", { signal: AbortSignal.timeout(1500) });
+    if (response.ok) return { value: "RUNNING", color: "green" };
+    return { value: "ERROR", color: "yellow" };
+  } catch { return { value: "STOPPED", color: "red" }; }
 }
 
 async function questMirrorRunning() {
