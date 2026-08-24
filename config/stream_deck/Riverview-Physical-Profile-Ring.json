@@ -1,0 +1,17 @@
+{
+  "device_model": "20GAT9902",
+  "order": [
+    { "number": 1, "name": "Default Profile", "uuid": "f40cbb56-817f-48c5-908f-a9e5f9eec0a8" },
+    { "number": 2, "name": "Roku2", "uuid": "9c576814-c3e0-4d5b-9b5d-dda437f9a89a" },
+    { "number": 3, "name": "WinToolsXL", "uuid": "b5b58f76-aea8-4822-b0d8-f51525c44692" },
+    { "number": 4, "name": "Windows Shutdown Menu XL", "uuid": "09a1eef6-a278-4adb-8a88-4b78702db3ee" },
+    { "number": 5, "name": "Estate Operations v0.5 Plugin", "uuid": "d4abffcd-7bde-4db7-856b-b26823e1780b" },
+    { "number": 6, "name": "Riverview", "uuid": "7c0c9d36-8b7f-4d71-9d45-2b6b1c05d0a1" }
+  ],
+  "navigation": {
+    "profile_previous": "com.elgato.streamdeck.profile.rotate",
+    "profile_next": "com.elgato.streamdeck.profile.rotate",
+    "default_positions": { "previous": "7,1", "next": "7,2" },
+    "shutdown_positions": { "previous": "6,3", "next": "7,3" }
+  }
+}
