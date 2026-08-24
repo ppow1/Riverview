@@ -82,7 +82,7 @@ function Get-CurrentWirelessQuest([string]$AdbPath) {
     foreach ($device in @($devices | Where-Object { $_.State -eq 'device' -and $_.Wireless })) {
         if (Test-QuestShell $AdbPath $device.Serial) { return $device.Serial }
     }
-    foreach ($line in @(& $AdbPath mdns services 2>$null | Where-Object { $_ -match '_adb-tls-connect\._tcp' })) {
+    foreach ($line in @(& $AdbPath mdns services 2>$null | Where-Object { $_ -match '(_adb\._tcp|_adb-tls-connect\._tcp)' })) {
         $endpoint = $null
         if ($line -match '(\d{1,3}(?:\.\d{1,3}){3}:\d+)') { $endpoint = $Matches[1] }
         elseif ($line -match '(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{2,5})') { $endpoint = "$($Matches[1]):$($Matches[2])" }
@@ -216,8 +216,7 @@ function Invoke-QuestDev {
     if ($Gesture -eq 'long') {
         $owned = @(Get-Process scrcpy -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'Riverview Quest Live View' })
         foreach ($process in $owned) { Stop-Process -Id $process.Id -Force }
-        if ($transport.transport -like 'wireless*') { & $transport.adb disconnect $transport.serial | Out-Null }
-        return Write-Result @{ state = 'stopped'; transport = $transport.transport; serial = $transport.serial; owned_session = $true }
+        return Write-Result @{ state = 'stopped'; transport = $transport.transport; serial = $transport.serial; owned_session = $true; adb_preserved = ($transport.transport -like 'wireless*') }
     }
     if (-not (Test-Path -LiteralPath $QuestMirror -PathType Leaf)) {
         return Write-Result @{ state = 'blocked'; failure_class = 'RIV-LIVEVIEW-0001: Quest live-view launcher is unavailable.' }
@@ -234,8 +233,13 @@ function Invoke-QuestDev {
     $psi.FileName = $PowerShell7; $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
     foreach ($arg in @('-NoProfile','-ExecutionPolicy','Bypass','-File',$QuestMirror,'-Serial',$transport.serial)) { [void]$psi.ArgumentList.Add($arg) }
     [void][System.Diagnostics.Process]::Start($psi)
-    Start-Sleep -Seconds 3
-    $started = @(Get-Process scrcpy -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'Riverview Quest Live View' })
+    $started = @()
+    $deadline = (Get-Date).AddSeconds(10)
+    while ((Get-Date) -lt $deadline) {
+        $started = @(Get-Process scrcpy -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'Riverview Quest Live View' })
+        if ($started.Count -gt 0) { break }
+        Start-Sleep -Milliseconds 250
+    }
     if ($started.Count -gt 0) {
         return Write-Result @{ state = 'ready'; transport = $transport.transport; serial = $transport.serial; live_view = 'running'; process_id = $started[0].Id; executable = $PowerShell7 }
     }

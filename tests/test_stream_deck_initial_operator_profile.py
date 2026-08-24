@@ -33,6 +33,9 @@ def test_action_layer_contains_required_boundaries_without_transient_endpoint():
     assert "Start-ScheduledTask" in text
     assert "QuestMirror" in text
     assert "mdns services" in text
+    assert "_adb\\._tcp|_adb-tls-connect\\._tcp" in text
+    assert "adb_preserved" in text
+    assert "disconnect $transport.serial" not in text
     assert "tcpip 5555" in text
     assert "Meta Quest Developer Hub" in text
     assert "adb-1WMHHB67ZF1473" not in text
