@@ -53,6 +53,13 @@ from .binding import (
     ProviderResourceCandidate,
     TierBinding,
 )
+from .reservation import (
+    CapacitySnapshot,
+    ReservationError,
+    ReservationState,
+    ResidentCognitionReservation,
+    ResidentCognitionReservationAdapter,
+)
 
 __all__ = [
     "CapabilityResourceRequest",
@@ -87,6 +94,11 @@ __all__ = [
     "CognitionBindingAdapter",
     "ProviderResourceCandidate",
     "TierBinding",
+    "CapacitySnapshot",
+    "ReservationError",
+    "ReservationState",
+    "ResidentCognitionReservation",
+    "ResidentCognitionReservationAdapter",
     "ReasoningRequest",
     "ReasoningResponse",
     "ReasoningResult",
