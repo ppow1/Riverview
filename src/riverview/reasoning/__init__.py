@@ -13,6 +13,12 @@ from .cognition_contracts import (
     ReasoningResult,
     ResidentReasoningPacket,
 )
+from .context_assembler import (
+    ASSEMBLER_VERSION,
+    ReasoningAssemblyRequest,
+    ReasoningContextAssemblyError,
+    ResidentReasoningPacketAssembler,
+)
 from .gpu import GpuEvidence, LocalGpuReasoningAdapter
 from .llama_cpp import LlamaCppReasoningAdapter
 from .ollama import OllamaReasoningAdapter
@@ -20,6 +26,7 @@ from .registry import ReasoningProviderRegistry
 
 __all__ = [
     "CapabilityResourceRequest",
+    "ASSEMBLER_VERSION",
     "CognitionActorClass",
     "CognitionFailureCode",
     "CognitionResult",
@@ -32,9 +39,12 @@ __all__ = [
     "LocalGpuReasoningAdapter",
     "OllamaReasoningAdapter",
     "ReasoningProvider",
+    "ReasoningAssemblyRequest",
+    "ReasoningContextAssemblyError",
     "ReasoningProviderRegistry",
     "ReasoningRequest",
     "ReasoningResponse",
     "ReasoningResult",
     "ResidentReasoningPacket",
+    "ResidentReasoningPacketAssembler",
 ]
