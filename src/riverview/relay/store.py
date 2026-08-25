@@ -6,9 +6,9 @@ Version: 0.4.0
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from collections.abc import Iterator
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -191,8 +191,14 @@ class RelayStore:
                     WHERE status = 'queued' AND active_attempt_id IS NULL
                       AND (role IS NULL OR role=%s)
                       AND (seat_id IS NULL OR seat_id=%s)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM work_order_attempts source_attempt
+                           WHERE source_attempt.attempt_id = work_orders.source_attempt_id
+                             AND work_orders.role IN ('validator','revalidator')
+                             AND source_attempt.worker_instance_id = %s
+                      )
                 """
-            claim_params: list[Any] = [role, seat_id]
+            claim_params: list[Any] = [role, seat_id, worker_instance_id]
             if work_order_id is not None:
                 claim_sql += " AND work_order_id=%s"
                 claim_params.append(work_order_id)
@@ -300,7 +306,7 @@ class RelayStore:
         self.heartbeat_fenced(identity, lease_seconds)
 
     def progress_fenced(self, identity: AttemptIdentity, *, idempotency_key: str,
-                        message: str, detail: dict[str, Any] | None = None) -> None:
+                        message: str, detail: dict[str, Any] | None = None) -> bool:
         """Record one meaningful progress event and increment exactly once."""
         if not idempotency_key.strip() or not message.strip():
             raise ValueError("RIV-WRK-0012: progress requires idempotency_key and message.")
@@ -330,7 +336,7 @@ class RelayStore:
                  idempotency_key, Classification.RIVER.value, json.dumps(payload)),
             )
             if cursor.rowcount != 1:
-                return
+                return False
             cursor.execute(
                 """UPDATE work_order_attempts SET last_progress_at=now(), progress_count=progress_count+1
                     WHERE attempt_id=%s AND work_order_id=%s AND lease_generation=%s
@@ -350,6 +356,7 @@ class RelayStore:
             )
             if cursor.rowcount != 1:
                 raise RuntimeError("RIV-WRK-0013: Progress work-order update was fenced.")
+            return True
 
     def progress(self, work_order_id: UUID, worker_id: str, *, phase: str, progress_percent: int | None = None, summary: str = "") -> None:
         identity = self._legacy_identity(work_order_id, worker_id)
