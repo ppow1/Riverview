@@ -25,6 +25,12 @@ from .provenance import (
     CognitionProvenanceWriter,
     ProvenanceLineageError,
 )
+from .session import (
+    CognitionSession,
+    CognitionSessionBoundary,
+    CognitionSessionError,
+    CognitionSessionTurn,
+)
 from .gpu import GpuEvidence, LocalGpuReasoningAdapter
 from .llama_cpp import LlamaCppReasoningAdapter
 from .ollama import OllamaReasoningAdapter
@@ -38,6 +44,10 @@ __all__ = [
     "CognitionProvenance",
     "CognitionProvenanceEventType",
     "CognitionProvenanceWriter",
+    "CognitionSession",
+    "CognitionSessionBoundary",
+    "CognitionSessionError",
+    "CognitionSessionTurn",
     "CognitionResult",
     "CognitionResultStatus",
     "CognitionTier",
