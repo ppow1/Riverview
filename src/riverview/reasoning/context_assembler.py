@@ -42,6 +42,20 @@ _STATE_LAYERS = frozenset({
     "artifact_material",
 })
 _EVIDENCE_LAYERS = _STATE_LAYERS - {"current_assignment", "implementation_constraints"}
+
+
+def _meaningful_current_assignment(value: object) -> bool:
+    """Return whether a current-assignment value contains required state."""
+    if not isinstance(value, Mapping):
+        return False
+    objective_ref = value.get("objective_ref")
+    instruction = value.get("instruction")
+    return (
+        isinstance(objective_ref, str)
+        and bool(objective_ref.strip())
+        and isinstance(instruction, str)
+        and bool(instruction.strip())
+    )
 _FORBIDDEN_LAYERS = frozenset({"unbounded_transcript", "conversation_history"})
 
 
@@ -183,7 +197,9 @@ class ResidentReasoningPacketAssembler:
             raise ReasoningContextAssemblyError("unbounded-context", "transcript-like context cannot cross the packet boundary.")
         current_state_items = [
             item for item in bundle.items
-            if item.layer == "current_assignment" and item.mandatory and isinstance(item.value, Mapping)
+            if item.layer == "current_assignment"
+            and item.mandatory
+            and _meaningful_current_assignment(item.value)
         ]
         if len(current_state_items) != 1 or not current_state_items[0].source_ref.strip():
             raise ReasoningContextAssemblyError("current-state-missing", "authoritative current operational state is required.")

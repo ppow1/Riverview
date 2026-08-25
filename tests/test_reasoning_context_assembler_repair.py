@@ -46,6 +46,27 @@ def test_current_state_requirement_does_not_accept_empty_or_provider_metadata() 
         ResidentReasoningPacketAssembler().assemble(replace(source_bundle, items=tuple(items)), request())
 
 
+def test_empty_current_assignment_value_fails_closed() -> None:
+    source_bundle = bundle()
+    items = tuple(
+        replace(item, value={}) if item.layer == "current_assignment" else item
+        for item in source_bundle.items
+    )
+    with pytest.raises(ReasoningContextAssemblyError, match="current-state-missing"):
+        ResidentReasoningPacketAssembler().assemble(replace(source_bundle, items=items), request())
+
+
+def test_current_assignment_without_required_state_material_fails_closed() -> None:
+    source_bundle = bundle()
+    items = tuple(
+        replace(item, value={"provider_ref": "provider://observed"})
+        if item.layer == "current_assignment" else item
+        for item in source_bundle.items
+    )
+    with pytest.raises(ReasoningContextAssemblyError, match="current-state-missing"):
+        ResidentReasoningPacketAssembler().assemble(replace(source_bundle, items=items), request())
+
+
 def test_valid_bounded_current_assignment_and_aggregate_limit_remain_enforced() -> None:
     packet = ResidentReasoningPacketAssembler().assemble(bundle(), request())
     assert packet.operational_state_refs
