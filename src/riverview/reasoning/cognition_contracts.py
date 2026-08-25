@@ -23,6 +23,8 @@ MAX_PACKET_TEXT = 4_000
 MAX_REASONING_TEXT = 8_000
 MAX_CONSTRAINTS = 32
 MAX_EXCLUSIONS = 32
+MAX_CONTEXT_REFS = 64
+MAX_CONTEXT_CHARS = 64_000
 MAX_PRIORITY = 100
 PACKET_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
@@ -126,6 +128,31 @@ def _refs(values: tuple[str, ...], name: str, limit: int = MAX_REFS) -> None:
         raise ValueError(f"RIV-COG-0001: {name} contains an invalid reference.")
 
 
+def _context_refs(values: tuple[str, ...], name: str) -> None:
+    """Validate reference-only context and its aggregate bound."""
+
+    _refs(values, name, MAX_CONTEXT_REFS)
+
+
+def _context_texts(values: tuple[str, ...], name: str) -> None:
+    """Validate bounded context text and prevent collection aggregation bypasses."""
+
+    _texts(values, name, MAX_CONTEXT_REFS)
+    if sum(len(item) for item in values) > MAX_CONTEXT_CHARS:
+        raise ValueError(f"RIV-COG-0001: {name} exceeds its aggregate context bound.")
+
+
+def _packet_context_total(*values: str | None | tuple[str, ...]) -> None:
+    total = 0
+    for value in values:
+        if isinstance(value, tuple):
+            total += sum(len(item) for item in value)
+        elif value is not None:
+            total += len(value)
+    if total > MAX_CONTEXT_CHARS:
+        raise ValueError("RIV-COG-0001: packet context exceeds its aggregate bound.")
+
+
 def _texts(values: tuple[str, ...], name: str, limit: int = MAX_CONSTRAINTS) -> None:
     if not isinstance(values, tuple) or len(values) > limit:
         raise ValueError(f"RIV-COG-0001: {name} exceeds its bound.")
@@ -160,6 +187,9 @@ class ResidentReasoningPacket:
     resident_id: UUID
     occupant_id: UUID
     office_id: UUID
+    implementation_id: UUID
+    source_cognition_event_id: UUID
+    objective_id: UUID
     authority_ref: str
     cognition_tier: CognitionTier
     request_class: str
@@ -168,6 +198,14 @@ class ResidentReasoningPacket:
     operational_state_refs: tuple[str, ...]
     evidence_refs: tuple[str, ...]
     constraints: tuple[str, ...]
+    authoritative_current_state_refs: tuple[str, ...]
+    unresolved_ambiguity: tuple[str, ...]
+    relevant_prior_decisions: tuple[str, ...]
+    known_deterministic_results: tuple[str, ...]
+    home_assessment: str
+    requested_output_schema: str
+    egress_policy: str
+    max_budget: int
     classification: str
     correlation_id: UUID
     packet_digest: str
@@ -177,7 +215,7 @@ class ResidentReasoningPacket:
     contract_version: str = COGNITION_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
-        for value, name in ((self.packet_id, "packet_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id"), (self.office_id, "office_id"), (self.correlation_id, "correlation_id")):
+        for value, name in ((self.packet_id, "packet_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id"), (self.office_id, "office_id"), (self.implementation_id, "implementation_id"), (self.source_cognition_event_id, "source_cognition_event_id"), (self.objective_id, "objective_id"), (self.correlation_id, "correlation_id")):
             _uuid(value, name)
         _optional_uuid(self.source_context_id, "source_context_id")
         _optional_uuid(self.causation_id, "causation_id")
@@ -186,9 +224,18 @@ class ResidentReasoningPacket:
         _bounded_text(self.request_class, "request_class", 200)
         _bounded_text(self.objective, "objective", MAX_PACKET_TEXT)
         _bounded_text(self.question, "question", MAX_PACKET_TEXT)
-        _refs(self.operational_state_refs, "operational_state_refs")
-        _refs(self.evidence_refs, "evidence_refs")
-        _texts(self.constraints, "constraints")
+        _context_refs(self.operational_state_refs, "operational_state_refs")
+        _context_refs(self.evidence_refs, "evidence_refs")
+        _context_texts(self.constraints, "constraints")
+        _context_refs(self.authoritative_current_state_refs, "authoritative_current_state_refs")
+        _context_texts(self.unresolved_ambiguity, "unresolved_ambiguity")
+        _context_refs(self.relevant_prior_decisions, "relevant_prior_decisions")
+        _context_texts(self.known_deterministic_results, "known_deterministic_results")
+        for value, name in ((self.home_assessment, "home_assessment"), (self.requested_output_schema, "requested_output_schema"), (self.egress_policy, "egress_policy")):
+            _bounded_text(value, name, MAX_PACKET_TEXT)
+        if not isinstance(self.max_budget, int) or not 0 < self.max_budget <= MAX_CONTEXT_CHARS:
+            raise ValueError("RIV-COG-0001: max_budget is outside its bound.")
+        _packet_context_total(self.objective, self.question, self.constraints, self.authoritative_current_state_refs, self.evidence_refs, self.unresolved_ambiguity, self.relevant_prior_decisions, self.known_deterministic_results, self.home_assessment, self.requested_output_schema, self.egress_policy)
         _classification(self.classification)
         if not isinstance(self.packet_digest, str) or not PACKET_DIGEST_PATTERN.fullmatch(self.packet_digest):
             raise ValueError("RIV-COG-0001: packet_digest must be a SHA-256 hexadecimal digest.")
@@ -202,6 +249,9 @@ class ResidentReasoningPacket:
             "resident_id": str(self.resident_id),
             "occupant_id": str(self.occupant_id),
             "office_id": str(self.office_id),
+            "implementation_id": str(self.implementation_id),
+            "source_cognition_event_id": str(self.source_cognition_event_id),
+            "objective_id": str(self.objective_id),
             "authority_ref": self.authority_ref,
             "cognition_tier": self.cognition_tier.value,
             "request_class": self.request_class,
@@ -210,6 +260,14 @@ class ResidentReasoningPacket:
             "operational_state_refs": list(self.operational_state_refs),
             "evidence_refs": list(self.evidence_refs),
             "constraints": list(self.constraints),
+            "authoritative_current_state_refs": list(self.authoritative_current_state_refs),
+            "unresolved_ambiguity": list(self.unresolved_ambiguity),
+            "relevant_prior_decisions": list(self.relevant_prior_decisions),
+            "known_deterministic_results": list(self.known_deterministic_results),
+            "home_assessment": self.home_assessment,
+            "requested_output_schema": self.requested_output_schema,
+            "egress_policy": self.egress_policy,
+            "max_budget": self.max_budget,
             "classification": self.classification,
             "correlation_id": str(self.correlation_id),
             "causation_id": str(self.causation_id) if self.causation_id else None,
@@ -226,6 +284,9 @@ class ResidentReasoningPacket:
             resident_id=_payload_uuid(payload, "resident_id"),
             occupant_id=_payload_uuid(payload, "occupant_id"),
             office_id=_payload_uuid(payload, "office_id"),
+            implementation_id=_payload_uuid(payload, "implementation_id"),
+            source_cognition_event_id=_payload_uuid(payload, "source_cognition_event_id"),
+            objective_id=_payload_uuid(payload, "objective_id"),
             authority_ref=payload["authority_ref"],
             cognition_tier=payload["cognition_tier"],
             request_class=payload["request_class"],
@@ -234,6 +295,14 @@ class ResidentReasoningPacket:
             operational_state_refs=_payload_tuple(payload, "operational_state_refs"),
             evidence_refs=_payload_tuple(payload, "evidence_refs"),
             constraints=_payload_tuple(payload, "constraints"),
+            authoritative_current_state_refs=_payload_tuple(payload, "authoritative_current_state_refs"),
+            unresolved_ambiguity=_payload_tuple(payload, "unresolved_ambiguity"),
+            relevant_prior_decisions=_payload_tuple(payload, "relevant_prior_decisions"),
+            known_deterministic_results=_payload_tuple(payload, "known_deterministic_results"),
+            home_assessment=payload["home_assessment"],
+            requested_output_schema=payload["requested_output_schema"],
+            egress_policy=payload["egress_policy"],
+            max_budget=payload["max_budget"],
             classification=payload["classification"],
             correlation_id=_payload_uuid(payload, "correlation_id"),
             packet_digest=payload["packet_digest"],
@@ -251,7 +320,17 @@ class EscalationAssessment:
     assessment_id: UUID
     resident_id: UUID
     occupant_id: UUID
+    office_id: UUID
+    implementation_id: UUID
+    authority_ref: str
+    source_cognition_event_id: UUID
+    packet_id: UUID
+    objective_id: UUID
     correlation_id: UUID
+    question: str
+    authoritative_current_state_refs: tuple[str, ...]
+    evidence_refs: tuple[str, ...]
+    constraints: tuple[str, ...]
     home_belief: bool
     home_belief_reason: str
     policy_permitted: bool
@@ -261,6 +340,7 @@ class EscalationAssessment:
     decision: EscalationDecision
     reason_class: str
     policy_ref: str
+    provenance_refs: tuple[str, ...]
     classification: str
     created_at: datetime
     expires_at: datetime
@@ -268,10 +348,14 @@ class EscalationAssessment:
     contract_version: str = COGNITION_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
-        for value, name in ((self.assessment_id, "assessment_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id"), (self.correlation_id, "correlation_id")):
+        for value, name in ((self.assessment_id, "assessment_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id"), (self.office_id, "office_id"), (self.implementation_id, "implementation_id"), (self.source_cognition_event_id, "source_cognition_event_id"), (self.packet_id, "packet_id"), (self.objective_id, "objective_id"), (self.correlation_id, "correlation_id")):
             _uuid(value, name)
-        for value, name in ((self.home_belief_reason, "home_belief_reason"), (self.policy_reason, "policy_reason"), (self.capacity_reason, "capacity_reason"), (self.reason_class, "reason_class"), (self.policy_ref, "policy_ref")):
+        for value, name in ((self.authority_ref, "authority_ref"), (self.question, "question"), (self.home_belief_reason, "home_belief_reason"), (self.policy_reason, "policy_reason"), (self.capacity_reason, "capacity_reason"), (self.reason_class, "reason_class"), (self.policy_ref, "policy_ref")):
             _bounded_text(value, name, 1_000)
+        _context_refs(self.authoritative_current_state_refs, "authoritative_current_state_refs")
+        _context_refs(self.evidence_refs, "evidence_refs")
+        _context_texts(self.constraints, "constraints")
+        _refs(self.provenance_refs, "provenance_refs")
         object.__setattr__(self, "decision", _enum(self.decision, EscalationDecision, "decision"))
         if self.target_tier is not None:
             object.__setattr__(self, "target_tier", _tier(self.target_tier, "target_tier"))
@@ -296,7 +380,17 @@ class EscalationAssessment:
             "assessment_id": str(self.assessment_id),
             "resident_id": str(self.resident_id),
             "occupant_id": str(self.occupant_id),
+            "office_id": str(self.office_id),
+            "implementation_id": str(self.implementation_id),
+            "authority_ref": self.authority_ref,
+            "source_cognition_event_id": str(self.source_cognition_event_id),
+            "packet_id": str(self.packet_id),
+            "objective_id": str(self.objective_id),
             "correlation_id": str(self.correlation_id),
+            "question": self.question,
+            "authoritative_current_state_refs": list(self.authoritative_current_state_refs),
+            "evidence_refs": list(self.evidence_refs),
+            "constraints": list(self.constraints),
             "home_belief": self.home_belief,
             "home_belief_reason": self.home_belief_reason,
             "policy_permitted": self.policy_permitted,
@@ -307,6 +401,7 @@ class EscalationAssessment:
             "reason_class": self.reason_class,
             "target_tier": self.target_tier.value if self.target_tier else None,
             "policy_ref": self.policy_ref,
+            "provenance_refs": list(self.provenance_refs),
             "classification": self.classification,
             "created_at": self.created_at.isoformat(),
             "expires_at": self.expires_at.isoformat(),
@@ -319,7 +414,17 @@ class EscalationAssessment:
             assessment_id=_payload_uuid(payload, "assessment_id"),
             resident_id=_payload_uuid(payload, "resident_id"),
             occupant_id=_payload_uuid(payload, "occupant_id"),
+            office_id=_payload_uuid(payload, "office_id"),
+            implementation_id=_payload_uuid(payload, "implementation_id"),
+            authority_ref=payload["authority_ref"],
+            source_cognition_event_id=_payload_uuid(payload, "source_cognition_event_id"),
+            packet_id=_payload_uuid(payload, "packet_id"),
+            objective_id=_payload_uuid(payload, "objective_id"),
             correlation_id=_payload_uuid(payload, "correlation_id"),
+            question=payload["question"],
+            authoritative_current_state_refs=_payload_tuple(payload, "authoritative_current_state_refs"),
+            evidence_refs=_payload_tuple(payload, "evidence_refs"),
+            constraints=_payload_tuple(payload, "constraints"),
             home_belief=payload["home_belief"],
             home_belief_reason=payload["home_belief_reason"],
             policy_permitted=payload["policy_permitted"],
@@ -329,6 +434,7 @@ class EscalationAssessment:
             decision=payload["decision"],
             reason_class=payload["reason_class"],
             policy_ref=payload["policy_ref"],
+            provenance_refs=_payload_tuple(payload, "provenance_refs"),
             classification=payload["classification"],
             created_at=_payload_datetime(payload, "created_at"),
             expires_at=_payload_datetime(payload, "expires_at"),
@@ -345,6 +451,9 @@ class CapabilityResourceRequest:
     correlation_id: UUID
     resident_id: UUID
     occupant_id: UUID
+    office_id: UUID
+    implementation_id: UUID
+    authority_ref: str
     cognition_tier: CognitionTier
     required_capability: str
     classification: str
@@ -358,11 +467,12 @@ class CapabilityResourceRequest:
     contract_version: str = COGNITION_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
-        for value, name in ((self.request_id, "request_id"), (self.correlation_id, "correlation_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id")):
+        for value, name in ((self.request_id, "request_id"), (self.correlation_id, "correlation_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id"), (self.office_id, "office_id"), (self.implementation_id, "implementation_id")):
             _uuid(value, name)
         object.__setattr__(self, "cognition_tier", _tier(self.cognition_tier))
         _bounded_text(self.required_capability, "required_capability", 500)
         _classification(self.classification)
+        _bounded_text(self.authority_ref, "authority_ref", 500)
         _bounded_text(self.policy_ref, "policy_ref", 500)
         _bounded_text(self.authorization_ref, "authorization_ref", 500)
         if self.priority is not None and (not isinstance(self.priority, int) or not 0 <= self.priority <= MAX_PRIORITY):
@@ -382,6 +492,9 @@ class CapabilityResourceRequest:
             "correlation_id": str(self.correlation_id),
             "resident_id": str(self.resident_id),
             "occupant_id": str(self.occupant_id),
+            "office_id": str(self.office_id),
+            "implementation_id": str(self.implementation_id),
+            "authority_ref": self.authority_ref,
             "cognition_tier": self.cognition_tier.value,
             "required_capability": self.required_capability,
             "classification": self.classification,
@@ -403,6 +516,9 @@ class CapabilityResourceRequest:
             correlation_id=_payload_uuid(payload, "correlation_id"),
             resident_id=_payload_uuid(payload, "resident_id"),
             occupant_id=_payload_uuid(payload, "occupant_id"),
+            office_id=_payload_uuid(payload, "office_id"),
+            implementation_id=_payload_uuid(payload, "implementation_id"),
+            authority_ref=payload["authority_ref"],
             cognition_tier=payload["cognition_tier"],
             required_capability=payload["required_capability"],
             classification=payload["classification"],
@@ -426,6 +542,10 @@ class CognitionResult:
     correlation_id: UUID
     resident_id: UUID
     occupant_id: UUID
+    office_id: UUID
+    implementation_id: UUID
+    authority_ref: str
+    source_cognition_event_id: UUID
     cognition_tier: CognitionTier
     status: CognitionResultStatus
     recommendation: str | None
@@ -451,12 +571,13 @@ class CognitionResult:
     contract_version: str = COGNITION_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
-        for value, name in ((self.result_id, "result_id"), (self.request_id, "request_id"), (self.correlation_id, "correlation_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id")):
+        for value, name in ((self.result_id, "result_id"), (self.request_id, "request_id"), (self.correlation_id, "correlation_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id"), (self.office_id, "office_id"), (self.implementation_id, "implementation_id"), (self.source_cognition_event_id, "source_cognition_event_id")):
             _uuid(value, name)
         _optional_uuid(self.packet_id, "packet_id")
         object.__setattr__(self, "cognition_tier", _tier(self.cognition_tier))
         object.__setattr__(self, "status", _enum(self.status, CognitionResultStatus, "status"))
         object.__setattr__(self, "actor_class", _enum(self.actor_class, CognitionActorClass, "actor_class"))
+        _bounded_text(self.authority_ref, "authority_ref", 500)
         if self.failure_code is not None:
             object.__setattr__(self, "failure_code", _enum(self.failure_code, CognitionFailureCode, "failure_code"))
         _optional_bounded(self.recommendation, "recommendation", MAX_REASONING_TEXT)
@@ -505,7 +626,7 @@ class CognitionResult:
     def validate_against(self, request: Any) -> None:
         """Reject identity, tier, correlation, or classification mismatches."""
 
-        for field in ("request_id", "correlation_id", "resident_id", "occupant_id", "cognition_tier", "classification"):
+        for field in ("request_id", "correlation_id", "resident_id", "occupant_id", "office_id", "implementation_id", "authority_ref", "source_cognition_event_id", "cognition_tier", "classification"):
             if not hasattr(request, field):
                 continue
             expected = getattr(request, field)
@@ -526,6 +647,10 @@ class CognitionResult:
             "correlation_id": str(self.correlation_id),
             "resident_id": str(self.resident_id),
             "occupant_id": str(self.occupant_id),
+            "office_id": str(self.office_id),
+            "implementation_id": str(self.implementation_id),
+            "authority_ref": self.authority_ref,
+            "source_cognition_event_id": str(self.source_cognition_event_id),
             "cognition_tier": self.cognition_tier.value,
             "status": self.status.value,
             "recommendation": self.recommendation,
@@ -560,6 +685,10 @@ class CognitionResult:
             correlation_id=_payload_uuid(payload, "correlation_id"),
             resident_id=_payload_uuid(payload, "resident_id"),
             occupant_id=_payload_uuid(payload, "occupant_id"),
+            office_id=_payload_uuid(payload, "office_id"),
+            implementation_id=_payload_uuid(payload, "implementation_id"),
+            authority_ref=payload["authority_ref"],
+            source_cognition_event_id=_payload_uuid(payload, "source_cognition_event_id"),
             cognition_tier=payload["cognition_tier"],
             status=payload["status"],
             recommendation=payload.get("recommendation"),
