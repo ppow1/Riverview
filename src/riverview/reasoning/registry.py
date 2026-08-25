@@ -37,3 +37,22 @@ class ReasoningProviderRegistry:
                 (request_classification,),
             )
             return [dict(zip(("participant_id", "provider_id", "provider_type", "role", "health", "capacity", "contract_version"), row, strict=True)) for row in cursor.fetchall()]
+
+    def available_for(self, *, request_classification: str, required_capability: str, max_age_seconds: int = 300) -> list[dict[str, object]]:
+        """Return fresh candidates for a named capability without selecting one."""
+        if not request_classification.strip() or not required_capability.strip():
+            raise ValueError("RIV-REASON-0001: classification and capability are required.")
+        if not 1 <= max_age_seconds <= 86_400:
+            raise ValueError("RIV-REASON-0001: freshness bound is invalid.")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT participant_id,provider_id,provider_type,role,health,capacity,contract_version
+                   FROM reasoning_providers
+                   WHERE enabled=true AND health='healthy' AND capacity > 0
+                   AND eligible_classifications ? %s
+                   AND capabilities ? %s
+                   AND observed_at >= now()-make_interval(secs=>%s)
+                   ORDER BY capacity DESC,participant_id""",
+                (request_classification, required_capability, max_age_seconds),
+            )
+            return [dict(zip(("participant_id", "provider_id", "provider_type", "role", "health", "capacity", "contract_version"), row, strict=True)) for row in cursor.fetchall()]

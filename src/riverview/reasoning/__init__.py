@@ -44,6 +44,15 @@ from .gpu import GpuEvidence, LocalGpuReasoningAdapter
 from .llama_cpp import LlamaCppReasoningAdapter
 from .ollama import OllamaReasoningAdapter
 from .registry import ReasoningProviderRegistry
+from .binding import (
+    BindingConfiguration,
+    BindingConfigurationLoader,
+    CapabilityBindingDecision,
+    CapabilityBindingError,
+    CognitionBindingAdapter,
+    ProviderResourceCandidate,
+    TierBinding,
+)
 
 __all__ = [
     "CapabilityResourceRequest",
@@ -71,6 +80,13 @@ __all__ = [
     "ReasoningContextAssemblyError",
     "ProvenanceLineageError",
     "ReasoningProviderRegistry",
+    "BindingConfiguration",
+    "BindingConfigurationLoader",
+    "CapabilityBindingDecision",
+    "CapabilityBindingError",
+    "CognitionBindingAdapter",
+    "ProviderResourceCandidate",
+    "TierBinding",
     "ReasoningRequest",
     "ReasoningResponse",
     "ReasoningResult",
