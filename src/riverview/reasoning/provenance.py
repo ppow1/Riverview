@@ -396,7 +396,15 @@ class CognitionProvenanceWriter:
     def reconstruct(self, request_id: UUID) -> tuple[CognitionProvenance, ...]:
         _uuid(request_id, "request_id")
         rows = self.event_store.read_aggregate(PROVENANCE_AGGREGATE_TYPE, request_id)
-        records = tuple(CognitionProvenance.from_typed_payload(row["payload"]) for row in rows)
+        # The cognition_request River aggregate may also carry later-package
+        # lineage facts (for example the P1 policy-decision event).  Those
+        # facts are intentionally not F2 CognitionProvenance records; retain
+        # the canonical F2 reconstruction by selecting its schema only.
+        records = tuple(
+            CognitionProvenance.from_typed_payload(row["payload"])
+            for row in rows
+            if row.get("payload", {}).get("schema_version") == PROVENANCE_SCHEMA_VERSION
+        )
         for record in records:
             if record.request_id != request_id:
                 raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: aggregate contains another request.")

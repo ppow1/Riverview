@@ -31,6 +31,15 @@ from .session import (
     CognitionSessionError,
     CognitionSessionTurn,
 )
+from .escalation_policy import (
+    POLICY_EVENT_TYPE,
+    POLICY_VERSION,
+    CapacitySnapshot,
+    ConsequenceClass,
+    EscalationPolicy,
+    PolicyDecisionRecorder,
+    PolicyInputError,
+)
 from .gpu import GpuEvidence, LocalGpuReasoningAdapter
 from .llama_cpp import LlamaCppReasoningAdapter
 from .ollama import OllamaReasoningAdapter
@@ -67,4 +76,11 @@ __all__ = [
     "ReasoningResult",
     "ResidentReasoningPacket",
     "ResidentReasoningPacketAssembler",
+    "CapacitySnapshot",
+    "ConsequenceClass",
+    "EscalationPolicy",
+    "POLICY_EVENT_TYPE",
+    "POLICY_VERSION",
+    "PolicyDecisionRecorder",
+    "PolicyInputError",
 ]
