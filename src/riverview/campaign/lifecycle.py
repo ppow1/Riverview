@@ -31,6 +31,35 @@ class DefectInput:
     evidence_ref: str
     required_repair: str
 
+    _FIELDS = (
+        "acceptance_criterion_ref",
+        "severity",
+        "expected_behavior",
+        "observed_behavior",
+        "evidence_ref",
+        "required_repair",
+    )
+
+    def as_payload(self) -> dict[str, str]:
+        """Return the canonical bounded JSON representation used at persistence boundaries."""
+        values = {field: getattr(self, field) for field in self._FIELDS}
+        if any(not isinstance(value, str) or not value.strip() for value in values.values()):
+            raise LifecycleGateError("RIV-CAM-0020A: structured defect fields must be non-empty strings.")
+        if self.severity not in {"blocking", "non_blocking"}:
+            raise LifecycleGateError("RIV-CAM-0020B: structured defect severity is invalid.")
+        if any(len(value) > 8_000 for value in values.values()):
+            raise LifecycleGateError("RIV-CAM-0020C: structured defect field exceeds its bound.")
+        return values
+
+    @classmethod
+    def from_payload(cls, payload: Any) -> "DefectInput":
+        if not isinstance(payload, dict) or set(payload) != set(cls._FIELDS):
+            raise LifecycleGateError("RIV-CAM-0020D: persisted structured defect is malformed.")
+        values = {field: payload[field] for field in cls._FIELDS}
+        defect = cls(**values)
+        defect.as_payload()
+        return defect
+
 
 class CampaignLifecycleStore:
     """Transactional package lifecycle persistence on objective stages."""

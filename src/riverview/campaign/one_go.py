@@ -17,7 +17,7 @@ from riverview.relay import AttemptIdentity, ClaimedWork, FenceNotCurrentError, 
 from riverview.relay.store import FencedClaimedWork
 from riverview.river.events import Classification, RiverEvent
 
-from .lifecycle import CampaignLifecycleStore, LifecycleGateError
+from .lifecycle import CampaignLifecycleStore, DefectInput, LifecycleGateError
 
 ONE_GO_CHECKPOINT = "RIV-CAM-004B"
 ROLE_ORDER = ("writer", "validator", "repair_writer", "revalidator")
@@ -45,6 +45,27 @@ class RoleExecutor(Protocol):
 
 class OneGoError(RuntimeError):
     """A bounded runner coordination failure."""
+
+
+def _prepare_execution(execution: dict[str, Any]) -> dict[str, Any]:
+    """Normalize structured defects before any fenced JSON persistence."""
+    prepared = dict(execution)
+    raw_defects = prepared.get("defects", ())
+    if not isinstance(raw_defects, (list, tuple)):
+        raise OneGoError(f"{ONE_GO_CHECKPOINT}-0004: structured defects must be a bounded collection.")
+    defects = tuple(
+        item if isinstance(item, DefectInput) else DefectInput.from_payload(item)
+        for item in raw_defects
+    )
+    prepared["defects"] = [defect.as_payload() for defect in defects]
+    return prepared
+
+
+def _structured_defects(execution: dict[str, Any]) -> tuple[DefectInput, ...]:
+    raw_defects = execution.get("defects", ())
+    if not isinstance(raw_defects, (list, tuple)):
+        raise OneGoError(f"{ONE_GO_CHECKPOINT}-0005: persisted structured defects are malformed.")
+    return tuple(item if isinstance(item, DefectInput) else DefectInput.from_payload(item) for item in raw_defects)
 
 
 def _identity(work: ClaimedWork) -> AttemptIdentity:
@@ -125,6 +146,7 @@ class CampaignOneGoRunner:
                     execution = self.executors[role](work)
                     if not isinstance(execution, dict) or execution.get("status") != "succeeded":
                         raise OneGoError(f"{ONE_GO_CHECKPOINT}-0002: role executor did not return a successful result.")
+                    execution = _prepare_execution(execution)
                     self.relay.complete_fenced(_identity(work), execution)
                     transition = self._advance_completed(role, work, execution)
                     return {"status": "succeeded", "role": role, "work_order_id": str(work.work_order_id), "transition": transition}
@@ -176,6 +198,7 @@ class CampaignOneGoRunner:
             "verdict", "basis_hash", "result_version_hash", "evidence_refs", "findings_summary",
             "defects", "implementation_ref",
         ) if key in execution}
+        validation["defects"] = _structured_defects(execution)
         result_id = self.lifecycle.record_validation(work, requested_by="campaign-runner", **validation)
         return f"validation_recorded:{result_id}"
 

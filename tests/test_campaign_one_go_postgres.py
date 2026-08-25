@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from uuid import uuid4
 
 from riverview.campaign import CampaignLifecycleStore, CampaignOneGoRunner, DefectInput, WorkerSlot
+from riverview.database import connect
 from riverview.relay import RelayStore
 from test_campaign_validation_lifecycle import _basis_hash, _package
 
@@ -61,3 +63,23 @@ def test_live_one_go_fail_repair_revalidation_accepts_and_preserves_history():
     }, objective_id, relay)
     outcomes = runner.run(max_steps=12)
     assert [item["role"] for item in outcomes] == ["writer", "validator", "repair_writer", "revalidator"]
+    assert outcomes[-1]["status"] == "succeeded"
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT runner_state,status FROM objective_stages WHERE stage_id=%s", (stage_id,))
+        assert cursor.fetchone() == ("accepted", "completed")
+        cursor.execute(
+            "SELECT result_report FROM work_orders WHERE objective_id=%s AND result_report->>'verdict'='FAIL'",
+            (objective_id,),
+        )
+        persisted_report = cursor.fetchone()[0]
+        restored_defects = tuple(DefectInput.from_payload(item) for item in json.loads(json.dumps(persisted_report["defects"])))
+        assert restored_defects == (defect,)
+        cursor.execute(
+            "SELECT expected_behavior,observed_behavior,evidence_ref,required_repair,state,repair_attempt_id,resolution_attempt_id "
+            "FROM campaign_validation_defects WHERE stage_id=%s",
+            (stage_id,),
+        )
+        defect_row = cursor.fetchone()
+        assert defect_row[:5] == ("valid", "invalid", "evidence:run004b", "repair", "resolved")
+        assert defect_row[5] is not None
+        assert defect_row[6] is not None

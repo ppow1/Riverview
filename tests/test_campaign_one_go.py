@@ -6,6 +6,7 @@ from collections import deque
 from uuid import uuid4
 
 from riverview.campaign.one_go import CampaignOneGoRunner, WorkerSlot
+from riverview.campaign import DefectInput
 from riverview.relay import AttemptIdentity, ClaimedWork
 from riverview.relay.store import FencedClaimedWork
 
@@ -92,7 +93,7 @@ def test_one_go_runs_validation_failure_repair_and_revalidation_loop():
     lifecycle = FakeLifecycle()
     runner = _runner(["writer", "validator", "repair_writer", "revalidator"], {
         "writer": lambda _work: _success(),
-        "validator": lambda _work: _success(verdict="FAIL", basis_hash="basis", findings_summary=("defect",), defects=("structured-defect",)),
+        "validator": lambda _work: _success(verdict="FAIL", basis_hash="basis", findings_summary=("defect",), defects=(DefectInput("criterion", "blocking", "expected", "observed", "evidence:test", "repair"),)),
         "repair_writer": lambda _work: _success(),
         "revalidator": lambda _work: _success(verdict="PASS", basis_hash="basis", findings_summary=(), defects=()),
     }, relay, lifecycle)
@@ -145,7 +146,7 @@ def test_one_go_handles_two_bounded_repair_cycles_without_collapsing_history():
         nonlocal validation_count
         validation_count += 1
         failed = validation_count < 3
-        return _success(verdict="FAIL" if failed else "PASS", basis_hash="basis", findings_summary=("defect",) if failed else (), defects=("structured-defect",) if failed else ())
+        return _success(verdict="FAIL" if failed else "PASS", basis_hash="basis", findings_summary=("defect",) if failed else (), defects=(DefectInput("criterion", "blocking", "expected", "observed", "evidence:test", "repair"),) if failed else ())
 
     runner = _runner(["writer", "validator", "repair_writer", "revalidator", "repair_writer", "revalidator"], {
         "writer": lambda _work: _success(), "validator": validate,
