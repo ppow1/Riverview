@@ -176,6 +176,7 @@ class RelayStore:
         role: str,
         lease_seconds: int = 30,
         work_order_id: UUID | None = None,
+        objective_id: UUID | None = None,
     ) -> FencedClaimedWork | None:
         """Claim one order and persist one exact, transactionally fenced attempt."""
         if seat_id not in {"C1", "C2", "C3"}:
@@ -185,23 +186,26 @@ class RelayStore:
         attempt_id = uuid4()
         fencing_token = uuid4()
         with connect(self._config) as connection, connection.cursor() as cursor:
-            claim_sql = """SELECT work_order_id, action_type, action_version, parameters,
+            claim_sql = """SELECT w.work_order_id, w.action_type, w.action_version, w.parameters,
                           hard_timeout_seconds, expected_duration_seconds, correlation_id
-                     FROM work_orders
-                    WHERE status = 'queued' AND active_attempt_id IS NULL
-                      AND (role IS NULL OR role=%s)
-                      AND (seat_id IS NULL OR seat_id=%s)
+                     FROM work_orders w
+                    WHERE w.status = 'queued' AND w.active_attempt_id IS NULL
+                      AND (w.role IS NULL OR w.role=%s)
+                      AND (w.seat_id IS NULL OR w.seat_id=%s)
                       AND NOT EXISTS (
                           SELECT 1 FROM work_order_attempts source_attempt
-                           WHERE source_attempt.attempt_id = work_orders.source_attempt_id
-                             AND work_orders.role IN ('validator','revalidator')
+                           WHERE source_attempt.attempt_id = w.source_attempt_id
+                             AND w.role IN ('validator','revalidator')
                              AND source_attempt.worker_instance_id = %s
                       )
                 """
             claim_params: list[Any] = [role, seat_id, worker_instance_id]
             if work_order_id is not None:
-                claim_sql += " AND work_order_id=%s"
+                claim_sql += " AND w.work_order_id=%s"
                 claim_params.append(work_order_id)
+            if objective_id is not None:
+                claim_sql += " AND w.objective_id=%s"
+                claim_params.append(objective_id)
             claim_sql += " ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1"
             cursor.execute(claim_sql, claim_params)
             row = cursor.fetchone()
