@@ -353,6 +353,27 @@ class RelayStore:
         if rejected:
             raise RuntimeError("RIV-WRK-0003: Terminal result was late or stale.")
 
+    def assert_fence_current(self, identity: AttemptIdentity) -> None:
+        """Validate the exact live attempt before an external side effect.
+
+        The row lock serializes this check with lease expiry/re-claim
+        transactions at the authority boundary. Terminal completion remains
+        fenced separately after reconciliation succeeds.
+        """
+        with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT 1 FROM work_orders
+                   WHERE work_order_id=%s AND status IN ('claimed','running')
+                     AND active_attempt_id=%s AND lease_generation=%s
+                     AND fencing_token=%s AND worker_instance_id=%s
+                     AND lease_expires_at > now()
+                   FOR UPDATE""",
+                (identity.work_order_id, identity.attempt_id, identity.lease_generation,
+                 identity.fencing_token, identity.worker_instance_id),
+            )
+            if cursor.fetchone() is None:
+                raise RuntimeError("RIV-WRK-0003: Attempt fence is not current before reconciliation.")
+
     def complete(self, work_order_id: UUID, worker_id: str, result: dict[str, Any]) -> None:
         self.complete_fenced(self._legacy_identity(work_order_id, worker_id), result)
 

@@ -117,6 +117,20 @@ class RestrictedRunner:
             self._fail(work.work_order_id, checkpoint, result.bounded_summary, result.result_category == "timed_out")
             return {"status": result.result_category, "execution_id": str(execution), "checkpoint_id": checkpoint}
         try:
+            self.store.assert_fence_current(self._identity(work))
+        except RuntimeError as exc:
+            # complete_fenced records the late result without touching the
+            # successor's active authority. Never cross reconciliation after
+            # this gate rejects the exact attempt tuple.
+            try:
+                self.store.complete_fenced(
+                    self._identity(work),
+                    {"status": "late_or_stale", "execution_id": str(execution), "reason": str(exc)},
+                )
+            except RuntimeError:
+                pass
+            return {"status": "stale", "execution_id": str(execution), "checkpoint_id": "RIV-WRK-0003"}
+        try:
             reconciled = ResultReconciler().reconcile_repository(
                 execution,
                 envelope.repository_root,
