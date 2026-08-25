@@ -126,7 +126,8 @@ def test_source_request_result_lineage_reconstructs_after_restart() -> None:
         event_id=uuid4(), occurred_at=datetime(2026, 8, 25, 12, 0, tzinfo=UTC),
     )
     result_record = CognitionProvenance.for_result(
-        response, source_event_id=SOURCE_EVENT, causation_id=request_record.event_id,
+        replace(response, source_cognition_event_id=SOURCE_EVENT), source_event_id=SOURCE_EVENT,
+        causation_id=request_record.event_id,
         event_id=uuid4(), occurred_at=datetime(2026, 8, 25, 12, 1, tzinfo=UTC),
     )
     writer.record(request_record)

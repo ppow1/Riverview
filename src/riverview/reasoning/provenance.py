@@ -252,7 +252,24 @@ class CognitionProvenance:
             occurred_at=occurred_at or result.created_at, result_reference=str(result.result_id),
         )
 
-    def validate_against_request(self, request: CapabilityResourceRequest | ResidentReasoningPacket) -> None:
+    def validate_against_request(
+        self,
+        request: CapabilityResourceRequest | ResidentReasoningPacket | "CognitionProvenance",
+    ) -> None:
+        if isinstance(request, CognitionProvenance):
+            # A stored request is the durable authority for downstream lineage.
+            # Provider/resource, result, status, failure, and live-generation
+            # fields are intentionally not compared: those are result facts.
+            for name in (
+                "request_id", "correlation_id", "resident_id", "occupant_id",
+                "office_id", "implementation_id", "authority_ref", "source_event_id",
+                "cognition_tier", "classification",
+            ):
+                if getattr(self, name) != getattr(request, name):
+                    raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: {name} correspondence mismatch.")
+            if request.packet_id is not None and self.packet_id != request.packet_id:
+                raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: packet correspondence mismatch.")
+            return
         for name in ("request_id", "correlation_id", "resident_id", "occupant_id", "cognition_tier", "classification"):
             expected_name = "packet_id" if name == "request_id" and hasattr(request, "packet_id") else name
             if expected_name == "packet_id":
@@ -348,8 +365,26 @@ class CognitionProvenanceWriter:
         event = provenance.to_river_event()
         if provenance.event_type != CognitionProvenanceEventType.REQUESTED:
             prior = self.event_store.read_aggregate(PROVENANCE_AGGREGATE_TYPE, provenance.request_id)
-            if not any(row.get("payload", {}).get("event_type") == CognitionProvenanceEventType.REQUESTED.value for row in prior):
+            request_rows = [
+                row for row in prior
+                if (
+                    row.get("event_type") == CognitionProvenanceEventType.REQUESTED.value
+                    or row.get("payload", {}).get("event_type") == CognitionProvenanceEventType.REQUESTED.value
+                )
+            ]
+            if not request_rows:
                 raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: cognition event has no recorded request lineage.")
+            if len(request_rows) != 1:
+                raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: stored request lineage is ambiguous.")
+            try:
+                canonical_request = CognitionProvenance.from_typed_payload(request_rows[0]["payload"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ProvenanceLineageError(
+                    f"{PROVENANCE_CHECKPOINT}: stored request lineage is malformed."
+                ) from exc
+            if canonical_request.event_type is not CognitionProvenanceEventType.REQUESTED:
+                raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: stored request lineage is invalid.")
+            provenance.validate_against_request(canonical_request)
         acknowledgement = self.event_store.append(event)
         if getattr(acknowledgement, "inserted", True) is False:
             existing = self.event_store.read_aggregate(PROVENANCE_AGGREGATE_TYPE, provenance.request_id)
