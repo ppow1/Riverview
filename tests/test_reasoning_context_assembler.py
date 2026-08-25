@@ -37,7 +37,7 @@ def bundle(*, source: FixtureSource | None = None):
 def request(*, occupant_id=OCCUPANT, resident_id=None, **changes) -> ReasoningAssemblyRequest:
     values = dict(
         packet_id=uuid4(),
-        resident_id=resident_id or uuid4(),
+        resident_id=resident_id or OCCUPANT,
         occupant_id=occupant_id,
         implementation_id=IMPLEMENTATION,
         source_cognition_event_id=SOURCE_EVENT,
@@ -67,7 +67,7 @@ def test_valid_context_assembles_into_f1_packet_and_preserves_identity() -> None
     source_bundle = bundle()
     packet = ResidentReasoningPacketAssembler().assemble(source_bundle, request())
     assert isinstance(packet, ResidentReasoningPacket)
-    assert packet.resident_id != packet.occupant_id
+    assert packet.resident_id == source_bundle.resident_id
     assert packet.occupant_id == OCCUPANT
     assert packet.office_id == source_bundle.office_id
     assert packet.authority_ref == "c465:office-authority"
@@ -78,7 +78,7 @@ def test_valid_context_assembles_into_f1_packet_and_preserves_identity() -> None
 def test_transcript_content_cannot_replace_authoritative_identity() -> None:
     packet = assemble(source=FixtureSource(name="Transcript claims a different resident"))
     assert packet.occupant_id == OCCUPANT
-    assert packet.resident_id != packet.occupant_id
+    assert packet.resident_id == OCCUPANT
     assert "Transcript claims" not in packet.as_typed_payload()["evidence_refs"]
 
 

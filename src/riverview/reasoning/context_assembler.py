@@ -163,6 +163,8 @@ class ResidentReasoningPacketAssembler:
             raise ReasoningContextAssemblyError("stale-bundle", "stale context cannot become a reasoning packet.")
         if bundle.resident_id != request.occupant_id:
             raise ReasoningContextAssemblyError("identity-mismatch", "packet occupant does not match the authoritative context bundle.")
+        if bundle.resident_id != request.resident_id:
+            raise ReasoningContextAssemblyError("identity-mismatch", "packet resident does not match the authoritative context bundle.")
         if bundle.office_id is None:
             raise ReasoningContextAssemblyError("office-binding-invalid", "authoritative office identity is required.")
         if not isinstance(request.max_budget, int) or not 0 < request.max_budget <= MAX_CONTEXT_CHARS:
@@ -179,6 +181,12 @@ class ResidentReasoningPacketAssembler:
             raise ReasoningContextAssemblyError("authority-anchor-incomplete", "authority envelope reference is required.")
         if any(item.layer in _FORBIDDEN_LAYERS for item in bundle.items):
             raise ReasoningContextAssemblyError("unbounded-context", "transcript-like context cannot cross the packet boundary.")
+        current_state_items = [
+            item for item in bundle.items
+            if item.layer == "current_assignment" and item.mandatory and isinstance(item.value, Mapping)
+        ]
+        if len(current_state_items) != 1 or not current_state_items[0].source_ref.strip():
+            raise ReasoningContextAssemblyError("current-state-missing", "authoritative current operational state is required.")
 
         state_refs = _item_refs(bundle, _STATE_LAYERS)
         evidence_refs = _item_refs(bundle, _EVIDENCE_LAYERS)
