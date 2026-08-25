@@ -212,7 +212,7 @@ class CognitionProvenance:
             authority_ref=authority_ref, source_event_id=source_event_id,
             request_id=request.request_id, correlation_id=request.correlation_id,
             causation_id=causation_id, cognition_tier=request.cognition_tier,
-            provider_ref=None, resource_class_ref=None, packet_id=None, result_id=None,
+            provider_ref=None, resource_class_ref=None, packet_id=request.packet_id, result_id=None,
             policy_decision_ref=request.policy_ref, status="requested", failure_code=None,
             classification=request.classification, live_generation=False,
             evidence_refs=evidence_refs, authoritative_state_refs=authoritative_state_refs,
@@ -271,8 +271,7 @@ class CognitionProvenance:
                 raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: packet correspondence mismatch.")
             return
         for name in ("request_id", "correlation_id", "resident_id", "occupant_id", "cognition_tier", "classification"):
-            expected_name = "packet_id" if name == "request_id" and hasattr(request, "packet_id") else name
-            if expected_name == "packet_id":
+            if name == "request_id" and isinstance(request, ResidentReasoningPacket):
                 if self.packet_id != request.packet_id:
                     raise ProvenanceLineageError(f"{PROVENANCE_CHECKPOINT}: packet correspondence mismatch.")
                 continue

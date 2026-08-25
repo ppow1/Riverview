@@ -459,6 +459,7 @@ class CapabilityResourceRequest:
     classification: str
     policy_ref: str
     authorization_ref: str
+    packet_id: UUID | None = None
     priority: int | None = None
     deadline_at: datetime | None = None
     latency_requirement: str | None = None
@@ -469,6 +470,7 @@ class CapabilityResourceRequest:
     def __post_init__(self) -> None:
         for value, name in ((self.request_id, "request_id"), (self.correlation_id, "correlation_id"), (self.resident_id, "resident_id"), (self.occupant_id, "occupant_id"), (self.office_id, "office_id"), (self.implementation_id, "implementation_id")):
             _uuid(value, name)
+        _optional_uuid(self.packet_id, "packet_id")
         object.__setattr__(self, "cognition_tier", _tier(self.cognition_tier))
         _bounded_text(self.required_capability, "required_capability", 500)
         _classification(self.classification)
@@ -500,6 +502,7 @@ class CapabilityResourceRequest:
             "classification": self.classification,
             "policy_ref": self.policy_ref,
             "authorization_ref": self.authorization_ref,
+            "packet_id": str(self.packet_id) if self.packet_id else None,
             "priority": self.priority,
             "deadline_at": self.deadline_at.isoformat() if self.deadline_at else None,
             "latency_requirement": self.latency_requirement,
@@ -524,6 +527,7 @@ class CapabilityResourceRequest:
             classification=payload["classification"],
             policy_ref=payload["policy_ref"],
             authorization_ref=payload["authorization_ref"],
+            packet_id=_payload_optional_uuid(payload, "packet_id"),
             priority=payload.get("priority"),
             deadline_at=datetime.fromisoformat(deadline) if deadline else None,
             latency_requirement=payload.get("latency_requirement"),

@@ -157,6 +157,7 @@ def _request_for_assessment(assessment: object):
         authority_ref=assessment.authority_ref,
         correlation_id=assessment.correlation_id,
         classification=assessment.classification,
+        packet_id=assessment.packet_id,
     )
     return request
 
@@ -200,6 +201,38 @@ def test_policy_recorder_rejects_unrelated_causation() -> None:
     store, request_id = _canonical_policy_store(assessment)
     with pytest.raises(PolicyInputError, match="causation"):
         PolicyDecisionRecorder(store).record(assessment, request_id=request_id, causation_id=uuid4())
+    assert len(store.events) == 1
+
+
+def test_policy_recorder_rejects_packet_when_canonical_request_has_none() -> None:
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Home can handle this.")
+    request = replace(_request_for_assessment(assessment), packet_id=None)
+    store = MemoryEventStore()
+    request_record = CognitionProvenance.for_request(
+        request, source_event_id=EVENT, office_id=OFFICE,
+        implementation_id=IMPLEMENTATION, authority_ref=assessment.authority_ref,
+    )
+    CognitionProvenanceWriter(store).record(request_record)
+    with pytest.raises(PolicyInputError, match="packet correspondence"):
+        PolicyDecisionRecorder(store).record(assessment, request_id=request.request_id)
+    assert len(store.events) == 1
+
+
+def test_policy_recorder_rejects_packet_substitution() -> None:
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Home can handle this.")
+    store, request_id = _canonical_policy_store(assessment)
+    forged = replace(assessment, packet_id=uuid4())
+    with pytest.raises(PolicyInputError, match="packet correspondence"):
+        PolicyDecisionRecorder(store).record(forged, request_id=request_id)
+    assert len(store.events) == 1
+
+
+def test_policy_recorder_rejects_classification_substitution() -> None:
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Home can handle this.")
+    store, request_id = _canonical_policy_store(assessment)
+    forged = replace(assessment, classification="public")
+    with pytest.raises(PolicyInputError, match="classification correspondence"):
+        PolicyDecisionRecorder(store).record(forged, request_id=request_id)
     assert len(store.events) == 1
 
 

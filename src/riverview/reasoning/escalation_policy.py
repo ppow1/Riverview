@@ -242,8 +242,10 @@ class PolicyDecisionRecorder:
             assessment_name = "source_event_id" if name == "source_cognition_event_id" else name
             if getattr(assessment, name) != getattr(canonical, assessment_name):
                 raise PolicyInputError(f"{POLICY_CHECKPOINT}: {name} correspondence mismatch.")
-        if canonical.packet_id is not None and assessment.packet_id != canonical.packet_id:
+        if assessment.packet_id != canonical.packet_id:
             raise PolicyInputError(f"{POLICY_CHECKPOINT}: packet correspondence mismatch.")
+        if assessment.classification != canonical.classification:
+            raise PolicyInputError(f"{POLICY_CHECKPOINT}: classification correspondence mismatch.")
 
     def record(self, assessment: EscalationAssessment, *, request_id: UUID, causation_id: UUID | None = None) -> Any:
         if not isinstance(request_id, UUID):
