@@ -4,13 +4,14 @@ Version: 0.5.0
 """
 
 from datetime import UTC, datetime
+from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
 from riverview.autonomy.control import ExecutionResult
-from riverview.relay import ClaimedWork
+from riverview.relay import ClaimedWork, FenceNotCurrentError
 from riverview.runner import RestrictedRunner
 
 
@@ -130,10 +131,12 @@ def test_stale_codex_result_is_rejected_before_reconciliation(monkeypatch, tmp_p
             calls.append("successor-claimed")
             self.active_identity = self.successor_identity
 
-        def assert_fence_current(self, _identity):
+        @contextmanager
+        def reconciliation_authority(self, _identity):
             calls.append("fence")
             if _identity != self.active_identity:
-                raise RuntimeError("RIV-WRK-0003: superseded by successor")
+                raise FenceNotCurrentError("RIV-WRK-0003: superseded by successor")
+            yield self
 
         def complete_fenced(self, _identity, payload):
             calls.append("late-audit")
@@ -173,10 +176,12 @@ def test_current_codex_result_reconciles_before_terminal_completion(monkeypatch,
     monkeypatch.setattr("riverview.runner.subprocess.check_output", lambda *_args, **_kwargs: "head\n")
 
     class CurrentStore:
-        def assert_fence_current(self, _identity):
+        @contextmanager
+        def reconciliation_authority(self, _identity):
             calls.append("fence")
+            yield self
 
-        def complete_fenced(self, _identity, _payload):
+        def complete(self, _payload):
             calls.append("complete")
 
     class Reconciler:
@@ -209,8 +214,10 @@ def test_reconciliation_failure_does_not_complete_current_work(monkeypatch, tmp_
     monkeypatch.setattr(runner, "_working_paths", lambda _repository: ())
 
     class CurrentStore:
-        def assert_fence_current(self, _identity):
+        @contextmanager
+        def reconciliation_authority(self, _identity):
             calls.append("fence")
+            yield self
 
         def complete_fenced(self, _identity, _payload):
             calls.append("complete")

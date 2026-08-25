@@ -5,6 +5,8 @@ Version: 0.1.0
 
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import replace
 from uuid import uuid4
 
@@ -44,6 +46,68 @@ def test_claim_identity_and_heartbeat_are_distinct_from_progress() -> None:
         count, timestamp = cursor.fetchone()
         assert count == 1 and timestamp is not None
     store.complete_fenced(identity, {"status": "succeeded", "test": "identity"})
+
+
+def test_reconciliation_authority_blocks_expiry_during_real_postgres_side_effect() -> None:
+    store, order, claimed, identity = _claimed()
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE work_orders SET lease_expires_at=now()+interval '0.5 seconds' WHERE work_order_id=%s",
+            (order.work_order_id,),
+        )
+
+    entered = threading.Event()
+    attempted = threading.Event()
+    finished = threading.Event()
+    sweep: dict[str, object] = {}
+
+    def expire_concurrently() -> None:
+        entered.wait(timeout=5)
+        attempted.set()
+        sweep["expired"] = store.expire_leases()
+        finished.set()
+
+    worker = threading.Thread(target=expire_concurrently)
+    worker.start()
+    with store.reconciliation_authority(identity) as authority:
+        entered.set()
+        assert attempted.wait(timeout=2)
+        assert finished.wait(timeout=2)  # SKIP LOCKED returns while A owns the row lock
+        time.sleep(1.2)  # the lease is logically expired, but A owns the row lock
+        sweep["reconciled"] = True
+        authority.complete({"status": "succeeded", "protected": True})
+    worker.join(timeout=5)
+
+    assert sweep["expired"] == []
+    assert sweep["reconciled"] is True
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT status,active_attempt_id FROM work_orders WHERE work_order_id=%s", (order.work_order_id,))
+        status, active_attempt = cursor.fetchone()
+    assert status == "succeeded"
+    assert active_attempt is None
+
+
+def test_reconciliation_authority_failure_releases_lock_for_expiry_recovery() -> None:
+    store, order, claimed, identity = _claimed()
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE work_orders SET lease_expires_at=now()+interval '30 seconds' WHERE work_order_id=%s",
+            (order.work_order_id,),
+        )
+
+    with pytest.raises(RuntimeError, match="reconciliation failure"):
+        with store.reconciliation_authority(identity):
+            raise RuntimeError("reconciliation failure")
+
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("UPDATE work_orders SET lease_expires_at=now()-interval '1 second' WHERE work_order_id=%s", (order.work_order_id,))
+    expired = store.expire_leases()
+    assert any(item.attempt_id == identity.attempt_id for item in expired)
+    store.requeue_timed_out(order.work_order_id)
+    successor = store.claim("run003-pytest", 30, worker_instance_id=uuid4(), seat_id="C2",
+                            role="validator", work_order_id=order.work_order_id)
+    assert successor is not None
+    store.complete_fenced(store._legacy_identity(order.work_order_id, "run003-pytest"), {"status": "succeeded"})
 
 
 @pytest.mark.parametrize("field", ["fencing_token", "lease_generation", "worker_instance_id"])

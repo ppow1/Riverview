@@ -26,7 +26,7 @@ from riverview.autonomy.control import (
 from riverview.autonomy.stale_base import StaleBaseRecoveryStore
 from riverview.database import connect
 from riverview.intake import EngineeringIntentStore
-from riverview.relay import AttemptIdentity, ClaimedWork, RelayStore
+from riverview.relay import AttemptIdentity, ClaimedWork, FenceNotCurrentError, RelayStore
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,8 +117,9 @@ class RestrictedRunner:
             self._fail(work.work_order_id, checkpoint, result.bounded_summary, result.result_category == "timed_out")
             return {"status": result.result_category, "execution_id": str(execution), "checkpoint_id": checkpoint}
         try:
-            self.store.assert_fence_current(self._identity(work))
-        except RuntimeError as exc:
+            authority_context = self.store.reconciliation_authority(self._identity(work))
+            authority = authority_context.__enter__()
+        except FenceNotCurrentError as exc:
             # complete_fenced records the late result without touching the
             # successor's active authority. Never cross reconciliation after
             # this gate rejects the exact attempt tuple.
@@ -131,49 +132,52 @@ class RestrictedRunner:
                 pass
             return {"status": "stale", "execution_id": str(execution), "checkpoint_id": "RIV-WRK-0003"}
         try:
-            reconciled = ResultReconciler().reconcile_repository(
-                execution,
-                envelope.repository_root,
-                envelope.allowed_paths,
-                baseline,
-                expected_base_sha=envelope.expected_base_sha,
-                acceptance_criteria=envelope.acceptance_criteria,
-                evidence_requirements=envelope.evidence_requirements,
-                write_policy=envelope.write_policy,
-            )
-        except RuntimeError as exc:
-            ResultReconciler().record_decision(
-                execution,
-                envelope.correlation_id,
-                "checkpoint",
-                f"Authoritative execution verification failed: {exc}",
-                ("execution:authoritative-verification-failed",),
-                f"execution.reconciliation.checkpoint:{execution}",
-            )
-            if result.result_category != "succeeded" and result.checkpoint_refs:
-                raise RuntimeError(f"{result.checkpoint_refs[0]}: {result.bounded_summary}") from exc
+            try:
+                reconciled = ResultReconciler().reconcile_repository(
+                    execution,
+                    envelope.repository_root,
+                    envelope.allowed_paths,
+                    baseline,
+                    expected_base_sha=envelope.expected_base_sha,
+                    acceptance_criteria=envelope.acceptance_criteria,
+                    evidence_requirements=envelope.evidence_requirements,
+                    write_policy=envelope.write_policy,
+                )
+            except RuntimeError as exc:
+                ResultReconciler().record_decision(
+                    execution,
+                    envelope.correlation_id,
+                    "checkpoint",
+                    f"Authoritative execution verification failed: {exc}",
+                    ("execution:authoritative-verification-failed",),
+                    f"execution.reconciliation.checkpoint:{execution}",
+                )
+                if result.result_category != "succeeded" and result.checkpoint_refs:
+                    raise RuntimeError(f"{result.checkpoint_refs[0]}: {result.bounded_summary}") from exc
+                raise
+            ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
+            observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=envelope.repository_root, text=True).strip()
+            report = {
+                "status": result.result_category,
+                "execution_id": str(execution),
+                "changed_paths": list(reconciled["changed_paths"]),
+                "summary": result.bounded_summary,
+                "repository_evidence": {
+                    "observed_git_head": observed_head,
+                    "ai_hints_readable": (envelope.repository_root / "AI_HINTS.md").is_file(),
+                    "charter_readable": (envelope.repository_root / "docs" / "governance" / "RIVERVIEW_CHARTER.md").is_file(),
+                    "changed_files": list(reconciled["changed_paths"]),
+                    "repository_suitable_for_bounded_codex_work": True,
+                    "write_policy": envelope.write_policy,
+                },
+            }
+            authority.complete(report)
+            return report
+        except BaseException as exc:
+            authority_context.__exit__(type(exc), exc, exc.__traceback__)
             raise
-        ResultReconciler().record_decision(execution, envelope.correlation_id, "accepted", "Codex result reconciled within the declared path policy.", ("execution:reconciled",), f"execution.reconciliation:{execution}")
-        observed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=envelope.repository_root, text=True).strip()
-        report = {
-            "status": result.result_category,
-            "execution_id": str(execution),
-            "changed_paths": list(reconciled["changed_paths"]),
-            "summary": result.bounded_summary,
-            "repository_evidence": {
-                "observed_git_head": observed_head,
-                "ai_hints_readable": (envelope.repository_root / "AI_HINTS.md").is_file(),
-                "charter_readable": (envelope.repository_root / "docs" / "governance" / "RIVERVIEW_CHARTER.md").is_file(),
-                "changed_files": list(reconciled["changed_paths"]),
-                "repository_suitable_for_bounded_codex_work": True,
-                "write_policy": envelope.write_policy,
-            },
-        }
-        if result.result_category == "succeeded":
-            self.store.complete_fenced(self._identity(work), report)
         else:
-            self._fail(work.work_order_id, result.checkpoint_refs[0] if result.checkpoint_refs else "RIV-EXE-0001", result.bounded_summary, result.result_category == "timed_out")
-        return report
+            authority_context.__exit__(None, None, None)
 
     @staticmethod
     def _working_paths(repository: Path) -> tuple[str, ...]:

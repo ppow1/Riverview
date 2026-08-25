@@ -6,7 +6,9 @@ Version: 0.4.0
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from dataclasses import dataclass
+from collections.abc import Iterator
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -53,6 +55,49 @@ class AttemptIdentity:
     lease_generation: int
     fencing_token: UUID
     worker_instance_id: UUID
+
+
+class FenceNotCurrentError(RuntimeError):
+    """The exact attempt no longer owns the active work-order fence."""
+
+
+class FencedReconciliation:
+    """A transaction-scoped authority guard for external reconciliation."""
+
+    def __init__(self, cursor: Any, identity: AttemptIdentity, correlation_id: UUID) -> None:
+        self._cursor = cursor
+        self.identity = identity
+        self.correlation_id = correlation_id
+
+    def complete(self, result: dict[str, Any]) -> None:
+        """Complete the protected attempt on the same row-lock transaction."""
+        self._cursor.execute(
+            """UPDATE work_orders SET status='succeeded', result_report=%s::jsonb,
+                      finished_at=now(), lease_expires_at=NULL,
+                      active_attempt_id=NULL, lease_generation=NULL, fencing_token=NULL,
+                      worker_instance_id=NULL, seat_id=NULL, role=NULL, updated_at=now()
+                WHERE work_order_id=%s AND status IN ('claimed','running')
+                  AND active_attempt_id=%s AND lease_generation=%s
+                  AND fencing_token=%s AND worker_instance_id=%s""",
+            (json.dumps(result), self.identity.work_order_id, self.identity.attempt_id,
+             self.identity.lease_generation, self.identity.fencing_token,
+             self.identity.worker_instance_id),
+        )
+        if self._cursor.rowcount != 1:
+            raise FenceNotCurrentError("RIV-WRK-0003: Protected terminal update lost the active fence.")
+        self._cursor.execute(
+            """UPDATE work_order_attempts
+                  SET finished_at=now(), terminal_state='succeeded', exit_code=0
+                WHERE attempt_id=%s AND work_order_id=%s""",
+            (self.identity.attempt_id, self.identity.work_order_id),
+        )
+        RelayStore._append_event(
+            self._cursor, event_type="runner.state_transition",
+            work_order_id=self.identity.work_order_id,
+            correlation_id=self.correlation_id,
+            payload={"from": "running", "to": "succeeded", "attempt_id": str(self.identity.attempt_id)},
+            idempotency_key=f"runner.complete:{self.identity.attempt_id}",
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,7 +417,32 @@ class RelayStore:
                  identity.fencing_token, identity.worker_instance_id),
             )
             if cursor.fetchone() is None:
-                raise RuntimeError("RIV-WRK-0003: Attempt fence is not current before reconciliation.")
+                raise FenceNotCurrentError("RIV-WRK-0003: Attempt fence is not current before reconciliation.")
+
+    @contextmanager
+    def reconciliation_authority(self, identity: AttemptIdentity) -> Iterator[FencedReconciliation]:
+        """Hold exact work-order authority across reconciliation side effects.
+
+        `expire_leases` uses `FOR UPDATE SKIP LOCKED`, so it cannot expire or
+        replace this attempt while the context is active. A process failure
+        closes the PostgreSQL transaction, releases the lock, and leaves the
+        still-running/expired order recoverable by the normal sweeper.
+        """
+        with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT correlation_id FROM work_orders
+                   WHERE work_order_id=%s AND status IN ('claimed','running')
+                     AND active_attempt_id=%s AND lease_generation=%s
+                     AND fencing_token=%s AND worker_instance_id=%s
+                     AND lease_expires_at > now()
+                   FOR UPDATE""",
+                (identity.work_order_id, identity.attempt_id, identity.lease_generation,
+                 identity.fencing_token, identity.worker_instance_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise FenceNotCurrentError("RIV-WRK-0003: Attempt fence is not current before reconciliation.")
+            yield FencedReconciliation(cursor, identity, row[0])
 
     def complete(self, work_order_id: UUID, worker_id: str, result: dict[str, Any]) -> None:
         self.complete_fenced(self._legacy_identity(work_order_id, worker_id), result)
