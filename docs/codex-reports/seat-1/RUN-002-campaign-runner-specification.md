@@ -85,10 +85,10 @@ Extend objectives only where a campaign-level requirement cannot be derived:
 - acceptance_state text not null default pending, constrained to pending,
   awaiting_validation, accepted, rejected.
 
-The current active phase is derived from the ordered incomplete stages. No
-active-stage column is added: the authoritative phase/package ordering remains
-objective_stages.sort_order and the current phase is a projection of that
-state.
+The current active phase is the `phase_key` of the first ordered phase
+containing an incomplete required package. It is derived from authoritative
+`objective_stages.sort_order`, `phase_key`, and lifecycle state. No
+objective-level active-stage column is added.
 
 ### A.3 Minimal stage extensions
 
@@ -104,7 +104,7 @@ Extend objective_stages with:
 
 A stage remains one work package. phase_key groups ordered packages into the
 current phase without creating another phase-state model. Current phase is
-derived from the first phase_key containing an active or incomplete package.
+derived from the first phase_key containing an incomplete required package.
 Execution role is assigned to each work order/attempt, not to the stage, so
 the same package can have writer, validator, repair_writer, revalidator, and
 arbitrator work orders without duplicating the package model.
@@ -1015,12 +1015,13 @@ Reuse without schema duplication:
 
 1. objectives:
    - attention_required;
-   - active_stage_id;
    - acceptance_state.
 
-   Necessary for campaign-level attention and explicit acceptance projection.
+   Necessary for campaign-level attention and explicit acceptance state.
    Existing objective status does not distinguish accepted from merely
-   completed/operationally advanced.
+   completed/operationally advanced. No objective-level active-stage value is
+   required: current phase is derived from authoritative objective-stage
+   lifecycle/order as defined in section Q.
 
 2. objective_stages:
    - phase_key;
@@ -1119,6 +1120,12 @@ existing structure cannot satisfy the specific requirement.
 
 Defer:
 
+- `objectives.active_stage_id`: NOT NEEDED. The current phase is derived
+  deterministically from authoritative `objective_stages` lifecycle/order
+  (`sort_order`, `phase_key`, and incomplete required-package state). No
+  separately writable objective-level active-stage authority or cache is
+  introduced; lifecycle transitions and dashboard projections use the derived
+  result.
 - generalized provider routing;
 - GPU scheduling;
 - new Grace abstractions;
@@ -1194,6 +1201,7 @@ A writer result may never perform the running → accepted transition.
 | 28 | dashboard restart | Projection rebuilds from PostgreSQL |
 | 29 | revalidation by repair writer | Assignment rejected |
 | 30 | arbitrary writer prose claiming success | No acceptance transition |
+| 31 | current phase has one authority | Given authoritative objective-stage lifecycle/order, current phase is deterministic; no separately writable objective-level active-stage value can contradict it or independently advance campaign lifecycle |
 
 ## Readiness
 
