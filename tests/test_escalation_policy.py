@@ -120,8 +120,11 @@ def test_unknown_inputs_and_missing_authority_fail_closed() -> None:
 def test_policy_decision_persists_version_and_outcome_as_f2_river_event() -> None:
     store = MemoryEventStore()
     assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.DIFFICULT, home_belief=True, home_belief_reason="Home reliability is exceeded.", capacity=CapacitySnapshot(high_reasoning_available=True))
-    PolicyDecisionRecorder(store).record(assessment, request_id=uuid4())
-    event = store.events[0]
+    request = _request_for_assessment(assessment)
+    request_record = CognitionProvenance.for_request(request, source_event_id=EVENT, office_id=OFFICE, implementation_id=IMPLEMENTATION, authority_ref=assessment.authority_ref)
+    CognitionProvenanceWriter(store).record(request_record)
+    PolicyDecisionRecorder(store).record(assessment, request_id=request.request_id)
+    event = store.events[1]
     assert event.event_type == POLICY_EVENT_TYPE
     assert event.aggregate_type == "cognition_request"
     assert event.payload["policy_version"] == assessment.policy_ref
@@ -132,27 +135,91 @@ def test_policy_decision_persists_version_and_outcome_as_f2_river_event() -> Non
 def test_policy_event_payload_is_reconstructable_after_store_recreation() -> None:
     store = MemoryEventStore()
     assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Routine is within home capability.")
-    request_id = uuid4()
-    PolicyDecisionRecorder(store).record(assessment, request_id=request_id)
+    request = _request_for_assessment(assessment)
+    request_record = CognitionProvenance.for_request(request, source_event_id=EVENT, office_id=OFFICE, implementation_id=IMPLEMENTATION, authority_ref=assessment.authority_ref)
+    CognitionProvenanceWriter(store).record(request_record)
+    PolicyDecisionRecorder(store).record(assessment, request_id=request.request_id)
     reloaded = MemoryEventStore()
     reloaded.events = list(store.events)
-    row = reloaded.read_aggregate("cognition_request", request_id)[0]
+    row = reloaded.read_aggregate("cognition_request", request.request_id)[1]
     assert row["payload"]["policy_version"] == "grace-escalation-policy-p1-v1"
     assert row["payload"]["decision"] == "deterministic"
 
 
+def _request_for_assessment(assessment: object):
+    from test_cognition_contracts import capability_request
+    request = replace(
+        capability_request(),
+        resident_id=assessment.resident_id,
+        occupant_id=assessment.occupant_id,
+        office_id=assessment.office_id,
+        implementation_id=assessment.implementation_id,
+        authority_ref=assessment.authority_ref,
+        correlation_id=assessment.correlation_id,
+        classification=assessment.classification,
+    )
+    return request
+
+
+def _canonical_policy_store(assessment: object) -> tuple[MemoryEventStore, UUID]:
+    request = _request_for_assessment(assessment)
+    store = MemoryEventStore()
+    request_record = CognitionProvenance.for_request(
+        request, source_event_id=EVENT, office_id=OFFICE,
+        implementation_id=IMPLEMENTATION, authority_ref=assessment.authority_ref,
+    )
+    CognitionProvenanceWriter(store).record(request_record)
+    return store, request.request_id
+
+
+def test_policy_recorder_rejects_unrelated_request_before_persistence() -> None:
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.DIFFICULT, home_belief=True, home_belief_reason="Home reliability is exceeded.", capacity=CapacitySnapshot(high_reasoning_available=True))
+    store, request_id = _canonical_policy_store(assessment)
+    with pytest.raises(PolicyInputError, match="canonical cognition request lineage"):
+        PolicyDecisionRecorder(store).record(assessment, request_id=uuid4())
+    assert len(store.events) == 1
+    assert store.events[0].event_type != POLICY_EVENT_TYPE
+
+
+@pytest.mark.parametrize("field", [
+    "resident_id", "occupant_id", "office_id", "implementation_id",
+    "authority_ref", "source_cognition_event_id", "correlation_id",
+])
+def test_policy_recorder_rejects_identity_or_lineage_substitution(field: str) -> None:
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.DIFFICULT, home_belief=True, home_belief_reason="Home reliability is exceeded.", capacity=CapacitySnapshot(high_reasoning_available=True))
+    store, request_id = _canonical_policy_store(assessment)
+    replacement = uuid4() if field.endswith("_id") else "authority://forged"
+    forged = replace(assessment, **{field: replacement})
+    with pytest.raises(PolicyInputError, match="correspondence mismatch"):
+        PolicyDecisionRecorder(store).record(forged, request_id=request_id)
+    assert len(store.events) == 1
+
+
+def test_policy_recorder_rejects_unrelated_causation() -> None:
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Home can handle this.")
+    store, request_id = _canonical_policy_store(assessment)
+    with pytest.raises(PolicyInputError, match="causation"):
+        PolicyDecisionRecorder(store).record(assessment, request_id=request_id, causation_id=uuid4())
+    assert len(store.events) == 1
+
+
+def test_policy_recorder_rejects_missing_canonical_request() -> None:
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Home can handle this.")
+    store = MemoryEventStore()
+    with pytest.raises(PolicyInputError, match="canonical cognition request lineage"):
+        PolicyDecisionRecorder(store).record(assessment, request_id=uuid4())
+
+
 def test_policy_event_coexists_with_f2_request_lineage() -> None:
     from test_cognition_provenance import MemoryEventStore
-    from test_cognition_contracts import capability_request
-
     store = MemoryEventStore()
-    request = capability_request()
+    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Routine is within home capability.")
+    request = _request_for_assessment(assessment)
     request_record = CognitionProvenance.for_request(
         request, source_event_id=EVENT, office_id=request.office_id,
         implementation_id=request.implementation_id, authority_ref=request.authority_ref,
     )
     CognitionProvenanceWriter(store).record(request_record)
-    assessment = EscalationPolicy().evaluate(packet(), consequence=ConsequenceClass.ROUTINE, home_belief=False, home_belief_reason="Routine is within home capability.")
     PolicyDecisionRecorder(store).record(assessment, request_id=request.request_id)
     reconstructed = CognitionProvenanceWriter(store).reconstruct(request.request_id)
     assert reconstructed == (request_record,)

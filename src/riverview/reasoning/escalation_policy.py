@@ -23,6 +23,11 @@ from .cognition_contracts import (
     EscalationDecision,
     ResidentReasoningPacket,
 )
+from .provenance import (
+    CognitionProvenance,
+    CognitionProvenanceEventType,
+    ProvenanceLineageError,
+)
 
 
 POLICY_VERSION = "grace-escalation-policy-p1-v1"
@@ -203,9 +208,52 @@ class PolicyDecisionRecorder:
     def __init__(self, event_store: PolicyEventStore) -> None:
         self.event_store = event_store
 
+    def _canonical_request(self, request_id: UUID) -> CognitionProvenance:
+        """Load the one durable F2 request which authorizes this decision."""
+
+        rows = self.event_store.read_aggregate(POLICY_AGGREGATE_TYPE, request_id)
+        request_rows = [
+            row for row in rows
+            if row.get("event_type") == CognitionProvenanceEventType.REQUESTED.value
+            or row.get("payload", {}).get("event_type") == CognitionProvenanceEventType.REQUESTED.value
+        ]
+        if len(request_rows) != 1:
+            raise PolicyInputError(
+                f"{POLICY_CHECKPOINT}: canonical cognition request lineage is missing or ambiguous."
+            )
+        try:
+            canonical = CognitionProvenance.from_typed_payload(request_rows[0]["payload"])
+        except (KeyError, TypeError, ValueError, ProvenanceLineageError) as exc:
+            raise PolicyInputError(
+                f"{POLICY_CHECKPOINT}: canonical cognition request lineage is malformed."
+            ) from exc
+        if canonical.event_type is not CognitionProvenanceEventType.REQUESTED:
+            raise PolicyInputError(f"{POLICY_CHECKPOINT}: canonical cognition request is invalid.")
+        if canonical.request_id != request_id:
+            raise PolicyInputError(f"{POLICY_CHECKPOINT}: canonical request identity does not match aggregate.")
+        return canonical
+
+    @staticmethod
+    def _validate_correspondence(assessment: EscalationAssessment, canonical: CognitionProvenance) -> None:
+        for name in (
+            "resident_id", "occupant_id", "office_id", "implementation_id",
+            "authority_ref", "source_cognition_event_id", "correlation_id",
+        ):
+            assessment_name = "source_event_id" if name == "source_cognition_event_id" else name
+            if getattr(assessment, name) != getattr(canonical, assessment_name):
+                raise PolicyInputError(f"{POLICY_CHECKPOINT}: {name} correspondence mismatch.")
+        if canonical.packet_id is not None and assessment.packet_id != canonical.packet_id:
+            raise PolicyInputError(f"{POLICY_CHECKPOINT}: packet correspondence mismatch.")
+
     def record(self, assessment: EscalationAssessment, *, request_id: UUID, causation_id: UUID | None = None) -> Any:
         if not isinstance(request_id, UUID):
             raise PolicyInputError(f"{POLICY_CHECKPOINT}: request identity is required for policy lineage.")
+        if not isinstance(assessment, EscalationAssessment):
+            raise PolicyInputError(f"{POLICY_CHECKPOINT}: a typed escalation assessment is required.")
+        canonical = self._canonical_request(request_id)
+        self._validate_correspondence(assessment, canonical)
+        if causation_id is not None and causation_id != assessment.source_cognition_event_id:
+            raise PolicyInputError(f"{POLICY_CHECKPOINT}: causation does not match the source cognition event.")
         payload = {
             "schema_version": POLICY_VERSION,
             "event_type": POLICY_EVENT_TYPE,
@@ -230,4 +278,3 @@ class PolicyDecisionRecorder:
             occurred_at=assessment.created_at,
         )
         return self.event_store.append(event)
-
