@@ -60,6 +60,19 @@ from .reservation import (
     ResidentCognitionReservation,
     ResidentCognitionReservationAdapter,
 )
+from .home_cognition import (
+    HOME_COGNITION_CAPABILITY,
+    HOME_COGNITION_CHECKPOINT,
+    HOME_COGNITION_VERSION,
+    HOME_OBSERVATION_EVENT,
+    AuthoritativeGraceState,
+    AuthorizedHomeProvider,
+    HomeCognitionExecutionError,
+    HomeCognitionInvocation,
+    HomeCognitionOutcome,
+    HomeCognitionService,
+    HomeGenerationObservation,
+)
 
 __all__ = [
     "CapabilityResourceRequest",
@@ -111,4 +124,15 @@ __all__ = [
     "POLICY_VERSION",
     "PolicyDecisionRecorder",
     "PolicyInputError",
+    "HOME_COGNITION_CAPABILITY",
+    "HOME_COGNITION_CHECKPOINT",
+    "HOME_COGNITION_VERSION",
+    "HOME_OBSERVATION_EVENT",
+    "AuthoritativeGraceState",
+    "AuthorizedHomeProvider",
+    "HomeCognitionExecutionError",
+    "HomeCognitionInvocation",
+    "HomeCognitionOutcome",
+    "HomeCognitionService",
+    "HomeGenerationObservation",
 ]
