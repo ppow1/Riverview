@@ -19,6 +19,12 @@ from .context_assembler import (
     ReasoningContextAssemblyError,
     ResidentReasoningPacketAssembler,
 )
+from .provenance import (
+    CognitionProvenance,
+    CognitionProvenanceEventType,
+    CognitionProvenanceWriter,
+    ProvenanceLineageError,
+)
 from .gpu import GpuEvidence, LocalGpuReasoningAdapter
 from .llama_cpp import LlamaCppReasoningAdapter
 from .ollama import OllamaReasoningAdapter
@@ -29,6 +35,9 @@ __all__ = [
     "ASSEMBLER_VERSION",
     "CognitionActorClass",
     "CognitionFailureCode",
+    "CognitionProvenance",
+    "CognitionProvenanceEventType",
+    "CognitionProvenanceWriter",
     "CognitionResult",
     "CognitionResultStatus",
     "CognitionTier",
@@ -41,6 +50,7 @@ __all__ = [
     "ReasoningProvider",
     "ReasoningAssemblyRequest",
     "ReasoningContextAssemblyError",
+    "ProvenanceLineageError",
     "ReasoningProviderRegistry",
     "ReasoningRequest",
     "ReasoningResponse",
