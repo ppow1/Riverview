@@ -11,9 +11,9 @@ import re
 import shutil
 import subprocess
 import threading
-from time import monotonic
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -26,7 +26,7 @@ from riverview.autonomy.control import (
 from riverview.autonomy.stale_base import StaleBaseRecoveryStore
 from riverview.database import connect
 from riverview.intake import EngineeringIntentStore
-from riverview.relay import ClaimedWork, RelayStore
+from riverview.relay import AttemptIdentity, ClaimedWork, RelayStore
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,11 +44,13 @@ class RestrictedRunner:
     def __init__(self, repository: Path, worker_id: str, heartbeat_seconds: float = 0.5) -> None:
         self.repository = repository.resolve()
         self.worker_id = worker_id
+        self.worker_instance_id = uuid4()
         self.heartbeat_seconds = heartbeat_seconds
         self.store = RelayStore()
 
     def run_once(self) -> dict[str, Any] | None:
-        work = self.store.claim(self.worker_id, 10)
+        work = self.store.claim(self.worker_id, 10, worker_instance_id=self.worker_instance_id,
+                                seat_id="C1", role="writer")
         if work is None:
             return None
         try:
@@ -59,7 +61,7 @@ class RestrictedRunner:
             return self._execute(work, command)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             checkpoint = self._checkpoint_from_error(str(exc))
-            self._fail(work.work_order_id, checkpoint, str(exc), timed_out=checkpoint == "RIV-EXE-0003")
+            self._fail(work, checkpoint, str(exc), timed_out=checkpoint == "RIV-EXE-0003")
             return {"status": "failed", "checkpoint_id": checkpoint}
 
     @staticmethod
@@ -154,7 +156,7 @@ class RestrictedRunner:
             },
         }
         if result.result_category == "succeeded":
-            self.store.complete(work.work_order_id, self.worker_id, report)
+            self.store.complete_fenced(self._identity(work), report)
         else:
             self._fail(work.work_order_id, result.checkpoint_refs[0] if result.checkpoint_refs else "RIV-EXE-0001", result.bounded_summary, result.result_category == "timed_out")
         return report
@@ -199,9 +201,9 @@ class RestrictedRunner:
             nonlocal last_progress
             while not stopped.wait(self.heartbeat_seconds):
                 try:
-                    self.store.heartbeat(work.work_order_id, self.worker_id, 10)
+                    self.store.heartbeat_fenced(self._identity(work), 10)
                     if monotonic() - last_progress >= 120:
-                        self.store.progress(work.work_order_id, self.worker_id, phase="testing", progress_percent=50, summary="Restricted runner heartbeat observed.")
+                        self.store.progress_fenced(self._identity(work), idempotency_key=f"runner-progress:{work.attempt_id}:{int(monotonic())}", message="Restricted runner meaningful progress observed.", detail={"phase": "testing", "progress_percent": 50})
                         last_progress = monotonic()
                 except RuntimeError as exc:
                     heartbeat_error.append(str(exc))
@@ -214,7 +216,7 @@ class RestrictedRunner:
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-            self._fail(work.work_order_id, "RIV-RUN-0005", "Hard timeout exceeded.", timed_out=True)
+            self._fail(work, "RIV-RUN-0005", "Hard timeout exceeded.", timed_out=True)
             return {"status": "timed_out", "checkpoint_id": "RIV-RUN-0005", "stdout": stdout[-4000:], "stderr": stderr[-4000:]}
         finally:
             stopped.set()
@@ -222,17 +224,34 @@ class RestrictedRunner:
         if heartbeat_error:
             raise RuntimeError(f"RIV-RUN-0006: Heartbeat failed: {heartbeat_error[-1]}")
         if process.returncode != 0:
-            self._fail(work.work_order_id, "RIV-RUN-0007", f"Process exit code {process.returncode}.", timed_out=False)
+            self._fail(work, "RIV-RUN-0007", f"Process exit code {process.returncode}.", timed_out=False)
             return {"status": "failed", "checkpoint_id": "RIV-RUN-0007", "stdout": stdout[-4000:], "stderr": stderr[-4000:]}
         report = {"status": "succeeded", "exit_code": process.returncode, "stdout": stdout[-4000:], "stderr": stderr[-4000:]}
-        self.store.complete(work.work_order_id, self.worker_id, report)
+        self.store.complete_fenced(self._identity(work), report)
         return report
 
-    def _fail(self, order_id: UUID, checkpoint: str, reason: str, timed_out: bool) -> None:
+    @staticmethod
+    def _identity(work: ClaimedWork) -> AttemptIdentity:
+        if None in (work.attempt_id, work.lease_generation, work.fencing_token, work.worker_instance_id):
+            raise RuntimeError("RIV-WRK-0014: Claimed work has incomplete fencing identity.")
+        return AttemptIdentity(work.work_order_id, work.attempt_id, work.lease_generation,
+                               work.fencing_token, work.worker_instance_id)
+
+    def _fail(self, work: ClaimedWork, checkpoint: str, reason: str, timed_out: bool) -> None:
         state = "timed_out" if timed_out else "failed"
+        identity = self._identity(work)
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("UPDATE work_orders SET status=%s,error_checkpoint=%s,result_report=%s::jsonb,finished_at=now(),lease_expires_at=NULL,updated_at=now() WHERE work_order_id=%s AND lease_owner=%s AND status IN('claimed','running')",(state,checkpoint,json.dumps({"status":state,"reason":reason}),order_id,self.worker_id))
+            cursor.execute("""UPDATE work_orders SET status=%s,error_checkpoint=%s,result_report=%s::jsonb,
+                              finished_at=now(),lease_expires_at=NULL,active_attempt_id=NULL,
+                              lease_generation=NULL,fencing_token=NULL,worker_instance_id=NULL,
+                              seat_id=NULL,role=NULL,updated_at=now()
+                           WHERE work_order_id=%s AND status IN('claimed','running')
+                             AND active_attempt_id=%s AND lease_generation=%s
+                             AND fencing_token=%s AND worker_instance_id=%s""",
+                           (state,checkpoint,json.dumps({"status":state,"reason":reason}),
+                            identity.work_order_id, identity.attempt_id, identity.lease_generation,
+                            identity.fencing_token, identity.worker_instance_id))
             if cursor.rowcount != 1:
                 raise RuntimeError("RIV-RUN-0008: Runner could not record terminal state.")
-            cursor.execute("UPDATE work_order_attempts SET finished_at=now(),exit_code=%s WHERE work_order_id=%s AND worker_id=%s AND finished_at IS NULL",(124 if timed_out else 1,order_id,self.worker_id))
-            cursor.execute("INSERT INTO steward_escalations(escalation_id,work_order_id,checkpoint_id,reason,state)VALUES(%s,%s,%s,%s,'open')",(uuid4(),order_id,checkpoint,reason))
+            cursor.execute("UPDATE work_order_attempts SET finished_at=now(),terminal_state=%s,exit_code=%s WHERE attempt_id=%s",(state,124 if timed_out else 1,identity.attempt_id))
+            cursor.execute("INSERT INTO steward_escalations(escalation_id,work_order_id,checkpoint_id,reason,state)VALUES(%s,%s,%s,%s,'open')",(uuid4(),identity.work_order_id,checkpoint,reason))

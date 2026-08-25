@@ -5,6 +5,7 @@ Version: 0.6.1
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import socket
@@ -13,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
 from typing import Any
+from uuid import uuid4
 
 import psycopg
 
@@ -37,8 +39,12 @@ class RelayWorker:
             raise ValueError("RIV-WRK-0005: poll_seconds must be positive.")
         self.repository = repository.resolve()
         self.worker_id = worker_id
+        self.worker_instance_id = uuid4()
+        self.seat_id = "C1"
+        self.supported_roles = ("writer",)
         self.poll_seconds = poll_seconds
         self.runner = RestrictedRunner(self.repository, worker_id)
+        self.runner.worker_instance_id = self.worker_instance_id
         self.statistics = WorkerStatistics()
         self.progress_interval_seconds = 120.0
         self._last_progress_at = 0.0
@@ -46,11 +52,17 @@ class RelayWorker:
     def _record(self, state: str, work_order_id: Any = None) -> None:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
-                """INSERT INTO relay_workers(worker_id,state,process_id,host_name,last_work_order_id)
-                   VALUES(%s,%s,%s,%s,%s)
+                """INSERT INTO relay_workers(worker_id,worker_instance_id,seat_id,supported_roles,
+                   state,process_id,host_name,last_work_order_id)
+                   VALUES(%s,%s,%s,%s::jsonb,%s,%s,%s,%s)
                    ON CONFLICT(worker_id) DO UPDATE SET state=EXCLUDED.state,process_id=EXCLUDED.process_id,
-                   host_name=EXCLUDED.host_name,last_seen_at=now(),last_work_order_id=COALESCE(EXCLUDED.last_work_order_id,relay_workers.last_work_order_id),updated_at=now()""",
-                (self.worker_id, state, os.getpid(), socket.gethostname(), work_order_id),
+                   worker_instance_id=EXCLUDED.worker_instance_id,seat_id=EXCLUDED.seat_id,
+                   supported_roles=EXCLUDED.supported_roles,host_name=EXCLUDED.host_name,
+                   last_seen_at=now(),stale=false,
+                   last_work_order_id=COALESCE(EXCLUDED.last_work_order_id,relay_workers.last_work_order_id),
+                   updated_at=now()""",
+                (self.worker_id, self.worker_instance_id, self.seat_id,
+                 json.dumps(list(self.supported_roles)), state, os.getpid(), socket.gethostname(), work_order_id),
             )
 
     def _record_notification(self) -> None:
