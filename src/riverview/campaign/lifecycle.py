@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, ClassVar
 from uuid import UUID, uuid4
@@ -224,6 +225,59 @@ class CampaignLifecycleStore:
             raise LifecycleGateError("RIV-CAM-0011: lifecycle work is missing exact fence identity.")
         return AttemptIdentity(work.work_order_id, work.attempt_id, work.lease_generation, work.fencing_token, work.worker_instance_id)
 
+    @staticmethod
+    def _result_binding(report: Any) -> tuple[str, str, tuple[str, ...]]:
+        """Extract the canonical, durable implementation-result identity."""
+        if not isinstance(report, dict):
+            raise LifecycleGateError("RIV-CAM-0031: completed result report is malformed.")
+        version = report.get("result_version_hash")
+        implementation = report.get("implementation_ref")
+        evidence = report.get("evidence_refs")
+        if not isinstance(version, str) or not version.strip():
+            raise LifecycleGateError("RIV-CAM-0032: result version is absent from the completed result.")
+        if not isinstance(implementation, str) or not implementation.strip():
+            raise LifecycleGateError("RIV-CAM-0033: implementation/tree reference is absent from the completed result.")
+        if implementation.startswith("commit:"):
+            digest = implementation[7:]
+            valid_ref = bool(re.fullmatch(r"[0-9a-fA-F]{40}", digest))
+        elif implementation.startswith("tree:"):
+            digest = implementation[5:]
+            valid_ref = bool(re.fullmatch(r"[0-9a-fA-F]{40,64}", digest))
+        else:
+            digest = ""
+            valid_ref = False
+        if not valid_ref or version != digest:
+            raise LifecycleGateError("RIV-CAM-0034: result version is not bound to an actual tree/commit reference.")
+        if not isinstance(evidence, (list, tuple)) or not evidence:
+            raise LifecycleGateError("RIV-CAM-0035: durable validation evidence is required.")
+        refs = tuple(evidence)
+        if any(not isinstance(ref, str) or not ref.strip() or len(ref) > 512 for ref in refs):
+            raise LifecycleGateError("RIV-CAM-0036: durable validation evidence is malformed.")
+        if any(":" not in ref for ref in refs):
+            raise LifecycleGateError("RIV-CAM-0037: validation evidence must be a durable reference.")
+        return version, implementation, refs
+
+    @classmethod
+    def _assert_result_binding(
+        cls, cursor: Any, *, source_work_order_id: UUID | None, source_attempt_id: UUID | None,
+        basis_id: UUID, result_version_hash: str, implementation_ref: str | None,
+        evidence_refs: tuple[str, ...],
+    ) -> None:
+        if source_work_order_id is None or source_attempt_id is None:
+            raise LifecycleGateError("RIV-CAM-0038: validation source result is missing.")
+        cursor.execute(
+            """SELECT w.status,w.result_report,w.validation_basis_id,a.terminal_state,a.work_order_id
+                 FROM work_orders w JOIN work_order_attempts a ON a.work_order_id=w.work_order_id
+                WHERE w.work_order_id=%s AND a.attempt_id=%s FOR UPDATE""",
+            (source_work_order_id, source_attempt_id),
+        )
+        source = cursor.fetchone()
+        if source is None or source[0] != "succeeded" or source[3] != "succeeded" or source[2] != basis_id:
+            raise LifecycleGateError("RIV-CAM-0039: source result is not an authoritative completed attempt.")
+        stored_version, stored_ref, stored_evidence = cls._result_binding(source[1])
+        if (stored_version, stored_ref, stored_evidence) != (result_version_hash, implementation_ref, tuple(evidence_refs)):
+            raise LifecycleGateError("RIV-CAM-0040: validation evidence does not correspond to the exact source result.")
+
     def handoff_writer_to_validation(self, work: ClaimedWork, *, validator_action_type: str,
                                      requested_by: str, parameters: dict[str, Any] | None = None) -> UUID:
         identity = self._identity(work)
@@ -251,6 +305,7 @@ class CampaignLifecycleStore:
             stage = cursor.fetchone()
             if stage is None or stage[0] not in {"running", "claimed"} or stage[1] != order[2]:
                 raise LifecycleGateError("RIV-CAM-0014: writer handoff is not a legal lifecycle transition.")
+            self._result_binding(order[4])
             validator_id = self._queue_work(
                 cursor, objective_id=order[0], stage_id=order[1], basis_id=order[2],
                 role="validator", action_type=validator_action_type, requested_by=requested_by,
@@ -261,7 +316,7 @@ class CampaignLifecycleStore:
             cursor.execute("UPDATE objective_stages SET runner_state='validation_pending',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))
             self._event(cursor, stage_id=order[1], correlation_id=self._stage_correlation(cursor, order[1]),
                         event_type="runner.state_transition", payload={"from": stage[0], "to": "validation_pending", "writer_attempt_id": str(identity.attempt_id), "validator_work_order_id": str(validator_id)},
-                        idempotency_key=f"runner.validation.pending:{identity.attempt_id}")
+                idempotency_key=f"runner.validation.pending:{identity.attempt_id}")
             return validator_id
 
     def record_validation(
@@ -296,6 +351,14 @@ class CampaignLifecycleStore:
                 raise LifecycleGateError("RIV-CAM-0019: validation basis hash does not match the immutable basis.")
             writer_attempt_id = stage[2]
             repair_attempt_id = stage[3] if role == "revalidator" else None
+            source_attempt_id = repair_attempt_id if role == "revalidator" else writer_attempt_id
+            if order[4] != source_attempt_id:
+                raise LifecycleGateError("RIV-CAM-0041: validation source attempt is not the authoritative result.")
+            self._assert_result_binding(
+                cursor, source_work_order_id=order[3], source_attempt_id=source_attempt_id,
+                basis_id=order[2], result_version_hash=result_version_hash,
+                implementation_ref=implementation_ref, evidence_refs=evidence_refs,
+            )
             cursor.execute("SELECT worker_instance_id FROM work_order_attempts WHERE attempt_id=%s", (writer_attempt_id,))
             writer_instance = cursor.fetchone()
             if writer_instance is None or writer_instance[0] == attempt[1]:
@@ -358,14 +421,27 @@ class CampaignLifecycleStore:
 
     def _accept_locked(self, cursor: Any, *, stage_id: UUID, validation_result_id: UUID,
                        validation_attempt_id: UUID, expected_state: str) -> None:
-        cursor.execute("SELECT objective_id,runner_state,writer_attempt_id,validation_basis_id FROM objective_stages WHERE stage_id=%s FOR UPDATE", (stage_id,))
+        cursor.execute("SELECT objective_id,runner_state,writer_attempt_id,repair_attempt_id,validation_basis_id FROM objective_stages WHERE stage_id=%s FOR UPDATE", (stage_id,))
         stage = cursor.fetchone()
         if stage is None or stage[1] != expected_state or expected_state not in {"validation_running", "revalidation_running"}:
             raise LifecycleGateError("RIV-CAM-0024: acceptance gate state is invalid.")
-        cursor.execute("SELECT verdict,basis_id,writer_attempt_id FROM campaign_validation_results WHERE validation_result_id=%s AND validation_attempt_id=%s FOR UPDATE", (validation_result_id, validation_attempt_id))
+        cursor.execute("SELECT verdict,basis_id,writer_attempt_id,repair_attempt_id,result_version_hash,implementation_ref,evidence_refs FROM campaign_validation_results WHERE validation_result_id=%s AND validation_attempt_id=%s FOR UPDATE", (validation_result_id, validation_attempt_id))
         result = cursor.fetchone()
-        if result is None or result[0] != "PASS" or result[1] != stage[3] or result[2] != stage[2]:
+        if result is None or result[0] != "PASS" or result[1] != stage[4] or result[2] != stage[2]:
             raise LifecycleGateError("RIV-CAM-0025: acceptance gate lacks exact independent PASS evidence.")
+        expected_source_attempt = stage[3] if expected_state == "revalidation_running" else stage[2]
+        expected_repair_attempt = stage[3] if expected_state == "revalidation_running" else None
+        if result[3] != expected_repair_attempt:
+            raise LifecycleGateError("RIV-CAM-0042: acceptance result is not bound to the current repair attempt.")
+        cursor.execute("SELECT work_order_id FROM work_order_attempts WHERE attempt_id=%s", (expected_source_attempt,))
+        source_order = cursor.fetchone()
+        if source_order is None:
+            raise LifecycleGateError("RIV-CAM-0043: acceptance source attempt is missing.")
+        self._assert_result_binding(
+            cursor, source_work_order_id=source_order[0], source_attempt_id=expected_source_attempt,
+            basis_id=stage[4], result_version_hash=result[4], implementation_ref=result[5],
+            evidence_refs=tuple(result[6] or ()),
+        )
         cursor.execute("SELECT 1 FROM campaign_validation_defects WHERE stage_id=%s AND severity='blocking' AND state='unresolved'", (stage_id,))
         if cursor.fetchone() is not None:
             raise LifecycleGateError("RIV-CAM-0026: unresolved blocking defect prevents acceptance.")
@@ -395,6 +471,14 @@ class CampaignLifecycleStore:
             attempt = cursor.fetchone()
             if stage is None or stage[0] != "repair_running" or stage[1] != order[2] or attempt is None or attempt[0] != "succeeded":
                 raise LifecycleGateError("RIV-CAM-0028: repair transition is stale or illegal.")
+            cursor.execute("SELECT result_report FROM work_orders WHERE work_order_id=%s", (identity.work_order_id,))
+            repair_report = cursor.fetchone()
+            repair_version, repair_ref, repair_evidence = self._result_binding(repair_report[0] if repair_report else None)
+            self._assert_result_binding(
+                cursor, source_work_order_id=identity.work_order_id, source_attempt_id=identity.attempt_id,
+                basis_id=order[2], result_version_hash=repair_version, implementation_ref=repair_ref,
+                evidence_refs=repair_evidence,
+            )
             cursor.execute("UPDATE campaign_validation_defects SET repair_attempt_id=%s WHERE stage_id=%s AND state='unresolved'", (identity.attempt_id, order[1]))
             revalidation_id = self._queue_work(cursor, objective_id=order[0], stage_id=order[1], basis_id=order[2], role="revalidator", action_type=revalidation_action_type, requested_by=requested_by, idempotency_key=f"runner.revalidation:{identity.attempt_id}", source_work_order_id=identity.work_order_id, source_attempt_id=identity.attempt_id)
             cursor.execute("UPDATE objective_stages SET runner_state='revalidation_pending',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))

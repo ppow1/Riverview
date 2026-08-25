@@ -160,6 +160,9 @@ class RestrictedRunner:
             report = {
                 "status": result.result_category,
                 "execution_id": str(execution),
+                "result_version_hash": observed_head,
+                "implementation_ref": f"commit:{observed_head}",
+                "evidence_refs": [f"execution:{execution}", f"reconciliation:execution:{execution}"],
                 "changed_paths": list(reconciled["changed_paths"]),
                 "summary": result.bounded_summary,
                 "repository_evidence": {
