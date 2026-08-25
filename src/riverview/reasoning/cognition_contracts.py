@@ -235,7 +235,7 @@ class ResidentReasoningPacket:
             _bounded_text(value, name, MAX_PACKET_TEXT)
         if not isinstance(self.max_budget, int) or not 0 < self.max_budget <= MAX_CONTEXT_CHARS:
             raise ValueError("RIV-COG-0001: max_budget is outside its bound.")
-        _packet_context_total(self.objective, self.question, self.constraints, self.authoritative_current_state_refs, self.evidence_refs, self.unresolved_ambiguity, self.relevant_prior_decisions, self.known_deterministic_results, self.home_assessment, self.requested_output_schema, self.egress_policy)
+        _packet_context_total(self.objective, self.question, self.operational_state_refs, self.constraints, self.authoritative_current_state_refs, self.evidence_refs, self.unresolved_ambiguity, self.relevant_prior_decisions, self.known_deterministic_results, self.home_assessment, self.requested_output_schema, self.egress_policy)
         _classification(self.classification)
         if not isinstance(self.packet_digest, str) or not PACKET_DIGEST_PATTERN.fullmatch(self.packet_digest):
             raise ValueError("RIV-COG-0001: packet_digest must be a SHA-256 hexadecimal digest.")

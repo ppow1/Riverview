@@ -16,6 +16,7 @@ from riverview.reasoning import (
     EscalationDecision,
     ResidentReasoningPacket,
 )
+from riverview.reasoning.cognition_contracts import MAX_CONTEXT_CHARS
 
 
 def future(minutes: int = 10) -> datetime:
@@ -181,6 +182,47 @@ def test_all_context_paths_have_field_and_aggregate_bounds() -> None:
         replace(p, objective="x" * 4_000, question="y" * 4_000, home_assessment="z" * 4_000,
                 requested_output_schema="o" * 4_000, egress_policy="e" * 4_000,
                 constraints=("c" * 4_000,) * 16)
+
+
+def _context_without_variable_fields(p: ResidentReasoningPacket) -> int:
+    return sum((
+        len(p.objective), len(p.question),
+        sum(map(len, p.authoritative_current_state_refs)),
+        sum(map(len, p.evidence_refs)), sum(map(len, p.unresolved_ambiguity)),
+        sum(map(len, p.relevant_prior_decisions)),
+        sum(map(len, p.known_deterministic_results)), len(p.home_assessment),
+        len(p.requested_output_schema), len(p.egress_policy),
+    ))
+
+
+def _bounded_constraints_for_total(p: ResidentReasoningPacket, target: int, operational_state_refs: tuple[str, ...] = ()) -> tuple[str, ...]:
+    remaining = target - _context_without_variable_fields(p) - sum(map(len, operational_state_refs))
+    assert 0 < remaining <= 32 * 4_000
+    chunks = []
+    while remaining:
+        size = min(4_000, remaining)
+        chunks.append("x" * size)
+        remaining -= size
+    return tuple(chunks)
+
+
+def test_operational_state_refs_cannot_bypass_packet_aggregate_limit() -> None:
+    p = packet()
+    refs = tuple("s" * 500 for _ in range(64))
+    constraints = _bounded_constraints_for_total(p, MAX_CONTEXT_CHARS - 1)
+    with pytest.raises(ValueError, match="aggregate bound"):
+        replace(p, operational_state_refs=refs, constraints=constraints)
+
+
+def test_packet_aggregate_boundary_is_inclusive_and_one_over_fails() -> None:
+    p = packet()
+    below = _bounded_constraints_for_total(p, MAX_CONTEXT_CHARS - 1)
+    exact = _bounded_constraints_for_total(p, MAX_CONTEXT_CHARS)
+    over = _bounded_constraints_for_total(p, MAX_CONTEXT_CHARS + 1)
+    assert replace(p, operational_state_refs=(), constraints=below)
+    assert replace(p, operational_state_refs=(), constraints=exact)
+    with pytest.raises(ValueError, match="aggregate bound"):
+        replace(p, operational_state_refs=(), constraints=over)
 
 
 def test_reference_based_packet_round_trip_preserves_complete_context() -> None:
