@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from riverview.database import DatabaseConfig, connect
 from riverview.diagnostics.models import DiagnosticEvent
