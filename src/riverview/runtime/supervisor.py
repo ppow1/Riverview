@@ -222,7 +222,7 @@ class RuntimeSupervisor:
                 return True
             state.pid = owned_pids[0] if owned_pids else None
             state.adopted = True
-            state.status = "running"
+            state.status = "running" if self._healthy(state.spec) else "starting"
             state.last_change = _now()
             return True
         if not state.spec.process_match:
@@ -243,7 +243,7 @@ class RuntimeSupervisor:
         if roots:
             state.pid = int(roots[0]["pid"])
             state.adopted = True
-            state.status = "running"
+            state.status = "running" if self._healthy(state.spec) else "starting"
             state.last_change = _now()
             return True
         return False
