@@ -555,8 +555,9 @@ class CodexCliAdapter:
             provider_output = output_path.read_text(encoding="utf-8") if output_path.exists() else stdout
             if process.returncode == 0 and worktree is not None:
                 changed = self._worktree_paths(worktree)
+                rename_pairs = self._worktree_rename_pairs(worktree)
                 allowed = tuple(Path(path).as_posix().rstrip("/") for path in envelope.allowed_paths)
-                outside = tuple(path for path in changed if not any(path == item or path.startswith(f"{item}/") for item in allowed))
+                outside = ResultReconciler._outside_scope(changed, allowed, rename_pairs)
                 if outside:
                     raise RuntimeError(f"RIV-EXE-0007: changed path escaped envelope: {outside!r}")
                 if not changed:
@@ -784,6 +785,25 @@ class CodexCliAdapter:
         return tuple(dict.fromkeys(paths))
 
     @staticmethod
+    def _worktree_rename_pairs(worktree: Path) -> tuple[tuple[str, str], ...]:
+        """Read Git's authoritative old/new correspondence for worktree renames."""
+
+        output = subprocess.check_output(
+            ["git", "status", "--porcelain=v1", "--find-renames=20%", "--untracked-files=all"],
+            cwd=worktree,
+            text=True,
+        )
+        pairs: list[tuple[str, str]] = []
+        for line in output.splitlines():
+            if len(line) < 4:
+                continue
+            value = line[3:].strip()
+            if " -> " in value and line[0] == "R":
+                old, new = value.split(" -> ", 1)
+                pairs.append((old, new))
+        return tuple(dict.fromkeys(pairs))
+
+    @staticmethod
     def _copy_allowed_changes(worktree: Path, repository: Path, changed: tuple[str, ...]) -> None:
         for relative in changed:
             relative_path = Path(relative)
@@ -824,6 +844,7 @@ class ResultReconciler:
         evidence_requirements: tuple[str, ...] = (),
         write_policy: str = READ_ONLY_POLICY, commit_sha: str | None = None,
         remote_verified_sha: str | None = None, claimed_changed_paths: tuple[str, ...] | None = None,
+        rename_pairs: tuple[tuple[str, str], ...] = (),
     ) -> dict[str, Any]:
         if result_category != "succeeded":
             raise RuntimeError("RIV-REC-0002: provider result is not successful.")
@@ -837,7 +858,7 @@ class ResultReconciler:
         elif observed_head != expected_base_sha:
             raise RuntimeError("RIV-REC-0002: authoritative repository HEAD changed during execution.")
         allowed = tuple(Path(path).as_posix().rstrip("/") for path in allowed_paths)
-        outside = tuple(path for path in changed_paths if not any(path == item or path.startswith(f"{item}/") for item in allowed))
+        outside = ResultReconciler._outside_scope(changed_paths, allowed, rename_pairs)
         if outside:
             raise RuntimeError(f"RIV-EXE-0007: authoritative changed path escaped envelope: {outside!r}")
         if claimed_changed_paths is not None and set(claimed_changed_paths) != set(changed_paths):
@@ -882,7 +903,63 @@ class ResultReconciler:
                 subprocess.run(["git", "merge-base", "--is-ancestor", remote_verified_sha, "origin/main"], cwd=repository_root, check=True, capture_output=True, text=True)
             except subprocess.CalledProcessError as exc:
                 raise RuntimeError("RIV-REC-0004: published commit is not reachable from origin/main.") from exc
-        return {"observed_head": observed_head, "changed_paths": changed_paths, "outside_scope": outside, "missing_artifacts": missing, "content_verified": not content_failures}
+        return {"observed_head": observed_head, "changed_paths": changed_paths, "rename_pairs": rename_pairs, "outside_scope": outside, "missing_artifacts": missing, "content_verified": not content_failures}
+
+    @staticmethod
+    def _outside_scope(
+        changed_paths: tuple[str, ...], allowed_paths: tuple[str, ...],
+        rename_pairs: tuple[tuple[str, str], ...] = (),
+    ) -> tuple[str, ...]:
+        """Authorize exact paths and bounded same-scope Git rename replacements."""
+
+        allowed = tuple(Path(path).as_posix().rstrip("/") for path in allowed_paths)
+        paired: set[str] = set()
+        outside: list[str] = []
+        seen_old: set[str] = set()
+        seen_new: set[str] = set()
+        changed = set(changed_paths)
+        for old, new in rename_pairs:
+            old_path = Path(old)
+            new_path = Path(new)
+            valid = (
+                old in changed
+                and new in changed
+                and old not in seen_old
+                and new not in seen_new
+                and not old_path.is_absolute()
+                and not new_path.is_absolute()
+                and ".." not in old_path.parts
+                and ".." not in new_path.parts
+                and any(old == item or old.startswith(f"{item}/") for item in allowed)
+                and old_path.parent == new_path.parent
+            )
+            if valid:
+                paired.update((old, new))
+                seen_old.add(old)
+                seen_new.add(new)
+            else:
+                outside.extend((old, new))
+        for path in changed_paths:
+            if path in paired or any(path == item or path.startswith(f"{item}/") for item in allowed):
+                continue
+            outside.append(path)
+        return tuple(dict.fromkeys(outside))
+
+    @staticmethod
+    def _git_rename_pairs(repository_root: Path, base_sha: str, commit_sha: str) -> tuple[tuple[str, str], ...]:
+        """Extract deterministic Git rename correspondence from an authoritative commit."""
+
+        output = subprocess.check_output(
+            ["git", "diff", "--name-status", "--find-renames=20%", base_sha, commit_sha],
+            cwd=repository_root,
+            text=True,
+        )
+        pairs: list[tuple[str, str]] = []
+        for line in output.splitlines():
+            fields = line.split("\t")
+            if len(fields) == 3 and fields[0].startswith("R"):
+                pairs.append((fields[1], fields[2]))
+        return tuple(dict.fromkeys(pairs))
 
     def persist(self, result: ExecutionResult) -> None:
         if result.remote_verified_sha and not result.commit_sha:
@@ -944,6 +1021,7 @@ class ResultReconciler:
         if result_row is None:
             raise RuntimeError("RIV-REC-0001: execution result is missing during authoritative verification.")
         commit_sha = result_row[1]
+        rename_pairs = self._git_rename_pairs(repository_root, expected_base_sha, commit_sha) if commit_sha and expected_base_sha else ()
         if commit_sha and expected_base_sha:
             changed = tuple(path for path in subprocess.check_output(["git", "diff", "--name-only", f"{expected_base_sha}..{commit_sha}"], cwd=repository_root, text=True).splitlines() if path)
         claimed = tuple(result_row[3] or ())
@@ -952,6 +1030,7 @@ class ResultReconciler:
             changed_paths=changed, allowed_paths=allowed_paths, repository_root=repository_root,
             acceptance_criteria=acceptance_criteria, evidence_requirements=evidence_requirements, write_policy=write_policy,
             commit_sha=commit_sha, remote_verified_sha=result_row[2], claimed_changed_paths=claimed,
+            rename_pairs=rename_pairs,
         )
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
@@ -964,7 +1043,7 @@ class ResultReconciler:
             event_type="execution.reconciled", aggregate_type="execution", aggregate_id=execution_id,
             correlation_id=UUID(str(self._execution_correlation(execution_id))), causation_id=execution_id,
             idempotency_key=f"execution.reconciled:{execution_id}", classification=Classification.RIVER,
-            payload={"execution_id": str(execution_id), "changed_paths": list(changed), "outside_scope": list(verified["outside_scope"])},
+            payload={"execution_id": str(execution_id), "changed_paths": list(changed), "rename_pairs": [list(pair) for pair in rename_pairs], "outside_scope": list(verified["outside_scope"])},
         ))
         return {"execution_id": str(execution_id), "changed_paths": changed, "outside_scope": verified["outside_scope"], "reconciled": True}
 

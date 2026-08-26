@@ -214,6 +214,53 @@ def test_authoritative_verifier_rejects_out_of_scope_change(tmp_path: Path) -> N
         )
 
 
+def test_authoritative_verifier_accepts_bounded_same_scope_rename() -> None:
+    changed = ("tests/test_home_cognition.py", "tests/test_e1_home_cognition.py")
+    pairs = (("tests/test_home_cognition.py", "tests/test_e1_home_cognition.py"),)
+    evidence = ResultReconciler._outside_scope(changed, (changed[0],), pairs)
+    assert evidence == ()
+
+
+@pytest.mark.parametrize(
+    ("changed", "allowed", "pairs"),
+    [
+        (("tests/authorized.py", "tests/unrelated.py"), ("tests/authorized.py",), (("src/other.py", "tests/unrelated.py"),)),
+        (("tests/authorized.py", "src/authorized.py"), ("tests/authorized.py",), (("tests/authorized.py", "src/authorized.py"),)),
+        (("tests/authorized.py", "tests/repaired.py", "docs/unrelated.md"), ("tests/authorized.py",), (("tests/authorized.py", "tests/repaired.py"),)),
+        (("src/unrelated.py", "tests/authorized.py"), ("tests/authorized.py",), (("src/unrelated.py", "tests/authorized.py"),)),
+        (("tests/authorized.py", "../outside.py"), ("tests/authorized.py",), (("tests/authorized.py", "../outside.py"),)),
+        (("tests/a.py", "tests/c.py", "tests/b.py"), ("tests/a.py", "tests/c.py"), (("tests/a.py", "tests/b.py"), ("tests/c.py", "tests/b.py"))),
+        (("tests/authorized.py", "src/owned.py"), ("tests/authorized.py",), (("tests/authorized.py", "src/owned.py"),)),
+    ],
+)
+def test_rename_authorization_rejects_scope_expansion(
+    changed: tuple[str, ...], allowed: tuple[str, ...], pairs: tuple[tuple[str, str], ...],
+) -> None:
+    assert ResultReconciler._outside_scope(changed, allowed, pairs)
+
+
+def test_git_rename_correspondence_survives_commit(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=repository, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@riverview.local"], cwd=repository, check=True)
+    subprocess.run(["git", "config", "user.name", "Riverview Test"], cwd=repository, check=True)
+    (repository / "tests").mkdir()
+    source = repository / "tests" / "test_home_cognition.py"
+    source.write_text("# home cognition test\noriginal\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tests/test_home_cognition.py"], cwd=repository, check=True)
+    subprocess.run(["git", "commit", "-m", "base"], cwd=repository, check=True, capture_output=True)
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
+    subprocess.run(["git", "mv", "tests/test_home_cognition.py", "tests/test_e1_home_cognition.py"], cwd=repository, check=True)
+    (repository / "tests" / "test_e1_home_cognition.py").write_text("# home cognition test\nrepaired\n", encoding="utf-8")
+    assert CodexCliAdapter._worktree_rename_pairs(repository) == (("tests/test_home_cognition.py", "tests/test_e1_home_cognition.py"),)
+    subprocess.run(["git", "commit", "-am", "bounded rename"], cwd=repository, check=True, capture_output=True)
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
+    pairs = ResultReconciler._git_rename_pairs(repository, base, commit)
+    assert pairs == (("tests/test_home_cognition.py", "tests/test_e1_home_cognition.py"),)
+    assert ResultReconciler._outside_scope(pairs[0], (pairs[0][0],), pairs) == ()
+
+
 def test_authoritative_verifier_checks_artifact_and_content(tmp_path: Path) -> None:
     artifact = tmp_path / "docs" / "result.md"
     artifact.parent.mkdir()
