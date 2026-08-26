@@ -60,6 +60,10 @@ class CharacterStore(_JsonStore):
             raise LookupError("RIV-CHAR-0001: accepted resident definition is unavailable.")
         return versions[-1].copy()
 
+    def proposals(self, resident_id: str) -> list[dict[str, Any]]:
+        """Return durable proposals for one resident without exposing other canon."""
+        return [item.copy() for item in self.data["proposals"] if item["resident_id"] == resident_id]
+
     def propose(self, resident_id: str, changes: dict[str, Any], *, author: str, source_evidence: list[str], rationale: str, classification: str = "operational") -> dict[str, Any]:
         base = self.current(resident_id)
         proposal = {"proposal_id": f"char-proposal-{uuid4()}", "resident_id": resident_id,

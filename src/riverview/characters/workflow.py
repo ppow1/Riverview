@@ -26,9 +26,22 @@ class CharacterDesignerWorkflow:
         return self.store.current(resident_id)
 
     def propose(self, resident_id: str, changes: dict[str, Any], *, author: str, sources: list[str], rationale: str) -> dict[str, Any]:
+        if not isinstance(changes, dict) or not changes:
+            raise ValueError("RIV-CHAR-0003: character changes must be a non-empty object.")
+        if any(key in {"authority", "operational_authority", "capabilities", "canonical_reference"} for key in changes):
+            raise PermissionError("RIV-CHAR-0003: character development cannot expand authority or replace identity anchors.")
+        if not author.strip() or not sources or not rationale.strip():
+            raise ValueError("RIV-CHAR-0003: author, source evidence, and rationale are required.")
         return self.store.propose(resident_id, changes, author=author, source_evidence=sources, rationale=rationale)
 
     def review(self, proposal_id: str, *, decision: str, reviewer: str, rationale: str) -> dict[str, Any]:
+        proposal = next((item for item in self.store.data["proposals"] if item["proposal_id"] == proposal_id), None)
+        if proposal is None:
+            raise LookupError("RIV-CHAR-0001: character proposal is unavailable.")
+        if reviewer.strip().casefold() == str(proposal.get("author", "")).strip().casefold():
+            raise PermissionError("RIV-CHAR-0003: character proposal requires independent review.")
+        if not reviewer.strip() or not rationale.strip():
+            raise ValueError("RIV-CHAR-0003: reviewer and review rationale are required.")
         return self.store.review(proposal_id, decision=decision, reviewer=reviewer, rationale=rationale)
 
     def publish(self, proposal_id: str) -> dict[str, Any]:

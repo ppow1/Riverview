@@ -172,7 +172,11 @@ class ResidentConversationGateway:
                     profiles.append(ResidentProfile(resident_id, name, role or "Riverview resident", f"riverview://occupant/{resident_id}", str(anchor or "durable resident state"), classification or "operational", certainty="verified"))
         except (RuntimeError, OSError, TypeError, ValueError):
             pass
-        return cls(tuple(profiles))
+        character_path = Path(__file__).resolve().parents[3] / "runtime" / "operator" / "character_store.json"
+        return cls(
+            tuple(profiles),
+            character_store=CharacterStore.from_profiles(tuple(profiles), path=character_path),
+        )
 
     def residents(self) -> tuple[dict[str, Any], ...]:
         return tuple(

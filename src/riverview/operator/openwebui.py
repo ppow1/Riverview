@@ -24,6 +24,7 @@ from pathlib import Path
 from psycopg import Error as PostgresError
 
 from riverview.autonomy.runtime import CMEStatusStore
+from riverview.characters.workflow import CharacterDesignerWorkflow, JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW
 from riverview.database import connect
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
 from riverview.operator.activity import ActivityProjection
@@ -35,6 +36,8 @@ from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.residents.direct_grace import DirectGraceFormation, extract_typed_proposal
 from riverview.residents.gateway import ResidentConversationGateway, RoomTurnPartialFailure
 
+
+JESSICA_WORKFLOW_HTML = """<!doctype html><html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Jessica Character Development</title><style>body{font:16px system-ui;max-width:900px;margin:2rem auto;padding:0 1rem;color:#17212b;background:#f5f7fa}section{background:#fff;border:1px solid #dbe2ea;border-radius:10px;padding:1rem;margin:1rem 0}textarea,input{width:100%;box-sizing:border-box;margin:.35rem 0 .7rem;padding:.55rem;font:inherit}button{margin:.25rem .35rem .25rem 0;padding:.55rem .8rem}pre{white-space:pre-wrap;overflow:auto;background:#f1f4f8;padding:.8rem;border-radius:6px}</style><a href='/'>&larr; Back to Operator</a><h1>Jessica · Grace Character Development</h1><p>Advisory only. Jessica may inspect and propose; independent review and Steward review are required before canon publication.</p><section><button id='inspect'>Inspect Grace canon</button><pre id='canon'>Not loaded.</pre></section><section><label>Observed Grace behavior</label><textarea id='behavior' rows='5' placeholder='Describe observed behavior, drift, or a missing trait.'></textarea><button id='discuss'>Discuss with Jessica</button><pre id='discussion'>No discussion yet.</pre></section><section><label>Proposed changes (JSON object)</label><textarea id='changes' rows='5'>{"traits":{"operations_judgment":"refine with evidence"}}</textarea><label>Source evidence</label><input id='sources' value='operator observation'><label>Rationale</label><textarea id='rationale' rows='3'>Refine the accepted character without changing identity or authority.</textarea><button id='propose'>Create governed proposal</button><pre id='result'>No proposal yet.</pre></section><script>const j=async(path,body)=>{const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const b=await r.json();if(!r.ok)throw Error(JSON.stringify(b));return b};const show=(id,v)=>document.getElementById(id).textContent=JSON.stringify(v,null,2);document.getElementById('inspect').onclick=async()=>{try{show('canon',await j('/api/jessica/character-development'))}catch(e){show('canon',{error:String(e)})}};document.getElementById('discuss').onclick=async()=>{try{show('discussion',await j('/api/jessica/character-development',{action:'discuss',observed_behavior:document.getElementById('behavior').value}))}catch(e){show('discussion',{error:String(e)})}};document.getElementById('propose').onclick=async()=>{try{show('result',await j('/api/jessica/character-development',{action:'propose',changes:JSON.parse(document.getElementById('changes').value),source_evidence:document.getElementById('sources').value.split(',').map(x=>x.trim()).filter(Boolean),rationale:document.getElementById('rationale').value}))}catch(e){show('result',{error:String(e)})}};fetch('/session',{method:'POST'}).finally(()=>document.getElementById('inspect').click())</script></html>"""
 
 CME_STATUS_HTML = """<!doctype html><html data-theme='system'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>CME status</title><style>:root{font:16px system-ui;color:#17212b;background:#f5f7fa;--panel:#fff;--border:#dbe2ea}body{max-width:760px;margin:3rem auto;padding:0 1rem}body,pre{background:var(--panel)}pre{white-space:pre-wrap;border:1px solid var(--border);border-radius:10px;padding:1rem}a{display:inline-block;margin-bottom:1rem}html[data-theme='dark']{color-scheme:dark;--panel:#182231;--border:#344257;color:#e8edf5;background:#111722}summary{cursor:pointer}</style><a href='/'>&larr; Back to Operator</a><h1>Continuous Momentum Engine</h1><p>Authoritative operational status.</p><section id='human'>Loading&hellip;</section><details><summary>Raw / Advanced</summary><pre id='status'></pre></details><script>document.documentElement.dataset.theme=localStorage.getItem('riverview-theme')||'system';let timer=0,requestSerial=0,appliedSerial=0;async function load(){const serial=++requestSerial;try{const r=await fetch('/api/cme/status?_rv='+Date.now(),{cache:'no-store'});const b=await r.json();if(serial<appliedSerial)return;appliedSerial=serial;document.getElementById('human').innerHTML='<strong>'+((b.heartbeat_health||'UNAVAILABLE')+' · '+(b.effective_state||'UNAVAILABLE'))+'</strong><p>Heartbeat age: '+(b.heartbeat_age_seconds??'unavailable')+'s</p><p>Last event: '+(b.last_event_type||'unavailable')+'</p><p>Waiting: '+(b.waiting_reason||'none')+'</p>';document.getElementById('status').textContent=JSON.stringify(b,null,2)}catch(error){document.getElementById('human').innerHTML='<strong>UNAVAILABLE · RECONNECTING</strong><p>Status will retry automatically.</p>';document.getElementById('status').textContent=String(error&&error.message||'status_unavailable')}finally{clearTimeout(timer);timer=setTimeout(load,3000)}}async function bootstrap(){try{await fetch('/session',{method:'POST',cache:'no-store'})}finally{load()}}bootstrap();document.addEventListener('visibilitychange',()=>{if(!document.hidden){clearTimeout(timer);load()}});</script></html>"""
 from riverview.river.events import Classification, RiverEvent
@@ -122,6 +125,7 @@ class RiverviewOpenWebUIService:
         self.provider = provider
         self.authorized_model = config.default_model
         self.resident_gateway = resident_gateway or ResidentConversationGateway.from_evidence()
+        self.jessica_workflow = CharacterDesignerWorkflow(self.resident_gateway.character_store)
         self.sessions: set[str] = set()
         # The projection owns UI history only; resident continuity/canon remains
         # exclusively in the resident/character mechanisms.
@@ -302,6 +306,8 @@ class RiverviewOpenWebUIService:
                     self._send_html(CME_STATUS_HTML)
                 elif self.path == "/":
                     self._send_html(CLEAN_UI_HTML)
+                elif self.path == "/jessica":
+                    self._send_html(JESSICA_WORKFLOW_HTML)
                 elif self.path == "/cme":
                     self._send_html("""<!doctype html><html data-theme='system'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>CME status</title><style>:root{font:16px system-ui;color:#17212b;background:#f5f7fa;--panel:#fff;--border:#dbe2ea}body{max-width:760px;margin:3rem auto;padding:0 1rem}body,pre{background:var(--panel)}pre{white-space:pre-wrap;border:1px solid var(--border);border-radius:10px;padding:1rem}a{display:inline-block;margin-bottom:1rem}html[data-theme='dark']{color-scheme:dark;--panel:#182231;--border:#344257;color:#e8edf5;background:#111722}summary{cursor:pointer}</style><a href='/'>← Back to Operator</a><h1>Continuous Momentum Engine</h1><p>Authoritative operational status.</p><section id='human'>Loading…</section><details><summary>Raw / Advanced</summary><pre id='status'></pre></details><script>document.documentElement.dataset.theme=localStorage.getItem('riverview-theme')||'system';async function load(){const r=await fetch('/api/cme/status',{cache:'no-store'});const b=await r.json();document.getElementById('human').innerHTML='<strong>'+((b.heartbeat_health||'UNAVAILABLE')+' · '+(b.effective_state||'UNAVAILABLE'))+'</strong><p>Heartbeat age: '+(b.heartbeat_age_seconds??'unavailable')+'s</p><p>Last event: '+(b.last_event_type||'unavailable')+'</p><p>Waiting: '+(b.waiting_reason||'none')+'</p>';document.getElementById('status').textContent=JSON.stringify(b,null,2)}load();setInterval(load,3000);</script></html>""")
                 elif self.path == "/spatial":
@@ -333,6 +339,15 @@ class RiverviewOpenWebUIService:
                 elif urlsplit(self.path).path == "/api/residents" and self._auth():
                     self._send(HTTPStatus.OK, {"residents": service.resident_gateway.residents()})
                 elif urlsplit(self.path).path == "/api/residents":
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                elif urlsplit(self.path).path == "/api/jessica/character-development" and self._auth():
+                    try:
+                        grace = service.jessica_workflow.inspect("grace")
+                        proposals = service.resident_gateway.character_store.proposals("grace")
+                        self._send(HTTPStatus.OK, {"workflow": JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW, "target_resident": {"resident_id": "grace", "name": "Grace", "role": "Director of Operations"}, "current_character": grace, "proposals": proposals, "authority_boundary": "Jessica may inspect, discuss, and propose; independent review and Steward review are required before publish."})
+                    except (LookupError, OSError, TypeError, ValueError):
+                        self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "jessica_workflow_unavailable", "checkpoint": "RIV-CHAR-0003"})
+                elif urlsplit(self.path).path == "/api/jessica/character-development":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif urlsplit(self.path).path == "/api/cme/status" and self._auth():
                     try:
@@ -792,6 +807,38 @@ class RiverviewOpenWebUIService:
                         diagnostic("RIV-RES-0002", "room_chat", failure_class, f"Bounded room request failed: {failure_class}; reason={reason}.")
                         emit_event("room.turn.failed", "room", room_text, UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None, {"failure_class": failure_class, "reason": reason, "classification": "operational"})
                         self._send(HTTPStatus.BAD_REQUEST, {"error": "room_chat_rejected", "checkpoint": "RIV-RES-0002", "failure_class": failure_class, "reason": reason})
+                    return
+                if self.path == "/api/jessica/character-development":
+                    if not self._auth():
+                        self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                        return
+                    try:
+                        length = int(self.headers.get("Content-Length", "0"))
+                        payload = json.loads(self.rfile.read(length)) if length else {}
+                        action = str(payload.get("action", "inspect")).strip().lower()
+                        if action == "inspect":
+                            grace = service.jessica_workflow.inspect("grace")
+                            result = {"workflow": JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW, "current_character": grace, "proposals": service.resident_gateway.character_store.proposals("grace")}
+                        elif action == "discuss":
+                            observed = str(payload.get("observed_behavior", "")).strip()
+                            if not observed:
+                                raise ValueError("RIV-CHAR-0003: observed behavior is required for discussion.")
+                            grace = service.jessica_workflow.inspect("grace")
+                            instruction = "Discuss Grace's character development with the Steward. Inspect this accepted Grace character material:\n" + json.dumps(grace, sort_keys=True) + "\n\nObserved Grace behavior from the Steward:\n" + observed + "\nIdentify evidence-supported drift, missing traits, or refinement opportunities. Do not invent biography or visual canon, do not change canon, and do not expand anyone's authority."
+                            jessica_id = service.resident_gateway.resolve("Jessica").resident_id
+                            _, response, metadata = service.resident_gateway.chat(jessica_id, instruction, provider=lambda request: service.provider(service.authorized_model, request), interface_id=service.config.service_identity, classification="operational", correlation_id=UUID(str(payload["correlation_id"])) if payload.get("correlation_id") else None)
+                            result = {"action": action, "resident": metadata, "response": response.as_typed_payload(), "canon_changed": False}
+                        elif action == "propose":
+                            result = service.jessica_workflow.propose("grace", payload.get("changes"), author=str(payload.get("author", "Jessica")), sources=[str(item) for item in payload.get("source_evidence", [])], rationale=str(payload.get("rationale", "")))
+                        elif action == "review":
+                            result = service.jessica_workflow.review(str(payload["proposal_id"]), decision=str(payload["decision"]), reviewer=str(payload["reviewer"]), rationale=str(payload["rationale"]))
+                        elif action == "publish":
+                            result = service.jessica_workflow.publish(str(payload["proposal_id"]))
+                        else:
+                            raise ValueError("RIV-CHAR-0003: unsupported Jessica workflow action.")
+                        self._send(HTTPStatus.OK, {"action": action, "result": result, "authority_boundary": "Jessica may inspect, discuss, and propose; independent review and Steward review are required before publish."})
+                    except (KeyError, TypeError, ValueError, LookupError, PermissionError, RuntimeError) as exc:
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": "jessica_workflow_rejected", "checkpoint": "RIV-CHAR-0003", "reason": str(exc)[:400]})
                     return
                 if self.path != "/api/chat" or not self._auth():
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
