@@ -78,6 +78,8 @@ from .high_reasoning import (
     HIGH_OBSERVATION_EVENT, AuthorizedHighReasoningProvider, HighGenerationObservation,
     HighReasoningCoordinator, HighReasoningExecutionError, HighReasoningInvocation,
     HighReasoningOutcome,
+    EXTERNAL_ADVISORY_VERSION, EXTERNAL_ADVISORY_CAPABILITY, EXTERNAL_ADVISORY_CHECKPOINT,
+    EXTERNAL_OBSERVATION_EVENT, ExternalAdvisoryCoordinator,
 )
 
 __all__ = [
@@ -145,4 +147,6 @@ __all__ = [
     "HIGH_OBSERVATION_EVENT", "AuthorizedHighReasoningProvider", "HighGenerationObservation",
     "HighReasoningCoordinator", "HighReasoningExecutionError", "HighReasoningInvocation",
     "HighReasoningOutcome",
+    "EXTERNAL_ADVISORY_VERSION", "EXTERNAL_ADVISORY_CAPABILITY", "EXTERNAL_ADVISORY_CHECKPOINT",
+    "EXTERNAL_OBSERVATION_EVENT", "ExternalAdvisoryCoordinator",
 ]

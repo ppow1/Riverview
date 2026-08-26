@@ -119,16 +119,24 @@ class HighReasoningCoordinator:
     def __init__(self, *, event_store: HighReasoningEventStore,
                  binding_adapter: CognitionBindingAdapter,
                  provider: AuthorizedHighReasoningProvider,
+                 tier: CognitionTier = CognitionTier.HIGH_REASONING,
+                 capability: str = HIGH_REASONING_CAPABILITY,
+                 actor_class: CognitionActorClass = CognitionActorClass.GRACE_HIGH_REASONING,
+                 version: str = HIGH_REASONING_VERSION,
+                 observation_event: str = HIGH_OBSERVATION_EVENT,
+                 required_decision: EscalationDecision = EscalationDecision.HIGH_REASONING_REQUIRED,
                  clock: Callable[[], datetime] | None = None,
                  monotonic: Callable[[], float] | None = None) -> None:
         self.event_store, self.binding_adapter, self.provider = event_store, binding_adapter, provider
+        self.tier, self.capability, self.actor_class = tier, capability, actor_class
+        self.version, self.observation_event, self.required_decision = version, observation_event, required_decision
         self.clock, self.monotonic = clock or (lambda: datetime.now(UTC)), monotonic or time.monotonic
         self.sessions, self.provenance = CognitionSessionBoundary(event_store), CognitionProvenanceWriter(event_store)
 
     def execute(self, invocation: HighReasoningInvocation) -> HighReasoningOutcome:
         p, a = invocation.packet, invocation.assessment
-        if (a.decision is not EscalationDecision.HIGH_REASONING_REQUIRED or
-                a.target_tier is not CognitionTier.HIGH_REASONING or
+        if (a.decision is not self.required_decision or
+                a.target_tier is not self.tier or
                 not a.policy_permitted or not a.capacity_eligible):
             raise HighReasoningExecutionError("policy-denied", "accepted P1 high-reasoning authorization is required.")
         if a.expires_at <= self.clock():
@@ -140,8 +148,8 @@ class HighReasoningCoordinator:
         request = CapabilityResourceRequest(
             request_id=uuid4(), correlation_id=p.correlation_id, resident_id=p.resident_id,
             occupant_id=p.occupant_id, office_id=p.office_id, implementation_id=p.implementation_id,
-            authority_ref=p.authority_ref, cognition_tier=CognitionTier.HIGH_REASONING,
-            required_capability=HIGH_REASONING_CAPABILITY, classification=p.classification,
+            authority_ref=p.authority_ref, cognition_tier=self.tier,
+            required_capability=self.capability, classification=p.classification,
             policy_ref=a.policy_ref, authorization_ref=invocation.authorization_ref,
             packet_id=p.packet_id, deadline_at=a.expires_at,
             latency_requirement="bounded-high-reasoning", constraints=tuple(dict.fromkeys((*p.constraints, "return advisory reasoning only"))))
@@ -169,7 +177,7 @@ class HighReasoningCoordinator:
         if request.authorization_ref != self.provider.authorization_ref:
             return self._failed(session, turn, request, decision, p, CognitionResultStatus.DENIED,
                                 CognitionFailureCode.DENIED, "provider authorization does not correspond.", candidate=candidate)
-        instruction = json.dumps({"schema_version": HIGH_REASONING_VERSION,
+        instruction = json.dumps({"schema_version": self.version,
             "resident_identity": {"resident_id": str(p.resident_id), "occupant_id": str(p.occupant_id),
                                    "office_id": str(p.office_id), "implementation_id": str(p.implementation_id)},
             "objective": p.objective, "question": p.question, "constraints": list(p.constraints),
@@ -183,12 +191,12 @@ class HighReasoningCoordinator:
             raise HighReasoningExecutionError("unbounded-context", "provider context references exceed their bound.")
         provider_request = ReasoningRequest(request_id=request.request_id, correlation_id=request.correlation_id,
             request_type="analysis", instruction=instruction, context_refs=refs,
-            classification=request.classification, required_output_schema=HIGH_REASONING_VERSION,
+            classification=request.classification, required_output_schema=self.version,
             evidence_requirements=("provider-request", "provider-response", "latency", "capacity", "f2-lineage"),
             expires_at=request.deadline_at, allowed_authority=_AUTHORITY,
             causation_id=p.source_cognition_event_id, objective_id=p.objective_id, response_format={"type":"object"})
         started = CognitionProvenance(event_id=uuid4(), event_type=CognitionProvenanceEventType.STARTED,
-            actor_class=CognitionActorClass.GRACE_HIGH_REASONING, resident_id=request.resident_id,
+            actor_class=self.actor_class, resident_id=request.resident_id,
             occupant_id=request.occupant_id, office_id=request.office_id, implementation_id=request.implementation_id,
             authority_ref=request.authority_ref, source_event_id=p.source_cognition_event_id, request_id=request.request_id,
             correlation_id=request.correlation_id, causation_id=fact.event_id, cognition_tier=request.cognition_tier,
@@ -219,12 +227,12 @@ class HighReasoningCoordinator:
                 raise ValueError("provider correspondence mismatch")
             result = CognitionResult(response.response_id, request.request_id, request.correlation_id, request.resident_id,
                 request.occupant_id, request.office_id, request.implementation_id, request.authority_ref,
-                p.source_cognition_event_id, CognitionTier.HIGH_REASONING, CognitionResultStatus.COMPLETED,
+            p.source_cognition_event_id, self.tier, CognitionResultStatus.COMPLETED,
                 value["recommendation"], value["rationale"], value["uncertainty"], value["confidence"],
                 tuple(value["constraints"]), tuple(value["unresolved_questions"]), value["further_escalation_warranted"],
                 candidate.provider_id, candidate.resource_class_ref or candidate.capability_name, p.packet_id, a.policy_ref,
                 tuple(dict.fromkeys((*value["provenance_refs"], *response.evidence_refs, *candidate.evidence_refs(), obs.request_evidence_ref, obs.response_evidence_ref or ""))),
-                True, CognitionActorClass.GRACE_HIGH_REASONING, request.classification, self.clock(), request.deadline_at, _AUTHORITY)
+                True, self.actor_class, request.classification, self.clock(), request.deadline_at, _AUTHORITY)
             result.validate_against(request)
         except Exception as exc:
             return self._failed(session, turn, request, decision, p, CognitionResultStatus.MALFORMED,
@@ -236,19 +244,41 @@ class HighReasoningCoordinator:
 
     @staticmethod
     def _binding_ok(decision: CapabilityBindingDecision, request: CapabilityResourceRequest) -> bool:
-        return isinstance(decision, CapabilityBindingDecision) and decision.request_id == request.request_id and decision.correlation_id == request.correlation_id and decision.cognition_tier is CognitionTier.HIGH_REASONING and decision.policy_ref == request.policy_ref
+        return isinstance(decision, CapabilityBindingDecision) and decision.request_id == request.request_id and decision.correlation_id == request.correlation_id and decision.cognition_tier is request.cognition_tier and decision.policy_ref == request.policy_ref
 
     def _failed(self, session, turn, request, binding, packet, status, code, reason, *, candidate=None, observation=None):
         refs = [f"failure:{code.value}"] + (list(candidate.evidence_refs()) if candidate else []) + ([f"observation:{observation.observation_id}"] if observation else [])
-        result = CognitionResult(uuid4(), request.request_id, request.correlation_id, request.resident_id, request.occupant_id, request.office_id, request.implementation_id, request.authority_ref, packet.source_cognition_event_id, CognitionTier.HIGH_REASONING, status, None, None, None, None, (), (), False, candidate.provider_id if candidate else None, (candidate.resource_class_ref or candidate.capability_name) if candidate else None, packet.packet_id, request.policy_ref, tuple(refs), False, CognitionActorClass.GRACE_HIGH_REASONING, request.classification, self.clock(), request.deadline_at, _AUTHORITY, code, reason)
+        result = CognitionResult(uuid4(), request.request_id, request.correlation_id, request.resident_id, request.occupant_id, request.office_id, request.implementation_id, request.authority_ref, packet.source_cognition_event_id, self.tier, status, None, None, None, None, (), (), False, candidate.provider_id if candidate else None, (candidate.resource_class_ref or candidate.capability_name) if candidate else None, packet.packet_id, request.policy_ref, tuple(refs), False, self.actor_class, request.classification, self.clock(), request.deadline_at, _AUTHORITY, code, reason)
         self.provenance.record(CognitionProvenance.for_result(result, source_event_id=packet.source_cognition_event_id, authoritative_state_refs=packet.authoritative_current_state_refs)); self._require_f2(request.request_id, self.provenance.reconstruct(request.request_id)[-1].event_id)
         return HighReasoningOutcome("failed", session, turn, request, binding, result, observation)
 
     def _record_observation(self, observation, request, causation_id):
-        self.event_store.append(RiverEvent(HIGH_OBSERVATION_EVENT, PROVENANCE_AGGREGATE_TYPE, request.request_id, f"cognition:high-observation:{observation.observation_id}", observation.as_payload(), request.correlation_id, causation_id, Classification.INTERNAL if request.classification == "internal" else Classification.RIVER, observation.finished_at))
+        self.event_store.append(RiverEvent(self.observation_event, PROVENANCE_AGGREGATE_TYPE, request.request_id, f"cognition:high-observation:{observation.observation_id}", observation.as_payload(), request.correlation_id, causation_id, Classification.INTERNAL if request.classification == "internal" else Classification.RIVER, observation.finished_at))
         if not any(row.get("payload", {}).get("observation_id") == str(observation.observation_id) for row in self.event_store.read_aggregate(PROVENANCE_AGGREGATE_TYPE, request.request_id)):
             raise HighReasoningExecutionError("missing-provenance", "high latency observation readback failed.")
 
     def _require_f2(self, request_id, event_id):
         if not any(item.event_id == event_id for item in self.provenance.reconstruct(request_id)):
             raise HighReasoningExecutionError("missing-provenance", "F2 high-reasoning readback failed.")
+
+
+EXTERNAL_ADVISORY_VERSION = "grace-external-advisory-e3-v1"
+EXTERNAL_ADVISORY_CAPABILITY = "EXTERNAL_ESCALATION"
+EXTERNAL_ADVISORY_CHECKPOINT = "RIV-COG-E3-0001"
+EXTERNAL_OBSERVATION_EVENT = "cognition.external_generation_observed"
+
+
+class ExternalAdvisoryCoordinator(HighReasoningCoordinator):
+    """E3 external-advisory mode over the shared bounded lineage machinery."""
+
+    def __init__(self, *, event_store: HighReasoningEventStore,
+                 binding_adapter: CognitionBindingAdapter,
+                 provider: AuthorizedHighReasoningProvider,
+                 clock: Callable[[], datetime] | None = None,
+                 monotonic: Callable[[], float] | None = None) -> None:
+        super().__init__(event_store=event_store, binding_adapter=binding_adapter, provider=provider,
+                         tier=CognitionTier.EXTERNAL_ESCALATION, capability=EXTERNAL_ADVISORY_CAPABILITY,
+                         actor_class=CognitionActorClass.EXTERNAL_REASONING, version=EXTERNAL_ADVISORY_VERSION,
+                         observation_event=EXTERNAL_OBSERVATION_EVENT,
+                         required_decision=EscalationDecision.EXTERNAL_ADVISORY_REQUIRED,
+                         clock=clock, monotonic=monotonic)

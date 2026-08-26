@@ -23,7 +23,7 @@ from test_e1_home_cognition import MemoryEventStore, grace_state
 AUTH = "authority://grace/high/e2"
 
 
-def packet_and_assessment(store):
+def packet_and_assessment(store, classification="internal"):
     state = grace_state()
     now = datetime.now(UTC)
     packet = ResidentReasoningPacketAssembler().assemble(
@@ -36,7 +36,7 @@ def packet_and_assessment(store):
             exact_question="Which bounded advisory path is appropriate?",
             home_assessment="Home cognition believes stronger reasoning may help.",
             requested_output_schema="grace-high-reasoning-e2-v1",
-            egress_policy="provider-neutral-authorized-local-advisory", classification="internal",
+            egress_policy="provider-neutral-authorized-local-advisory", classification=classification,
             max_budget=16000, expires_at=now + timedelta(minutes=5),
             constraints=("advisory only",), causation_id=None,
         ),
