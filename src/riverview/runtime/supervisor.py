@@ -199,12 +199,28 @@ class RuntimeSupervisor:
     def _adopt(self, state: ServiceState) -> bool:
         if state.spec.port is not None and state.spec.service_id != "spatial" and self._healthy(state.spec):
             listener_pids = self._listener_pids(state.spec.port)
-            if len(listener_pids) > 1:
+            process_by_pid = {
+                int(process["pid"]): process
+                for process in self._processes()
+                if process.get("pid") is not None
+            }
+            foreign_pids = [
+                pid
+                for pid in listener_pids
+                if pid in process_by_pid and not self._process_belongs_to_repository(process_by_pid[pid])
+            ]
+            owned_pids = [pid for pid in listener_pids if pid not in foreign_pids]
+            if foreign_pids:
+                state.status = "failed"
+                state.last_failure = "foreign-root-listener"
+                state.last_change = _now()
+                return True
+            if len(owned_pids) > 1:
                 state.status = "failed"
                 state.last_failure = "duplicate-listener"
                 state.last_change = _now()
                 return True
-            state.pid = listener_pids[0] if listener_pids else None
+            state.pid = owned_pids[0] if owned_pids else None
             state.adopted = True
             state.status = "running"
             state.last_change = _now()
