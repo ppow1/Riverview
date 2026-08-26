@@ -1,4 +1,4 @@
-<!-- Version: 0.6.0 -->
+<!-- Version: 0.6.1 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -38,6 +38,59 @@ Rules:
 - For Steward-requested engineering work through Grace, read `docs/operations/GRACE_ENGINEERING_TASK_SUBMISSION_TEMPLATE.md` before forming or submitting the task. It is the canonical single-task and parallel-task Comms5/Grace submission, one-approval, lineage-following, and same-lineage recovery template.
 - Preserve valuable but uncommitted ideas in `docs/operations/boards/parking_lot.md`; substantial parked ideas use `docs/operations/parking_lot/PL-####-slug.md`. Parking does not authorize implementation.
 - Use `docs/operations/boards/ready_bench.md` only for Steward-committed work that has been sufficiently elaborated into durable specification, roadmap/execution sequence, bounded work packages, dependencies, acceptance criteria, and scope boundaries. Read `docs/operations/PARKING_LOT_AND_READY_BENCH.md` before promoting work between these states.
+
+## HERMES WINDOWS LAUNCH / RECOVERY
+
+Hermes is installed at:
+
+`A:\AI\Tools\Hermes\hermes-agent`
+
+On Windows PowerShell, launch Hermes through the installed Windows command on `PATH`:
+
+`hermes`
+
+Verified Windows command resolution on 2026-08-26:
+
+`A:\AI\Tools\Hermes\data\bin\hermes.exe`
+
+Verified installation at that time:
+
+- Hermes Agent `v0.20.5 (2026.8.19)` / upstream `f751a8c5`
+- install method: `git`
+- install directory: `A:\AI\Tools\Hermes\hermes-agent`
+- Python: `3.11.16`
+
+For a fresh interactive Hermes session in PowerShell:
+
+```powershell
+Clear-Host
+Set-Location 'A:\AI\Tools\Hermes\hermes-agent'
+hermes
+```
+
+Important Windows distinction:
+
+- **Do not use `\.\hermes` as the normal PowerShell launcher.** `A:\AI\Tools\Hermes\hermes-agent\hermes` is a 273-byte extensionless Python source wrapper (`#!/usr/bin/env python3`) which imports `hermes_cli.main`; it is not the installed Windows command.
+- `Get-Command hermes` should resolve to `A:\AI\Tools\Hermes\data\bin\hermes.exe`.
+- `hermes` with no subcommand is the documented fresh interactive-chat launch.
+- `hermes chat` is a CLI subcommand and is not the proven normal Windows launch used for a fresh full interactive session.
+- `hermes --resume <session_id>` resumes a specific saved session.
+- `hermes -c` resumes the most recent session; `hermes -c "name"` resumes by session name.
+- `hermes --tui` explicitly launches the modern TUI; `hermes --cli` explicitly forces the classic REPL.
+- `hermes sessions list` lists saved sessions.
+- `hermes profile` manages profiles described by the installed CLI as "multiple isolated Hermes instances"; inspect `hermes profile --help` before relying on profiles for concurrent credential/resource isolation.
+
+Useful launch diagnostics:
+
+```powershell
+Clear-Host
+Set-Location 'A:\AI\Tools\Hermes\hermes-agent'
+Get-Command hermes | Format-List CommandType,Name,Source,Path
+hermes --version
+hermes --help
+```
+
+Do not assume Campaign Runner execution-budget settings are top-level Hermes CLI flags. The Riverview/Hermes Tranche 2 checkpoint records substantial Campaign Runner execution policy of expected duration 1,200 seconds, hard timeout 1,800 seconds, and per-run Hermes guidance of `--max-turns 300`, but the verified Hermes v0.20.5 top-level help did **not** advertise `--max-turns` or `--run-budget` as top-level CLI options. Re-check the installed command's help or the Campaign Runner adapter before using those values in a PowerShell Hermes launch command.
 
 ## STREAM DECK WORK
 
