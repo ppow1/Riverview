@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from collections import Counter
 import threading
+import pytest
 from uuid import uuid4
 
 from riverview.campaign import (AcceptanceResult, Candidate, DefectInput, PackageDefect,
                                 PackageEngineerLoop, PackagePass, RepairResult)
 from riverview.campaign import CampaignLifecycleStore
+from riverview.campaign import LifecycleGateError
+from riverview.database import connect
 from test_campaign_validation_lifecycle import _package
 
 
@@ -41,6 +44,14 @@ class FakeLifecycle:
         run = next(value for value in self.runs.values() if value["package_run_id"] == package_run_id)
         run.update({key: value for key, value in values.items() if value is not None})
 
+    def record_package_candidate(self, *, package_run_id, candidate_ref, candidate_version_hash, verification):
+        run = next(value for value in self.runs.values() if value["package_run_id"] == package_run_id)
+        run.update({"state": "candidate_ready", "candidate_ref": candidate_ref,
+                    "candidate_version_hash": candidate_version_hash,
+                    "internal_verification": verification,
+                    "acceptance_candidate_ref": None,
+                    "acceptance_candidate_version_hash": None})
+
     def record_package_ledger_entry(self, *, package_run_id, **values):
         run = next(value for value in self.runs.values() if value["package_run_id"] == package_run_id)
         run["discovery_sequence"] += 1
@@ -62,6 +73,8 @@ class FakeLifecycle:
         run["state"] = "awaiting_independent_acceptance"
         run["candidate_ref"] = candidate_ref
         run["candidate_version_hash"] = candidate_version_hash
+        run["acceptance_candidate_ref"] = candidate_ref
+        run["acceptance_candidate_version_hash"] = candidate_version_hash
         run["internal_verification"] = verification
         self.dispatches.append(candidate_ref)
         return run["acceptance_dispatch_count"]
@@ -257,5 +270,62 @@ def test_postgres_double_start_acceptance_dispatch_has_one_winner():
         thread.start()
     for thread in threads:
         thread.join(timeout=10)
-    assert sum(isinstance(result, int) for result in results) == 1
+    assert results == [1, 1]
     assert lifecycle.package_run(stage_id=stage_id)["acceptance_dispatch_count"] == 1
+
+
+@pytest.mark.parametrize("candidate_ref,candidate_version,dispatch_count,accepted_ref", [
+    (None, "a" * 40, 1, None),
+    ("commit:" + "a" * 40, None, 1, None),
+    ("commit:" + "a" * 40, "a" * 40, 0, None),
+    ("commit:" + "a" * 40, "a" * 40, 1, "commit:" + "b" * 40),
+])
+def test_postgres_malformed_accepted_projection_fails_closed(candidate_ref, candidate_version, dispatch_count, accepted_ref):
+    lifecycle, _relay, objective_id, stage_id, _basis_id, _key = _package()
+    package_run_id = lifecycle.begin_package_run(
+        objective_id=objective_id, stage_id=stage_id, worktree_ref="A:/Riverview/package-worktree",
+    )
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """UPDATE campaign_package_runs
+                  SET state='accepted',candidate_ref=%s,candidate_version_hash=%s,
+                      acceptance_dispatch_count=%s,acceptance_candidate_ref=%s,
+                      acceptance_candidate_version_hash=%s
+                WHERE package_run_id=%s""",
+            (candidate_ref, candidate_version, dispatch_count, accepted_ref,
+             "a" * 40 if accepted_ref else None, package_run_id),
+        )
+    executor = FakeExecutor([])
+    with pytest.raises(LifecycleGateError):
+        PackageEngineerLoop(
+            lifecycle, objective_id=objective_id, stage_id=stage_id,
+            worktree_ref="A:/Riverview/package-worktree", executor=executor,
+            independent_acceptance=lambda candidate, *, worktree_ref: AcceptanceResult(True),
+        ).run()
+    assert executor.candidates == 0
+
+
+def test_postgres_awaiting_acceptance_restart_waits_without_adapter_or_redispatch():
+    lifecycle, _relay, objective_id, stage_id, _basis_id, _key = _package()
+    package_run_id = lifecycle.begin_package_run(
+        objective_id=objective_id, stage_id=stage_id, worktree_ref="A:/Riverview/package-worktree",
+    )
+    candidate_ref, version_hash = "commit:" + "c" * 40, "c" * 40
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """UPDATE campaign_package_runs
+                  SET state='awaiting_independent_acceptance',candidate_ref=%s,
+                      candidate_version_hash=%s,acceptance_dispatch_count=1,
+                      acceptance_candidate_ref=%s,acceptance_candidate_version_hash=%s
+                WHERE package_run_id=%s""",
+            (candidate_ref, version_hash, candidate_ref, version_hash, package_run_id),
+        )
+    executor = FakeExecutor([])
+    resumed = PackageEngineerLoop(
+        CampaignLifecycleStore(), objective_id=objective_id, stage_id=stage_id,
+        worktree_ref="A:/Riverview/package-worktree", executor=executor,
+        independent_acceptance=lambda candidate, *, worktree_ref: (_ for _ in ()).throw(AssertionError("redispatched")),
+    ).run()
+    assert resumed.state == "awaiting_independent_acceptance"
+    assert resumed.acceptance_dispatches == 1
+    assert executor.candidates == 0

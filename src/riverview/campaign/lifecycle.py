@@ -713,7 +713,8 @@ class CampaignLifecycleStore:
                 """SELECT package_run_id,objective_id,stage_id,state,repair_generation,
                               discovery_sequence,worktree_ref,candidate_ref,
                               candidate_version_hash,internal_verification,
-                              acceptance_dispatch_count,last_error
+                              acceptance_dispatch_count,acceptance_candidate_ref,
+                              acceptance_candidate_version_hash,last_error
                          FROM campaign_package_runs WHERE stage_id=%s""",
                 (stage_id,),
             )
@@ -724,6 +725,7 @@ class CampaignLifecycleStore:
                          "repair_generation", "discovery_sequence", "worktree_ref",
                          "candidate_ref", "candidate_version_hash",
                          "internal_verification", "acceptance_dispatch_count",
+                         "acceptance_candidate_ref", "acceptance_candidate_version_hash",
                          "last_error"), row))
 
     def update_package_run(self, *, package_run_id: UUID, state: str | None = None,
@@ -733,7 +735,7 @@ class CampaignLifecycleStore:
                            candidate_version_hash: str | None = None,
                            internal_verification: dict[str, Any] | None = None,
                            last_error: str | None = None) -> None:
-        allowed = {"executing", "repairing", "verifying", "awaiting_independent_acceptance",
+        allowed = {"executing", "repairing", "verifying", "candidate_ready", "awaiting_independent_acceptance",
                    "acceptance_failed", "accepted", "escalated"}
         if state is not None and state not in allowed:
             raise LifecycleGateError("RIV-CAM-0060: package run state is invalid.")
@@ -860,11 +862,24 @@ class CampaignLifecycleStore:
                 """UPDATE campaign_package_runs
                       SET state='awaiting_independent_acceptance',candidate_ref=%s,
                           candidate_version_hash=%s,internal_verification=%s::jsonb,
+                          acceptance_candidate_ref=%s,acceptance_candidate_version_hash=%s,
                           acceptance_dispatch_count=acceptance_dispatch_count+1,updated_at=now()
-                    WHERE package_run_id=%s AND state IN ('verifying','acceptance_failed')""",
-                (candidate_ref, candidate_version_hash, json.dumps(verification), package_run_id),
+                    WHERE package_run_id=%s AND state IN ('verifying','candidate_ready','acceptance_failed')
+                      AND (acceptance_candidate_ref IS NULL OR
+                           (acceptance_candidate_ref=%s AND acceptance_candidate_version_hash=%s))""",
+                (candidate_ref, candidate_version_hash, json.dumps(verification), candidate_ref,
+                 candidate_version_hash, package_run_id, candidate_ref, candidate_version_hash),
             )
             if cursor.rowcount != 1:
+                cursor.execute(
+                    """SELECT state,acceptance_dispatch_count,acceptance_candidate_ref,
+                                      acceptance_candidate_version_hash
+                                 FROM campaign_package_runs WHERE package_run_id=%s FOR UPDATE""",
+                    (package_run_id,),
+                )
+                current = cursor.fetchone()
+                if current and current[0] == "awaiting_independent_acceptance" and current[2:] == (candidate_ref, candidate_version_hash):
+                    return current[1]
                 raise LifecycleGateError("RIV-CAM-0069: package is not ready for independent acceptance.")
             cursor.execute("SELECT stage_id FROM campaign_package_runs WHERE package_run_id=%s", (package_run_id,))
             stage_id = cursor.fetchone()[0]
@@ -875,6 +890,22 @@ class CampaignLifecycleStore:
                         idempotency_key=f"runner.package.acceptance:{package_run_id}:{candidate_version_hash}")
             cursor.execute("SELECT acceptance_dispatch_count FROM campaign_package_runs WHERE package_run_id=%s", (package_run_id,))
             return cursor.fetchone()[0]
+
+    def record_package_candidate(self, *, package_run_id: UUID, candidate_ref: str,
+                                 candidate_version_hash: str, verification: dict[str, Any]) -> None:
+        if not candidate_ref.strip() or not candidate_version_hash.strip():
+            raise LifecycleGateError("RIV-CAM-0073: package candidate evidence is incomplete.")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """UPDATE campaign_package_runs
+                      SET state='candidate_ready',candidate_ref=%s,candidate_version_hash=%s,
+                          acceptance_candidate_ref=NULL,acceptance_candidate_version_hash=NULL,
+                          internal_verification=%s::jsonb,updated_at=now()
+                    WHERE package_run_id=%s AND state IN ('verifying','acceptance_failed')""",
+                (candidate_ref, candidate_version_hash, json.dumps(verification), package_run_id),
+            )
+            if cursor.rowcount != 1:
+                raise LifecycleGateError("RIV-CAM-0074: package candidate state is stale or already dispatched.")
 
     def record_package_acceptance(self, *, package_run_id: UUID, accepted: bool,
                                   reason: str | None = None) -> None:

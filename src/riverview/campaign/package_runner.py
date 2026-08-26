@@ -121,15 +121,48 @@ class PackageEngineerLoop:
         # touching the package adapter: a new process must not replay
         # engineering, regenerate a candidate, or dispatch another validator.
         if projection.get("state") == "accepted":
-            candidate_ref = projection.get("candidate_ref")
-            version_hash = projection.get("candidate_version_hash")
-            if not isinstance(candidate_ref, str) or not candidate_ref.strip() or not isinstance(version_hash, str) or not version_hash.strip():
-                raise LifecycleGateError(f"{PACKAGE_CHECKPOINT}-0011: accepted package lacks durable candidate evidence.")
-            candidate = Candidate(candidate_ref, version_hash, dict(projection.get("internal_verification") or {}))
+            candidate = self._candidate_from_projection(projection, require_dispatch=True)
             return self._outcome(
                 package_run_id, "accepted", int(projection.get("acceptance_dispatch_count") or 0),
                 candidate=candidate,
             )
+        if projection.get("state") == "awaiting_independent_acceptance":
+            # The dispatch is durable, but its validator result may arrive in a
+            # different process.  Waiting is a resume state, not an invitation
+            # to replay engineering or dispatch a second validator.
+            candidate = self._candidate_from_projection(projection, require_dispatch=True)
+            return self._outcome(
+                package_run_id, "awaiting_independent_acceptance",
+                int(projection.get("acceptance_dispatch_count") or 0), candidate=candidate,
+            )
+        if projection.get("state") == "candidate_ready":
+            # A crash after durable candidate creation but before dispatch can
+            # resume at the one remaining atomic boundary.
+            candidate = self._candidate_from_projection(projection, require_dispatch=False)
+            acceptance_dispatches = self.lifecycle.dispatch_package_acceptance(
+                package_run_id=package_run_id, candidate_ref=candidate.candidate_ref,
+                candidate_version_hash=candidate.version_hash,
+                verification=dict(projection.get("internal_verification") or {}),
+            )
+            result = self.independent_acceptance(candidate, worktree_ref=self.worktree_ref)
+            if result.accepted:
+                self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=True)
+                return self._outcome(package_run_id, "accepted", acceptance_dispatches, candidate=candidate)
+            self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=False, reason=result.reason)
+            # Continue below only after the validator has supplied structured
+            # defects; the package engineer owns the next repair pass.
+            if not result.defects:
+                reason = f"{PACKAGE_CHECKPOINT}-0006: independent validator failed without structured defects."
+                self.lifecycle.update_package_run(package_run_id=package_run_id, state="escalated", last_error=reason)
+                return self._outcome(package_run_id, "escalated", acceptance_dispatches, reason)
+            generation = int(projection.get("repair_generation") or 0) + 1
+            root_attempts = self._root_attempts(package_run_id)
+            escalation = self._repair_all(package_run_id, result.defects, generation, root_attempts)
+            if escalation is not None:
+                self.lifecycle.update_package_run(package_run_id=package_run_id, state="escalated", last_error=escalation)
+                return self._outcome(package_run_id, "escalated", acceptance_dispatches, escalation)
+            self.lifecycle.update_package_run(package_run_id=package_run_id, state="verifying", repair_generation=generation)
+            projection = self.lifecycle.package_run(stage_id=self.stage_id) or {}
         generation = int(projection.get("repair_generation") or 0)
         acceptance_dispatches = int(projection.get("acceptance_dispatch_count") or 0)
         root_attempts = self._root_attempts(package_run_id)
@@ -170,6 +203,11 @@ class PackageEngineerLoop:
                 continue
 
             candidate = self.executor.create_candidate(worktree_ref=self.worktree_ref, repair_generation=generation)
+            self.lifecycle.record_package_candidate(
+                package_run_id=package_run_id, candidate_ref=candidate.candidate_ref,
+                candidate_version_hash=candidate.version_hash,
+                verification={"package_pass": package_pass.verification, "full_pass": full.verification},
+            )
             acceptance_dispatches = self.lifecycle.dispatch_package_acceptance(
                 package_run_id=package_run_id, candidate_ref=candidate.candidate_ref,
                 candidate_version_hash=candidate.version_hash,
@@ -250,6 +288,22 @@ class PackageEngineerLoop:
         return PackageRunOutcome(state, package_run_id, candidate,
                                  len(self.lifecycle.package_ledger(package_run_id=package_run_id)),
                                  dispatches, reason)
+
+    @staticmethod
+    def _candidate_from_projection(projection: dict[str, Any], *, require_dispatch: bool) -> Candidate:
+        candidate_ref = projection.get("candidate_ref")
+        version_hash = projection.get("candidate_version_hash")
+        dispatch_count = projection.get("acceptance_dispatch_count")
+        dispatched_ref = projection.get("acceptance_candidate_ref")
+        dispatched_version = projection.get("acceptance_candidate_version_hash")
+        if (not isinstance(candidate_ref, str) or not candidate_ref.strip() or
+                not isinstance(version_hash, str) or not version_hash.strip()):
+            raise LifecycleGateError(f"{PACKAGE_CHECKPOINT}-0011: package candidate evidence is malformed.")
+        if isinstance(dispatch_count, bool) or not isinstance(dispatch_count, int) or dispatch_count < 0:
+            raise LifecycleGateError(f"{PACKAGE_CHECKPOINT}-0012: package acceptance dispatch count is malformed.")
+        if require_dispatch and (dispatch_count < 1 or dispatched_ref != candidate_ref or dispatched_version != version_hash):
+            raise LifecycleGateError(f"{PACKAGE_CHECKPOINT}-0013: package acceptance evidence is incomplete or mismatched.")
+        return Candidate(candidate_ref, version_hash, dict(projection.get("internal_verification") or {}))
 
 
 def _load_callable(spec: str) -> Any:
