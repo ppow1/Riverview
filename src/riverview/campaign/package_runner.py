@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from .lifecycle import CampaignLifecycleStore, DefectInput, LifecycleGateError
 
@@ -111,6 +111,7 @@ class PackageEngineerLoop:
         self.independent_acceptance = independent_acceptance
         self.max_repairs_per_root = max_repairs_per_root
         self.max_package_passes = max_package_passes
+        self.acceptance_owner_id = uuid4()
 
     def run(self) -> PackageRunOutcome:
         package_run_id = self.lifecycle.begin_package_run(
@@ -139,16 +140,17 @@ class PackageEngineerLoop:
             # A crash after durable candidate creation but before dispatch can
             # resume at the one remaining atomic boundary.
             candidate = self._candidate_from_projection(projection, require_dispatch=False)
-            acceptance_dispatches = self.lifecycle.dispatch_package_acceptance(
+            owns_acceptance, acceptance_dispatches = self.lifecycle.claim_package_acceptance(
                 package_run_id=package_run_id, candidate_ref=candidate.candidate_ref,
-                candidate_version_hash=candidate.version_hash,
-                verification=dict(projection.get("internal_verification") or {}),
+                candidate_version_hash=candidate.version_hash, owner_id=self.acceptance_owner_id,
             )
+            if not owns_acceptance:
+                return self._outcome(package_run_id, "awaiting_independent_acceptance", acceptance_dispatches, candidate=candidate)
             result = self.independent_acceptance(candidate, worktree_ref=self.worktree_ref)
             if result.accepted:
-                self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=True)
+                self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=True, owner_id=self.acceptance_owner_id)
                 return self._outcome(package_run_id, "accepted", acceptance_dispatches, candidate=candidate)
-            self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=False, reason=result.reason)
+            self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=False, reason=result.reason, owner_id=self.acceptance_owner_id)
             # Continue below only after the validator has supplied structured
             # defects; the package engineer owns the next repair pass.
             if not result.defects:
@@ -208,19 +210,20 @@ class PackageEngineerLoop:
                 candidate_version_hash=candidate.version_hash,
                 verification={"package_pass": package_pass.verification, "full_pass": full.verification},
             )
-            acceptance_dispatches = self.lifecycle.dispatch_package_acceptance(
+            owns_acceptance, acceptance_dispatches = self.lifecycle.claim_package_acceptance(
                 package_run_id=package_run_id, candidate_ref=candidate.candidate_ref,
-                candidate_version_hash=candidate.version_hash,
-                verification={"package_pass": package_pass.verification, "full_pass": full.verification},
+                candidate_version_hash=candidate.version_hash, owner_id=self.acceptance_owner_id,
             )
+            if not owns_acceptance:
+                return self._outcome(package_run_id, "awaiting_independent_acceptance", acceptance_dispatches, candidate=candidate)
             result = self.independent_acceptance(candidate, worktree_ref=self.worktree_ref)
             if not isinstance(result, AcceptanceResult):
                 raise LifecycleGateError(f"{PACKAGE_CHECKPOINT}-0005: independent acceptance returned an invalid result.")
             if result.accepted:
-                self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=True)
+                self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=True, owner_id=self.acceptance_owner_id)
                 return self._outcome(package_run_id, "accepted", acceptance_dispatches, candidate=candidate)
 
-            self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=False, reason=result.reason)
+            self.lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=False, reason=result.reason, owner_id=self.acceptance_owner_id)
             if not result.defects:
                 reason = f"{PACKAGE_CHECKPOINT}-0006: independent validator failed without structured defects."
                 self.lifecycle.update_package_run(package_run_id=package_run_id, state="escalated", last_error=reason)

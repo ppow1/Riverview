@@ -714,7 +714,9 @@ class CampaignLifecycleStore:
                               discovery_sequence,worktree_ref,candidate_ref,
                               candidate_version_hash,internal_verification,
                               acceptance_dispatch_count,acceptance_candidate_ref,
-                              acceptance_candidate_version_hash,last_error
+                              acceptance_candidate_version_hash,acceptance_owner_id,
+                              acceptance_lease_generation,acceptance_lease_expires_at,
+                              acceptance_invocation_started_at,last_error
                          FROM campaign_package_runs WHERE stage_id=%s""",
                 (stage_id,),
             )
@@ -726,6 +728,8 @@ class CampaignLifecycleStore:
                          "candidate_ref", "candidate_version_hash",
                          "internal_verification", "acceptance_dispatch_count",
                          "acceptance_candidate_ref", "acceptance_candidate_version_hash",
+                         "acceptance_owner_id", "acceptance_lease_generation",
+                         "acceptance_lease_expires_at", "acceptance_invocation_started_at",
                          "last_error"), row))
 
     def update_package_run(self, *, package_run_id: UUID, state: str | None = None,
@@ -891,6 +895,61 @@ class CampaignLifecycleStore:
             cursor.execute("SELECT acceptance_dispatch_count FROM campaign_package_runs WHERE package_run_id=%s", (package_run_id,))
             return cursor.fetchone()[0]
 
+    def claim_package_acceptance(self, *, package_run_id: UUID, candidate_ref: str,
+                                 candidate_version_hash: str, owner_id: UUID,
+                                 lease_seconds: int = 60) -> tuple[bool, int]:
+        """Atomically acquire the sole permission to invoke acceptance."""
+        if not isinstance(owner_id, UUID) or isinstance(lease_seconds, bool) or lease_seconds < 1:
+            raise LifecycleGateError("RIV-CAM-0075: acceptance owner identity or lease is invalid.")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT state,candidate_ref,candidate_version_hash,acceptance_dispatch_count,
+                              acceptance_candidate_ref,acceptance_candidate_version_hash,
+                              acceptance_owner_id,acceptance_lease_expires_at
+                         FROM campaign_package_runs WHERE package_run_id=%s FOR UPDATE""",
+                (package_run_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise LifecycleGateError("RIV-CAM-0076: package run is missing.")
+            state, current_ref, current_version, count, dispatched_ref, dispatched_version, current_owner, expires = row
+            if (current_ref, current_version) != (candidate_ref, candidate_version_hash):
+                raise LifecycleGateError("RIV-CAM-0077: acceptance candidate correspondence is stale.")
+            if state == "candidate_ready":
+                cursor.execute(
+                    """UPDATE campaign_package_runs
+                          SET state='awaiting_independent_acceptance',
+                              acceptance_candidate_ref=%s,acceptance_candidate_version_hash=%s,
+                              acceptance_owner_id=%s,acceptance_lease_generation=acceptance_lease_generation+1,
+                              acceptance_lease_expires_at=now()+(%s * interval '1 second'),
+                              acceptance_invocation_started_at=now(),
+                              acceptance_dispatch_count=acceptance_dispatch_count+1,updated_at=now()
+                        WHERE package_run_id=%s AND state='candidate_ready'""",
+                    (candidate_ref, candidate_version_hash, owner_id, lease_seconds, package_run_id),
+                )
+                if cursor.rowcount != 1:
+                    raise LifecycleGateError("RIV-CAM-0078: acceptance ownership claim was lost.")
+                return True, count + 1
+            if state == "awaiting_independent_acceptance":
+                if (dispatched_ref, dispatched_version) != (candidate_ref, candidate_version_hash):
+                    raise LifecycleGateError("RIV-CAM-0079: pending acceptance belongs to another candidate.")
+                cursor.execute(
+                    """UPDATE campaign_package_runs
+                          SET acceptance_owner_id=%s,acceptance_lease_generation=acceptance_lease_generation+1,
+                              acceptance_lease_expires_at=now()+(%s * interval '1 second'),
+                              acceptance_invocation_started_at=now(),updated_at=now()
+                        WHERE package_run_id=%s AND state='awaiting_independent_acceptance'
+                          AND acceptance_candidate_ref=%s AND acceptance_candidate_version_hash=%s
+                          AND acceptance_lease_expires_at IS NOT NULL AND acceptance_lease_expires_at <= now()""",
+                    (owner_id, lease_seconds, package_run_id, candidate_ref, candidate_version_hash),
+                )
+                if cursor.rowcount == 1:
+                    return True, count
+                return False, count
+            if state == "accepted":
+                return False, count
+            raise LifecycleGateError("RIV-CAM-0080: package is not at an acceptance ownership boundary.")
+
     def record_package_candidate(self, *, package_run_id: UUID, candidate_ref: str,
                                  candidate_version_hash: str, verification: dict[str, Any]) -> None:
         if not candidate_ref.strip() or not candidate_version_hash.strip():
@@ -908,9 +967,17 @@ class CampaignLifecycleStore:
                 raise LifecycleGateError("RIV-CAM-0074: package candidate state is stale or already dispatched.")
 
     def record_package_acceptance(self, *, package_run_id: UUID, accepted: bool,
-                                  reason: str | None = None) -> None:
+                                  reason: str | None = None, owner_id: UUID | None = None) -> None:
         state = "accepted" if accepted else "acceptance_failed"
         with connect() as connection, connection.cursor() as cursor:
-            cursor.execute("UPDATE campaign_package_runs SET state=%s,last_error=%s,updated_at=now() WHERE package_run_id=%s AND state='awaiting_independent_acceptance'", (state, reason, package_run_id))
+            if owner_id is not None and not isinstance(owner_id, UUID):
+                raise LifecycleGateError("RIV-CAM-0081: acceptance owner identity is invalid.")
+            cursor.execute(
+                """UPDATE campaign_package_runs
+                      SET state=%s,last_error=%s,updated_at=now()
+                    WHERE package_run_id=%s AND state='awaiting_independent_acceptance'
+                      AND (%s IS NULL OR acceptance_owner_id=%s)""",
+                (state, reason, package_run_id, owner_id, owner_id),
+            )
             if cursor.rowcount != 1:
                 raise LifecycleGateError("RIV-CAM-0070: package acceptance state is stale.")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 import threading
+import time
 import pytest
 from uuid import uuid4
 
@@ -79,7 +80,13 @@ class FakeLifecycle:
         self.dispatches.append(candidate_ref)
         return run["acceptance_dispatch_count"]
 
-    def record_package_acceptance(self, *, package_run_id, accepted, reason=None):
+    def claim_package_acceptance(self, *, package_run_id, candidate_ref, candidate_version_hash, owner_id, lease_seconds=60):
+        return True, self.dispatch_package_acceptance(
+            package_run_id=package_run_id, candidate_ref=candidate_ref,
+            candidate_version_hash=candidate_version_hash, verification={},
+        )
+
+    def record_package_acceptance(self, *, package_run_id, accepted, reason=None, owner_id=None):
         run = next(value for value in self.runs.values() if value["package_run_id"] == package_run_id)
         run["state"] = "accepted" if accepted else "acceptance_failed"
         run["last_error"] = reason
@@ -329,3 +336,69 @@ def test_postgres_awaiting_acceptance_restart_waits_without_adapter_or_redispatc
     assert resumed.state == "awaiting_independent_acceptance"
     assert resumed.acceptance_dispatches == 1
     assert executor.candidates == 0
+
+
+def test_postgres_five_candidate_ready_runners_invoke_one_validator():
+    lifecycle, _relay, objective_id, stage_id, _basis_id, _key = _package()
+    package_run_id = lifecycle.begin_package_run(
+        objective_id=objective_id, stage_id=stage_id, worktree_ref="A:/Riverview/package-worktree",
+    )
+    candidate_ref, version_hash = "commit:" + "d" * 40, "d" * 40
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """UPDATE campaign_package_runs
+                  SET state='candidate_ready',candidate_ref=%s,candidate_version_hash=%s,
+                      acceptance_dispatch_count=0
+                WHERE package_run_id=%s""",
+            (candidate_ref, version_hash, package_run_id),
+        )
+    calls = []
+    barrier = threading.Barrier(5)
+
+    def run_one() -> None:
+        local = CampaignLifecycleStore()
+        executor = FakeExecutor([])
+        loop = PackageEngineerLoop(
+            local, objective_id=objective_id, stage_id=stage_id,
+            worktree_ref="A:/Riverview/package-worktree", executor=executor,
+            independent_acceptance=lambda candidate, *, worktree_ref: (calls.append(candidate.candidate_ref) or AcceptanceResult(True)),
+        )
+        barrier.wait(timeout=5)
+        loop.run()
+
+    threads = [threading.Thread(target=run_one) for _ in range(5)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    assert calls == [candidate_ref]
+    projection = CampaignLifecycleStore().package_run(stage_id=stage_id)
+    assert projection["acceptance_dispatch_count"] == 1
+    assert projection["state"] == "accepted"
+
+
+def test_postgres_expired_acceptance_owner_can_be_reclaimed_once():
+    lifecycle, _relay, objective_id, stage_id, _basis_id, _key = _package()
+    package_run_id = lifecycle.begin_package_run(
+        objective_id=objective_id, stage_id=stage_id, worktree_ref="A:/Riverview/package-worktree",
+    )
+    candidate_ref, version_hash = "commit:" + "e" * 40, "e" * 40
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """UPDATE campaign_package_runs
+                  SET state='candidate_ready',candidate_ref=%s,candidate_version_hash=%s
+                WHERE package_run_id=%s""",
+            (candidate_ref, version_hash, package_run_id),
+        )
+    owner_a, owner_b = uuid4(), uuid4()
+    assert lifecycle.claim_package_acceptance(
+        package_run_id=package_run_id, candidate_ref=candidate_ref,
+        candidate_version_hash=version_hash, owner_id=owner_a, lease_seconds=1,
+    ) == (True, 1)
+    time.sleep(1.2)
+    assert lifecycle.claim_package_acceptance(
+        package_run_id=package_run_id, candidate_ref=candidate_ref,
+        candidate_version_hash=version_hash, owner_id=owner_b, lease_seconds=60,
+    ) == (True, 1)
+    with pytest.raises(LifecycleGateError):
+        lifecycle.record_package_acceptance(package_run_id=package_run_id, accepted=True, owner_id=owner_a)
