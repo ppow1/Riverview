@@ -1,6 +1,6 @@
 # Hermes / Riverview Integration — Tranche 2 Steward Checkpoint
 
-Status: TECHNICALLY INCOMPLETE; BLOCKED AT PROVIDER STRUCTURED-OUTPUT BOUNDARY
+Status: TECHNICALLY COMPLETE; READY FOR STEWARD REVIEW
 Date: 2026-08-26
 Authority: Steward-controlled Riverview lifecycle and acceptance
 Authoritative checkout: `A:\theestate\Riverview`
@@ -137,6 +137,54 @@ this checkpoint does not create one.
 
 ## Acceptance state
 
-Tranche 2 is not technically complete and is not institutionally accepted.
-The system must stop at the current provider/Steward boundary until the
-structured-output blocker is resolved through an authorized bounded continuation.
+Tranche 2 is technically complete and ready for Steward review. It is not
+institutionally accepted. The next transition belongs to the Steward.
+
+## Final completion addendum — 2026-08-26
+
+The authorized continuation resolved the remaining structured-output and
+correspondence defects and completed one fresh real PostgreSQL lifecycle proof.
+
+- objective: `c083f54f-1c42-4124-bd3a-2285d4fc37f1`
+- stage: `3b6cd40d-006a-4485-8bc5-f3df41977cc6`
+- basis: `8eedf5c1-9df7-46c1-b0a3-c70c2e0c6199`
+- writer order/attempt: `c74e61de-8884-4c02-b207-a4d3ea04ba3d` /
+  `c3e686dc-d3b2-4554-a794-63a4c54f4b19`
+- validator order/attempt: `a6361bd9-1875-4f25-bce1-fc6e569dfbdf` /
+  `3fce59cb-23ba-44bb-976e-ee2ad22f2fd0`
+- validator result: `970cabea-08f5-4dd2-9157-edbe9454453c`, `FAIL`
+- repair order/attempt: `a29fde2d-4225-420d-b86f-bbce0a3dbdce` /
+  `a877b02f-0130-429c-854d-1a7e7d386863`
+- revalidator order/attempt: `7819f011-0e75-4d43-bbfd-ae1ce16747d1` /
+  `50503efd-bc86-4b2b-a126-59f1f90dc1a7`
+- revalidator result: `5f201dc6-ab6b-4e98-a4e1-fefca3094d40`, `PASS`
+- final stage/objective state: `accepted / completed` technically
+- validator and revalidator used the same basis hash:
+  `7094adc072456bffbe6d4f72f8e54d7331cd61233c2034693c9d741b7f7a5720`
+- writer/validator candidate: `94594552fd84fbdb4162ce2da54c378c0b3a2a17`
+- repaired/revalidated candidate: `3234f5b1684d0e869157cbbb238ad689d71eccbc`
+- selected resource: dynamic C3 scheduling identity, with Hermes resource
+  metadata `resource:hermes-local`; independent credential correspondence to
+  C3 remains unproven and is not claimed.
+
+The automatic READY notification was created by the revalidator PASS transition:
+
+- notification: `4cd5506f-a833-437c-9aa1-5c806917b3fa`
+- idempotency key: `runner.steward_attention:ready:5f201dc6-ab6b-4e98-a4e1-fefca3094d40`
+- type: `ready_for_steward_review`
+- message: `Riverview Hermes is ready for your review.`
+- state: `delivered`
+- duplicate count: `1`
+- `acknowledged_at`: `NULL`
+- delivery path: existing Estate `WindowsPresenter` (ding then synchronous
+  Windows speech on the default endpoint)
+
+The technical Tranche 2 candidate is now ready for Steward review. Technical
+completion, notification delivery, acknowledgement, and institutional
+acceptance remain distinct. Institutional acceptance has not been performed.
+
+The authoritative Riverview roadmap and integration documents do not define a
+formal Tranche 3 or Tranche 4 scope. Recommended next work is therefore not
+automatically started: the Steward should define and authorize the next bounded
+tranche after reviewing this candidate. No Tranche 3 or Tranche 4 is inferred or
+created by this report.

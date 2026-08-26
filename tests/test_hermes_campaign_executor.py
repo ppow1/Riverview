@@ -137,3 +137,16 @@ def test_validator_request_requires_json_object_response_format():
     result = HermesCampaignRoleExecutor(hermes).execute(_claimed(fenced(role="validator")))
     assert result["verdict"] == "FAIL"
     assert hermes.requests[-1].response_format == {"type": "json_object"}
+
+
+def test_validator_request_spells_out_exact_expected_evidence_refs():
+    hermes = FakeHermes(json.dumps({
+        "verdict": "FAIL", "basis_hash": "sha256:basis", "result_version_hash": "sha256:candidate",
+        "evidence_refs": ["hermes:expected:1", "hermes:expected:2"], "findings_summary": "defect",
+        "implementation_ref": "candidate://bounded", "defects": [],
+    }))
+    source = fenced(role="validator")
+    source.parameters["validation_basis_hash"] = "sha256:basis"
+    source.parameters["expected_evidence_refs"] = ["hermes:expected:1", "hermes:expected:2"]
+    HermesCampaignRoleExecutor(hermes).execute(_claimed(source))
+    assert 'Set evidence_refs exactly to ["hermes:expected:1","hermes:expected:2"]' in hermes.requests[-1].instruction
