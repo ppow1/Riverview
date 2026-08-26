@@ -123,6 +123,26 @@ class CampaignOneGoRunner:
             outcomes.append(outcome)
         return tuple(outcomes)
 
+    def run_package(self, *, stage_id: UUID, worktree_ref: str, package_executor: Any,
+                    independent_acceptance: Any, max_repairs_per_root: int = 3) -> Any:
+        """Run package-engineer self-repair before the final validator boundary.
+
+        Existing ``run`` remains the compatible role-by-role RUN-004 path.  New
+        package launches use this explicit seam so a package engineer owns
+        diagnosis, bounded repair, and full verification in one worktree while
+        the lifecycle store still owns durable identity/fencing evidence.
+        """
+        if self.objective_id is None:
+            raise OneGoError(f"{ONE_GO_CHECKPOINT}: package execution requires an objective scope.")
+        from .package_runner import PackageEngineerLoop
+
+        return PackageEngineerLoop(
+            self.lifecycle, objective_id=self.objective_id, stage_id=stage_id,
+            worktree_ref=worktree_ref, executor=package_executor,
+            independent_acceptance=independent_acceptance,
+            max_repairs_per_root=max_repairs_per_root,
+        ).run()
+
     def tick(self) -> dict[str, Any] | None:
         """Claim and advance at most one exact fenced role attempt."""
         for worker in self.workers:

@@ -681,3 +681,205 @@ class CampaignLifecycleStore:
         if row is None:
             raise LifecycleGateError("RIV-CAM-0055: failed repair attempt history is missing.")
         return row[0]
+
+    # RUN-005A package-engineer projection.  This is deliberately separate
+    # from campaign_validation_defects: the latter is the authoritative
+    # validator defect record, while this ledger records every observable
+    # package-pass symptom, including defects found and repaired internally.
+    def begin_package_run(self, *, objective_id: UUID, stage_id: UUID, worktree_ref: str,
+                          package_run_id: UUID | None = None) -> UUID:
+        if not isinstance(objective_id, UUID) or not isinstance(stage_id, UUID):
+            raise LifecycleGateError("RIV-CAM-0057: package identity is invalid.")
+        if not isinstance(worktree_ref, str) or not worktree_ref.strip() or len(worktree_ref) > 2048:
+            raise LifecycleGateError("RIV-CAM-0058: package worktree reference is invalid.")
+        package_run_id = package_run_id or uuid4()
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """INSERT INTO campaign_package_runs(
+                    package_run_id,objective_id,stage_id,state,worktree_ref)
+                   VALUES(%s,%s,%s,'executing',%s)
+                   ON CONFLICT(stage_id) DO NOTHING""",
+                (package_run_id, objective_id, stage_id, worktree_ref),
+            )
+            cursor.execute("SELECT package_run_id FROM campaign_package_runs WHERE stage_id=%s", (stage_id,))
+            row = cursor.fetchone()
+            if row is None:
+                raise LifecycleGateError("RIV-CAM-0059: package run could not be resumed or created.")
+            return row[0]
+
+    def package_run(self, *, stage_id: UUID) -> dict[str, Any] | None:
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT package_run_id,objective_id,stage_id,state,repair_generation,
+                              discovery_sequence,worktree_ref,candidate_ref,
+                              candidate_version_hash,internal_verification,
+                              acceptance_dispatch_count,last_error
+                         FROM campaign_package_runs WHERE stage_id=%s""",
+                (stage_id,),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return dict(zip(("package_run_id", "objective_id", "stage_id", "state",
+                         "repair_generation", "discovery_sequence", "worktree_ref",
+                         "candidate_ref", "candidate_version_hash",
+                         "internal_verification", "acceptance_dispatch_count",
+                         "last_error"), row))
+
+    def update_package_run(self, *, package_run_id: UUID, state: str | None = None,
+                           repair_generation: int | None = None,
+                           discovery_sequence: int | None = None,
+                           candidate_ref: str | None = None,
+                           candidate_version_hash: str | None = None,
+                           internal_verification: dict[str, Any] | None = None,
+                           last_error: str | None = None) -> None:
+        allowed = {"executing", "repairing", "verifying", "awaiting_independent_acceptance",
+                   "acceptance_failed", "accepted", "escalated"}
+        if state is not None and state not in allowed:
+            raise LifecycleGateError("RIV-CAM-0060: package run state is invalid.")
+        if repair_generation is not None and (isinstance(repair_generation, bool) or repair_generation < 0):
+            raise LifecycleGateError("RIV-CAM-0061: package repair generation is invalid.")
+        if discovery_sequence is not None and (isinstance(discovery_sequence, bool) or discovery_sequence < 0):
+            raise LifecycleGateError("RIV-CAM-0062: package discovery sequence is invalid.")
+        values = [state, repair_generation, discovery_sequence, candidate_ref,
+                  candidate_version_hash, internal_verification, last_error]
+        if internal_verification is not None:
+            json.dumps(internal_verification)
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """UPDATE campaign_package_runs
+                      SET state=COALESCE(%s,state), repair_generation=COALESCE(%s,repair_generation),
+                          discovery_sequence=COALESCE(%s,discovery_sequence),
+                          candidate_ref=COALESCE(%s,candidate_ref),
+                          candidate_version_hash=COALESCE(%s,candidate_version_hash),
+                          internal_verification=COALESCE(%s::jsonb,internal_verification),
+                          last_error=%s, updated_at=now()
+                    WHERE package_run_id=%s""",
+                (values[0], values[1], values[2], values[3], values[4],
+                 json.dumps(values[5]) if values[5] is not None else None,
+                 values[6], package_run_id),
+            )
+            if cursor.rowcount != 1:
+                raise LifecycleGateError("RIV-CAM-0063: package run is missing.")
+
+    def record_package_ledger_entry(
+        self, *, package_run_id: UUID, objective_id: UUID, stage_id: UUID,
+        root_cause_key: str, checkpoint: str, observed_behavior: str,
+        expected_behavior: str, evidence_ref: str, root_cause: str,
+        acceptance_criterion_ref: str, severity: str, required_repair: str,
+        changed_paths: tuple[str, ...] = (), failing_command: str | None = None,
+        stdout_ref: str | None = None, stderr_ref: str | None = None,
+        repair_description: str | None = None, repair_verification: str | None = None,
+        verification_result: str = "pending", status: str = "observed",
+        defect_id: UUID | None = None, repair_generation: int = 0,
+        ledger_id: UUID | None = None, discovery_sequence: int | None = None,
+    ) -> UUID:
+        required = (root_cause_key, checkpoint, observed_behavior, expected_behavior,
+                    evidence_ref, root_cause, acceptance_criterion_ref, required_repair)
+        if any(not isinstance(value, str) or not value.strip() for value in required):
+            raise LifecycleGateError("RIV-CAM-0064: package ledger evidence is incomplete.")
+        if severity not in {"blocking", "non_blocking"} or status not in {"observed", "repairing", "repaired", "escalated"} or verification_result not in {"pending", "passed", "failed"}:
+            raise LifecycleGateError("RIV-CAM-0065: package ledger status is invalid.")
+        paths = tuple(changed_paths)
+        if any(not isinstance(path, str) or not path.strip() or len(path) > 2048 for path in paths) or len(paths) > 256:
+            raise LifecycleGateError("RIV-CAM-0066: package ledger changed paths are invalid.")
+        ledger_id = ledger_id or uuid4()
+        with connect() as connection, connection.cursor() as cursor:
+            if discovery_sequence is None:
+                cursor.execute("SELECT discovery_sequence + 1 FROM campaign_package_runs WHERE package_run_id=%s FOR UPDATE", (package_run_id,))
+                sequence_row = cursor.fetchone()
+                if sequence_row is None:
+                    raise LifecycleGateError("RIV-CAM-0067: package run is missing.")
+                discovery_sequence = sequence_row[0]
+            cursor.execute(
+                """INSERT INTO campaign_repair_ledger(
+                    ledger_id,package_run_id,objective_id,stage_id,defect_id,root_cause_key,
+                    discovery_sequence,acceptance_criterion_ref,severity,checkpoint,failing_command,observed_behavior,
+                    expected_behavior,stdout_ref,stderr_ref,evidence_ref,required_repair,root_cause,
+                    repair_description,changed_paths,repair_verification,verification_result,
+                    repair_generation,status,repaired_at)
+                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,
+                          CASE WHEN %s='repaired' THEN now() ELSE NULL END)""",
+                (ledger_id, package_run_id, objective_id, stage_id, defect_id, root_cause_key,
+                 discovery_sequence, acceptance_criterion_ref, severity, checkpoint, failing_command, observed_behavior,
+                 expected_behavior, stdout_ref, stderr_ref, evidence_ref, required_repair, root_cause,
+                 repair_description, json.dumps(paths), repair_verification,
+                 verification_result, repair_generation, status, status),
+            )
+            cursor.execute(
+                """UPDATE campaign_package_runs SET discovery_sequence=GREATEST(discovery_sequence,%s),
+                          updated_at=now() WHERE package_run_id=%s""",
+                (discovery_sequence, package_run_id),
+            )
+        return ledger_id
+
+    def package_ledger(self, *, package_run_id: UUID) -> tuple[dict[str, Any], ...]:
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT ledger_id,defect_id,root_cause_key,discovery_sequence,
+                              acceptance_criterion_ref,severity,checkpoint,observed_behavior,
+                              expected_behavior,evidence_ref,required_repair,root_cause,
+                              repair_description,changed_paths,repair_verification,
+                              verification_result,repair_generation,status
+                         FROM campaign_repair_ledger WHERE package_run_id=%s
+                        ORDER BY discovery_sequence""",
+                (package_run_id,),
+            )
+            rows = cursor.fetchall()
+        fields = ("ledger_id", "defect_id", "root_cause_key", "discovery_sequence",
+                  "acceptance_criterion_ref", "severity", "checkpoint", "observed_behavior",
+                  "expected_behavior", "evidence_ref", "required_repair", "root_cause",
+                  "repair_description", "changed_paths", "repair_verification",
+                  "verification_result", "repair_generation", "status")
+        return tuple(dict(zip(fields, row)) for row in rows)
+
+    def update_package_ledger_entry(self, *, ledger_id: UUID, status: str,
+                                    repair_description: str, changed_paths: tuple[str, ...],
+                                    repair_verification: str, verification_result: str) -> None:
+        if status not in {"repaired", "escalated", "repairing"} or verification_result not in {"pending", "passed", "failed"}:
+            raise LifecycleGateError("RIV-CAM-0071: package ledger update is invalid.")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """UPDATE campaign_repair_ledger
+                      SET status=%s,repair_description=%s,changed_paths=%s::jsonb,
+                          repair_verification=%s,verification_result=%s,
+                          repaired_at=CASE WHEN %s='repaired' THEN now() ELSE repaired_at END
+                    WHERE ledger_id=%s""",
+                (status, repair_description, json.dumps(tuple(changed_paths)), repair_verification,
+                 verification_result, status, ledger_id),
+            )
+            if cursor.rowcount != 1:
+                raise LifecycleGateError("RIV-CAM-0072: package ledger entry is missing.")
+
+    def dispatch_package_acceptance(self, *, package_run_id: UUID, candidate_ref: str,
+                                    candidate_version_hash: str, verification: dict[str, Any]) -> int:
+        if not candidate_ref.strip() or not candidate_version_hash.strip():
+            raise LifecycleGateError("RIV-CAM-0068: package candidate evidence is incomplete.")
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """UPDATE campaign_package_runs
+                      SET state='awaiting_independent_acceptance',candidate_ref=%s,
+                          candidate_version_hash=%s,internal_verification=%s::jsonb,
+                          acceptance_dispatch_count=acceptance_dispatch_count+1,updated_at=now()
+                    WHERE package_run_id=%s AND state IN ('verifying','acceptance_failed')""",
+                (candidate_ref, candidate_version_hash, json.dumps(verification), package_run_id),
+            )
+            if cursor.rowcount != 1:
+                raise LifecycleGateError("RIV-CAM-0069: package is not ready for independent acceptance.")
+            cursor.execute("SELECT stage_id FROM campaign_package_runs WHERE package_run_id=%s", (package_run_id,))
+            stage_id = cursor.fetchone()[0]
+            self._event(cursor, stage_id=stage_id, correlation_id=self._stage_correlation(cursor, stage_id),
+                        event_type="runner.package.independent_acceptance_dispatched",
+                        payload={"package_run_id": str(package_run_id), "candidate_ref": candidate_ref,
+                                 "candidate_version_hash": candidate_version_hash},
+                        idempotency_key=f"runner.package.acceptance:{package_run_id}:{candidate_version_hash}")
+            cursor.execute("SELECT acceptance_dispatch_count FROM campaign_package_runs WHERE package_run_id=%s", (package_run_id,))
+            return cursor.fetchone()[0]
+
+    def record_package_acceptance(self, *, package_run_id: UUID, accepted: bool,
+                                  reason: str | None = None) -> None:
+        state = "accepted" if accepted else "acceptance_failed"
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("UPDATE campaign_package_runs SET state=%s,last_error=%s,updated_at=now() WHERE package_run_id=%s AND state='awaiting_independent_acceptance'", (state, reason, package_run_id))
+            if cursor.rowcount != 1:
+                raise LifecycleGateError("RIV-CAM-0070: package acceptance state is stale.")
