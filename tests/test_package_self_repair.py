@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import threading
 from uuid import uuid4
 
 from riverview.campaign import (AcceptanceResult, Candidate, DefectInput, PackageDefect,
@@ -59,6 +60,9 @@ class FakeLifecycle:
         run = next(value for value in self.runs.values() if value["package_run_id"] == package_run_id)
         run["acceptance_dispatch_count"] += 1
         run["state"] = "awaiting_independent_acceptance"
+        run["candidate_ref"] = candidate_ref
+        run["candidate_version_hash"] = candidate_version_hash
+        run["internal_verification"] = verification
         self.dispatches.append(candidate_ref)
         return run["acceptance_dispatch_count"]
 
@@ -140,6 +144,21 @@ def test_same_root_defect_escalates_after_bounded_repairs_without_spinning():
     assert len(lifecycle.dispatches) == 0
 
 
+def test_accepted_package_restart_is_a_terminal_noop():
+    lifecycle = FakeLifecycle()
+    executor = FakeExecutor([])
+    first = _loop(lifecycle, executor, lambda candidate, *, worktree_ref: AcceptanceResult(True))
+    calls_before = (len(executor.repaired), executor.candidates, len(lifecycle.dispatches))
+    second = PackageEngineerLoop(
+        lifecycle, objective_id=uuid4(), stage_id=next(iter(lifecycle.runs)),
+        worktree_ref="A:/Riverview/package-worktree", executor=executor,
+        independent_acceptance=lambda candidate, *, worktree_ref: (_ for _ in ()).throw(AssertionError("redispatched")),
+    ).run()
+    assert second.state == "accepted"
+    assert second.acceptance_dispatches == 1
+    assert (len(executor.repaired), executor.candidates, len(lifecycle.dispatches)) == calls_before
+
+
 def test_restart_projection_reuses_package_run_and_preserves_ledger():
     lifecycle = FakeLifecycle()
     objective_id, stage_id = uuid4(), uuid4()
@@ -186,3 +205,57 @@ def test_postgres_multi_defect_and_independent_fail_return_to_repair():
     assert outcome.acceptance_dispatches == 2
     assert len(lifecycle.package_ledger(package_run_id=outcome.package_run_id)) == 5
     assert lifecycle.package_run(stage_id=stage_id)["state"] == "accepted"
+
+
+def test_postgres_accepted_restart_does_not_reexecute_or_redispatch():
+    lifecycle, _relay, objective_id, stage_id, _basis_id, _key = _package()
+    executor = FakeExecutor([])
+    first = PackageEngineerLoop(
+        lifecycle, objective_id=objective_id, stage_id=stage_id,
+        worktree_ref="A:/Riverview/package-worktree", executor=executor,
+        independent_acceptance=lambda candidate, *, worktree_ref: AcceptanceResult(True),
+    ).run()
+    dispatch_count = lifecycle.package_run(stage_id=stage_id)["acceptance_dispatch_count"]
+    recreated = CampaignLifecycleStore()
+    second = PackageEngineerLoop(
+        recreated, objective_id=objective_id, stage_id=stage_id,
+        worktree_ref="A:/Riverview/package-worktree", executor=executor,
+        independent_acceptance=lambda candidate, *, worktree_ref: (_ for _ in ()).throw(AssertionError("redispatched")),
+    ).run()
+    third = PackageEngineerLoop(
+        CampaignLifecycleStore(), objective_id=objective_id, stage_id=stage_id,
+        worktree_ref="A:/Riverview/package-worktree", executor=executor,
+        independent_acceptance=lambda candidate, *, worktree_ref: (_ for _ in ()).throw(AssertionError("redispatched")),
+    ).run()
+    assert first.state == second.state == third.state == "accepted"
+    assert second.acceptance_dispatches == third.acceptance_dispatches == dispatch_count == 1
+    assert executor.candidates == 1
+
+
+def test_postgres_double_start_acceptance_dispatch_has_one_winner():
+    lifecycle, _relay, objective_id, stage_id, _basis_id, _key = _package()
+    package_run_id = lifecycle.begin_package_run(
+        objective_id=objective_id, stage_id=stage_id, worktree_ref="A:/Riverview/package-worktree",
+    )
+    lifecycle.update_package_run(package_run_id=package_run_id, state="verifying")
+    barrier = threading.Barrier(2)
+    results = []
+
+    def dispatch() -> None:
+        local = CampaignLifecycleStore()
+        barrier.wait(timeout=5)
+        try:
+            results.append(local.dispatch_package_acceptance(
+                package_run_id=package_run_id, candidate_ref="commit:" + "b" * 40,
+                candidate_version_hash="b" * 40, verification={"full": "pass"},
+            ))
+        except Exception as exc:  # the losing transaction must fail closed
+            results.append(exc)
+
+    threads = [threading.Thread(target=dispatch) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    assert sum(isinstance(result, int) for result in results) == 1
+    assert lifecycle.package_run(stage_id=stage_id)["acceptance_dispatch_count"] == 1

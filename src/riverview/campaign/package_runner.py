@@ -117,6 +117,19 @@ class PackageEngineerLoop:
             objective_id=self.objective_id, stage_id=self.stage_id, worktree_ref=self.worktree_ref,
         )
         projection = self.lifecycle.package_run(stage_id=self.stage_id) or {}
+        # Terminal acceptance is durable package state.  Inspect it before
+        # touching the package adapter: a new process must not replay
+        # engineering, regenerate a candidate, or dispatch another validator.
+        if projection.get("state") == "accepted":
+            candidate_ref = projection.get("candidate_ref")
+            version_hash = projection.get("candidate_version_hash")
+            if not isinstance(candidate_ref, str) or not candidate_ref.strip() or not isinstance(version_hash, str) or not version_hash.strip():
+                raise LifecycleGateError(f"{PACKAGE_CHECKPOINT}-0011: accepted package lacks durable candidate evidence.")
+            candidate = Candidate(candidate_ref, version_hash, dict(projection.get("internal_verification") or {}))
+            return self._outcome(
+                package_run_id, "accepted", int(projection.get("acceptance_dispatch_count") or 0),
+                candidate=candidate,
+            )
         generation = int(projection.get("repair_generation") or 0)
         acceptance_dispatches = int(projection.get("acceptance_dispatch_count") or 0)
         root_attempts = self._root_attempts(package_run_id)
