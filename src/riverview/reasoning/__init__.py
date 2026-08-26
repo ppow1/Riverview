@@ -82,6 +82,15 @@ from .high_reasoning import (
     EXTERNAL_OBSERVATION_EVENT, ExternalAdvisoryCoordinator,
 )
 from .result_integration import IntegratedGraceResult, GraceResultIntegrator, ResultIntegrationError
+from .hermes import (
+    HermesAuthenticationError,
+    HermesMalformedResponseError,
+    HermesPolicyViolationError,
+    HermesProviderError,
+    HermesReasoningProvider,
+    HermesTimeoutError,
+    HermesUnavailableError,
+)
 
 __all__ = [
     "CapabilityResourceRequest",
@@ -151,4 +160,6 @@ __all__ = [
     "EXTERNAL_ADVISORY_VERSION", "EXTERNAL_ADVISORY_CAPABILITY", "EXTERNAL_ADVISORY_CHECKPOINT",
     "EXTERNAL_OBSERVATION_EVENT", "ExternalAdvisoryCoordinator",
     "IntegratedGraceResult", "GraceResultIntegrator", "ResultIntegrationError",
+    "HermesAuthenticationError", "HermesMalformedResponseError", "HermesPolicyViolationError", "HermesProviderError",
+    "HermesReasoningProvider", "HermesTimeoutError", "HermesUnavailableError",
 ]

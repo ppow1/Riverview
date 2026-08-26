@@ -44,6 +44,7 @@ class ClaimedWork:
     worker_instance_id: UUID | None = None
     seat_id: str | None = None
     role: str | None = None
+    correlation_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)

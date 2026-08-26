@@ -80,6 +80,7 @@ def _claimed(work: FencedClaimedWork) -> ClaimedWork:
         work.identity.work_order_id, work.action_type, work.action_version, work.parameters,
         work.hard_timeout_seconds, 0, work.identity.attempt_id, work.identity.lease_generation,
         work.identity.fencing_token, work.identity.worker_instance_id, work.seat_id, work.role,
+        work.correlation_id,
     )
 
 
