@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from riverview.campaign import CampaignLifecycleStore, DefectInput, LifecycleGateError
+from riverview.campaign import CampaignLifecycleStore, CampaignOneGoRunner, DefectInput, LifecycleGateError, WorkerSlot
 from riverview.database import connect
 from riverview.grace.objectives import ObjectiveStore, StageSpec
 from riverview.relay import RelayStore
@@ -335,3 +335,66 @@ def _basis_hash(basis_id: UUID) -> str:
     with connect() as connection, connection.cursor() as cursor:
         cursor.execute("SELECT specification_hash FROM campaign_validation_bases WHERE basis_id=%s", (basis_id,))
         return cursor.fetchone()[0]
+
+
+def test_failed_repair_can_be_retried_without_replaying_upstream_and_can_accept() -> None:
+    lifecycle, relay, objective_id, stage_id, basis_id, writer, validator, _ = _validation_setup()
+    _technical_complete(relay, validator)
+    defect = DefectInput("criterion-1", "blocking", "works", "fails", "evidence:retry", "repair it")
+    lifecycle.record_validation(
+        validator, verdict="FAIL", basis_hash=_basis_hash(basis_id), result_version_hash=RESULT_VERSION,
+        evidence_refs=RESULT_EVIDENCE, implementation_ref=RESULT_REF, findings_summary=("defect",), defects=(defect,),
+    )
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT work_order_id FROM work_orders WHERE stage_id=%s AND role='repair_writer' AND source_attempt_id=%s", (stage_id, validator.attempt_id))
+        failed_order_id = cursor.fetchone()[0]
+    failed_repair = relay.claim("run004c-repair-failed", 30, worker_instance_id=uuid4(), seat_id="C3", role="repair_writer", work_order_id=failed_order_id)
+    assert failed_repair is not None
+    lifecycle.mark_running(failed_repair)
+    runner = CampaignOneGoRunner(
+        (WorkerSlot("run004c-failure", "C3", ("repair_writer",), uuid4()),),
+        {"repair_writer": lambda _work: {}}, relay=relay, lifecycle=lifecycle, objective_id=objective_id,
+    )
+    runner._fail_if_current(failed_repair, "RIV-REC-0004: reconciliation rejected bounded repair")
+
+    replacement_id = lifecycle.retry_failed_repair(
+        failed_repair_work_order_id=failed_order_id, requested_by="recovery-test",
+        reason="accepted reconciliation repair is now available",
+    )
+    assert replacement_id != failed_order_id
+    assert lifecycle.retry_failed_repair(failed_repair_work_order_id=failed_order_id, requested_by="recovery-test") == replacement_id
+
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT status,error_checkpoint,result_report FROM work_orders WHERE work_order_id=%s", (failed_order_id,))
+        old_status, old_checkpoint, old_report = cursor.fetchone()
+        assert old_status == "failed" and old_checkpoint == "RIV-REC-0004" and old_report["status"] == "failed"
+        cursor.execute("SELECT parameters FROM work_orders WHERE work_order_id=%s", (replacement_id,))
+        replacement_parameters = cursor.fetchone()[0]
+        assert replacement_parameters["defects"] == [defect.as_payload()]
+        assert replacement_parameters["retry_of_work_order_id"] == str(failed_order_id)
+        cursor.execute("SELECT count(*) FROM work_orders w JOIN work_order_attempts a ON a.work_order_id=w.work_order_id WHERE w.stage_id=%s AND a.role='writer'", (stage_id,))
+        writer_count = cursor.fetchone()[0]
+        cursor.execute("SELECT count(*) FROM work_orders w JOIN work_order_attempts a ON a.work_order_id=w.work_order_id WHERE w.stage_id=%s AND a.role='validator'", (stage_id,))
+        validator_count = cursor.fetchone()[0]
+        assert writer_count == 1 and validator_count == 1
+
+    replacement = relay.claim("run004c-repair-retry", 30, worker_instance_id=uuid4(), seat_id="C3", role="repair_writer", work_order_id=replacement_id)
+    assert replacement is not None and replacement.attempt_id != failed_repair.attempt_id
+    lifecycle.mark_running(replacement)
+    with pytest.raises(RuntimeError, match="late or stale"):
+        relay.complete_fenced(CampaignLifecycleStore._identity(failed_repair), {"status": "succeeded"})
+    _technical_complete(relay, replacement)
+    revalidation_order = lifecycle.record_repair_completion(replacement)
+    revalidator = relay.claim("run004c-revalidator", 30, worker_instance_id=uuid4(), seat_id="C2", role="revalidator", work_order_id=revalidation_order)
+    assert revalidator is not None and revalidator.worker_instance_id != replacement.worker_instance_id
+    lifecycle.mark_running(revalidator)
+    _technical_complete(relay, revalidator)
+    lifecycle.record_validation(
+        revalidator, verdict="PASS", basis_hash=_basis_hash(basis_id), result_version_hash=RESULT_VERSION,
+        evidence_refs=RESULT_EVIDENCE, implementation_ref=RESULT_REF, findings_summary=(), defects=(),
+    )
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT runner_state,status FROM objective_stages WHERE stage_id=%s", (stage_id,))
+        assert cursor.fetchone() == ("accepted", "completed")
+        cursor.execute("SELECT count(*) FROM river_events WHERE event_type='runner.repair.retry_queued' AND aggregate_id=%s", (stage_id,))
+        assert cursor.fetchone()[0] == 1

@@ -513,3 +513,171 @@ class CampaignLifecycleStore:
             cursor.execute("UPDATE objective_stages SET runner_state='revalidation_pending',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))
             self._event(cursor, stage_id=order[1], correlation_id=self._stage_correlation(cursor, order[1]), event_type="runner.state_transition", payload={"from": "repair_running", "to": "revalidation_pending", "repair_attempt_id": str(identity.attempt_id), "revalidation_work_order_id": str(revalidation_id)}, idempotency_key=f"runner.revalidation.pending:{identity.attempt_id}")
             return revalidation_id
+
+    def retry_failed_repair(
+        self, *, failed_repair_work_order_id: UUID, requested_by: str,
+        action_type: str = "relay.noop", reason: str = "recoverable repair execution failure",
+        idempotency_key: str | None = None,
+    ) -> UUID:
+        """Queue one bounded replacement repair attempt without replaying upstream work."""
+
+        if not isinstance(failed_repair_work_order_id, UUID) or not requested_by.strip() or not reason.strip():
+            raise LifecycleGateError("RIV-CAM-0044: repair retry request is incomplete.")
+        retry_key = idempotency_key or f"runner.repair.retry:{failed_repair_work_order_id}:1"
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT objective_id,stage_id,validation_basis_id,source_work_order_id,
+                              source_attempt_id,status,error_checkpoint,result_report
+                     FROM work_orders WHERE work_order_id=%s FOR UPDATE""",
+                (failed_repair_work_order_id,),
+            )
+            failed = cursor.fetchone()
+            if failed is None:
+                raise LifecycleGateError("RIV-CAM-0045: failed repair work order is missing.")
+            objective_id, stage_id, basis_id, validator_order_id, validator_attempt_id, status, checkpoint, report = failed
+            if status != "failed" or checkpoint != "RIV-REC-0004":
+                raise LifecycleGateError("RIV-CAM-0046: repair failure is not an explicitly recoverable reconciliation failure.")
+            if not isinstance(report, dict) or report.get("status") != "failed":
+                raise LifecycleGateError("RIV-CAM-0047: failed repair result is not durably recorded.")
+            failed_attempt_id = self._failed_attempt_id(cursor, failed_repair_work_order_id)
+            cursor.execute(
+                "SELECT role FROM work_order_attempts WHERE attempt_id=%s AND work_order_id=%s",
+                (failed_attempt_id, failed_repair_work_order_id),
+            )
+            failed_attempt_role = cursor.fetchone()
+            if failed_attempt_role is None or failed_attempt_role[0] != "repair_writer":
+                raise LifecycleGateError("RIV-CAM-0056: failed work order is not a repair-writer attempt.")
+
+            cursor.execute(
+                """SELECT work_order_id FROM work_orders
+                    WHERE stage_id=%s
+                      AND parameters->>'retry_of_work_order_id'=%s
+                    ORDER BY created_at
+                    LIMIT 1""",
+                (stage_id, str(failed_repair_work_order_id)),
+            )
+            existing = cursor.fetchone()
+            if existing is not None:
+                return existing[0]
+
+            cursor.execute(
+                """SELECT runner_state,validation_basis_id,writer_attempt_id,repair_attempt_id
+                     FROM objective_stages WHERE stage_id=%s AND objective_id=%s FOR UPDATE""",
+                (stage_id, objective_id),
+            )
+            stage = cursor.fetchone()
+            if stage is None or stage[0] != "failed" or stage[1] != basis_id or stage[3] != failed_attempt_id:
+                raise LifecycleGateError("RIV-CAM-0048: stage is not eligible for failed-repair recovery.")
+
+            cursor.execute(
+                """SELECT w.status,w.validation_basis_id,a.terminal_state,a.role
+                     FROM work_orders w
+                     JOIN work_order_attempts a ON a.work_order_id=w.work_order_id
+                    WHERE w.work_order_id=%s AND a.attempt_id=%s AND a.role='validator'""",
+                (validator_order_id, validator_attempt_id),
+            )
+            validator_order = cursor.fetchone()
+            if validator_order is None or validator_order[0] != "succeeded" or validator_order[1] != basis_id or validator_order[2] != "succeeded":
+                raise LifecycleGateError("RIV-CAM-0049: repair retry validator lineage is invalid.")
+            cursor.execute(
+                """SELECT validation_result_id,verdict,writer_attempt_id
+                     FROM campaign_validation_results
+                    WHERE validation_attempt_id=%s AND basis_id=%s
+                    ORDER BY created_at DESC LIMIT 1""",
+                (validator_attempt_id, basis_id),
+            )
+            validation = cursor.fetchone()
+            if validation is None or validation[1] != "FAIL" or validation[2] != stage[2]:
+                raise LifecycleGateError("RIV-CAM-0050: original validator FAIL is not authoritative.")
+
+            cursor.execute(
+                """SELECT defect_id,acceptance_criterion_ref,severity,expected_behavior,
+                              observed_behavior,evidence_ref,required_repair
+                     FROM campaign_validation_defects
+                    WHERE stage_id=%s AND validation_result_id=%s AND state='unresolved'
+                    ORDER BY created_at,defect_id""",
+                (stage_id, validation[0]),
+            )
+            defects = cursor.fetchall()
+            if not defects:
+                raise LifecycleGateError("RIV-CAM-0051: unresolved structured defects are required for repair recovery.")
+
+            cursor.execute(
+                """SELECT w.status,w.result_report,a.terminal_state
+                     FROM work_orders w JOIN work_order_attempts a ON a.attempt_id=%s
+                    WHERE a.role='writer' AND a.work_order_id=w.work_order_id""",
+                (stage[2],),
+            )
+            writer = cursor.fetchone()
+            if writer is None or writer[0] != "succeeded" or writer[2] != "succeeded":
+                raise LifecycleGateError("RIV-CAM-0052: accepted writer implementation basis is unavailable.")
+            self._result_binding(writer[1])
+
+            cursor.execute(
+                """SELECT 1 FROM work_orders
+                    WHERE stage_id=%s AND role='repair_writer'
+                      AND status IN ('queued','claimed','running')""",
+                (stage_id,),
+            )
+            if cursor.fetchone() is not None:
+                raise LifecycleGateError("RIV-CAM-0053: an active repair attempt already owns this stage.")
+
+            defect_payload = [
+                DefectInput(row[1], row[2], row[3], row[4], row[5], row[6]).as_payload()
+                for row in defects
+            ]
+            parameters = {
+                "retry_of_work_order_id": str(failed_repair_work_order_id),
+                "retry_of_attempt_id": str(failed_attempt_id),
+                "retry_generation": 1,
+                "source_validation_result_id": str(validation[0]),
+                "source_validator_work_order_id": str(validator_order_id),
+                "source_validator_attempt_id": str(validator_attempt_id),
+                "defects": defect_payload,
+                "retry_reason": reason[:1000],
+            }
+            replacement_id = self._queue_work(
+                cursor, objective_id=objective_id, stage_id=stage_id, basis_id=basis_id,
+                role="repair_writer", action_type=action_type, requested_by=requested_by,
+                idempotency_key=retry_key, source_work_order_id=validator_order_id,
+                source_attempt_id=validator_attempt_id, parameters=parameters,
+            )
+            cursor.execute(
+                """UPDATE objective_stages
+                      SET runner_state='repair_pending',blocked_reason=NULL,
+                          repair_attempt_id=NULL,last_state_transition_at=now(),updated_at=now()
+                    WHERE stage_id=%s AND runner_state='failed'""",
+                (stage_id,),
+            )
+            if cursor.rowcount != 1:
+                raise LifecycleGateError("RIV-CAM-0054: failed-repair recovery transition was not applied.")
+            self._event(
+                cursor, stage_id=stage_id, correlation_id=self._stage_correlation(cursor, stage_id),
+                event_type="runner.repair.retry_queued",
+                payload={
+                    "from": "failed", "to": "repair_pending",
+                    "failed_repair_work_order_id": str(failed_repair_work_order_id),
+                    "failed_repair_attempt_id": parameters["retry_of_attempt_id"],
+                    "replacement_repair_work_order_id": str(replacement_id),
+                    "retry_generation": 1,
+                    "validation_result_id": str(validation[0]),
+                    "validator_work_order_id": str(validator_order_id),
+                    "validator_attempt_id": str(validator_attempt_id),
+                    "defect_ids": [str(row[0]) for row in defects],
+                },
+                idempotency_key=retry_key,
+            )
+            return replacement_id
+
+    @staticmethod
+    def _failed_attempt_id(cursor: Any, work_order_id: UUID) -> UUID:
+        cursor.execute(
+            """SELECT attempt_id FROM work_order_attempts
+                WHERE work_order_id=%s AND terminal_state='failed'
+                ORDER BY finished_at DESC LIMIT 1""",
+            (work_order_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise LifecycleGateError("RIV-CAM-0055: failed repair attempt history is missing.")
+        return row[0]
