@@ -44,5 +44,8 @@ class CharacterDesignerWorkflow:
             raise ValueError("RIV-CHAR-0003: reviewer and review rationale are required.")
         return self.store.review(proposal_id, decision=decision, reviewer=reviewer, rationale=rationale)
 
+    def steward_review(self, proposal_id: str, *, decision: str, rationale: str) -> dict[str, Any]:
+        return self.store.steward_review(proposal_id, decision=decision, reviewer="Steward", rationale=rationale)
+
     def publish(self, proposal_id: str) -> dict[str, Any]:
         return self.store.publish(proposal_id)

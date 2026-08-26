@@ -832,6 +832,8 @@ class RiverviewOpenWebUIService:
                             result = service.jessica_workflow.propose("grace", payload.get("changes"), author=str(payload.get("author", "Jessica")), sources=[str(item) for item in payload.get("source_evidence", [])], rationale=str(payload.get("rationale", "")))
                         elif action == "review":
                             result = service.jessica_workflow.review(str(payload["proposal_id"]), decision=str(payload["decision"]), reviewer=str(payload["reviewer"]), rationale=str(payload["rationale"]))
+                        elif action == "steward_review":
+                            result = service.jessica_workflow.steward_review(str(payload["proposal_id"]), decision=str(payload["decision"]), rationale=str(payload["rationale"]))
                         elif action == "publish":
                             result = service.jessica_workflow.publish(str(payload["proposal_id"]))
                         else:

@@ -19,7 +19,8 @@ def test_character_proposal_review_publish_preserves_canon_and_rejected_path(tmp
     workflow.review(rejected["proposal_id"], decision="rejected", reviewer="Steward", rationale="not accepted")
     assert store.current("RES-000003")["version"] == original["version"]
     accepted = workflow.propose("RES-000003", {"traits": {"temperament": "warm"}}, author="Character Designer", sources=["estate://design/helen"], rationale="harmless development round")
-    workflow.review(accepted["proposal_id"], decision="accepted", reviewer="Steward", rationale="approved")
+    workflow.review(accepted["proposal_id"], decision="accepted", reviewer="Independent Reviewer", rationale="independent review passed")
+    workflow.steward_review(accepted["proposal_id"], decision="accepted", rationale="Steward approves this bounded character refinement")
     published = workflow.publish(accepted["proposal_id"])
     assert published["version"] == "v2"
     assert store.current("RES-000003")["traits"]["temperament"] == "warm"
@@ -55,6 +56,18 @@ def test_jessica_workflow_is_grace_owned_and_review_gated():
     assert JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW["owner"] == "grace"
     assert JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW["stages"][-1] == "publish"
     assert "self_authorize_canon" in JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW["prohibited"]
+
+
+def test_character_workflow_rejects_authority_changes_and_requires_independent_review(tmp_path: Path):
+    store = CharacterStore.from_profiles(profiles(), tmp_path / "characters.json")
+    workflow = CharacterDesignerWorkflow(store)
+    with pytest.raises(PermissionError):
+        workflow.propose("RES-000003", {"authority": "expanded"}, author="Jessica", sources=["observation"], rationale="not allowed")
+    proposal = workflow.propose("RES-000003", {"traits": {"temperament": "warm"}}, author="Jessica", sources=["observation"], rationale="bounded")
+    with pytest.raises(PermissionError):
+        workflow.steward_review(proposal["proposal_id"], decision="accepted", rationale="missing independent review")
+    with pytest.raises(PermissionError):
+        workflow.review(proposal["proposal_id"], decision="accepted", reviewer="Jessica", rationale="self review")
 
 
 def test_conversational_session_replays_only_bounded_prior_turns():

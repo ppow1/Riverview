@@ -78,7 +78,33 @@ class CharacterStore(_JsonStore):
         proposal = next((p for p in self.data["proposals"] if p["proposal_id"] == proposal_id), None)
         if proposal is None:
             raise LookupError("RIV-CHAR-0001: character proposal is unavailable.")
-        proposal.update({"review_state": decision, "status": decision, "reviewer": reviewer, "review_rationale": rationale, "reviewed_at": _now()})
+        proposal.update({
+            "review_state": "independent_review_accepted" if decision == "accepted" else decision,
+            "status": "independent_review_accepted" if decision == "accepted" else decision,
+            "independent_reviewer": reviewer,
+            "independent_review_rationale": rationale,
+            "independent_reviewed_at": _now(),
+        })
+        self.save(); return proposal.copy()
+
+    def steward_review(self, proposal_id: str, *, decision: str, reviewer: str, rationale: str) -> dict[str, Any]:
+        """Apply the distinct final Steward review after independent review."""
+        if decision not in {"accepted", "rejected", "unresolved"}:
+            raise ValueError("RIV-CHAR-0001: review decision is closed.")
+        proposal = next((p for p in self.data["proposals"] if p["proposal_id"] == proposal_id), None)
+        if proposal is None:
+            raise LookupError("RIV-CHAR-0001: character proposal is unavailable.")
+        if proposal.get("status") != "independent_review_accepted":
+            raise PermissionError("RIV-CHAR-0003: Steward review requires an independent review pass.")
+        if reviewer.strip().casefold() != "steward" or not rationale.strip():
+            raise PermissionError("RIV-CHAR-0003: final character review must be performed by the Steward with rationale.")
+        proposal.update({
+            "review_state": "steward_review_accepted" if decision == "accepted" else decision,
+            "status": decision,
+            "steward_reviewer": reviewer,
+            "steward_review_rationale": rationale,
+            "steward_reviewed_at": _now(),
+        })
         self.save(); return proposal.copy()
 
     def publish(self, proposal_id: str) -> dict[str, Any]:
@@ -90,7 +116,11 @@ class CharacterStore(_JsonStore):
         published = {**base, **proposal["changes"], "resident_id": base["resident_id"],
                      "version": f"v{version_number}", "prior_version": base["version"],
                      "author": proposal["author"], "source_evidence": proposal["source_evidence"],
-                     "rationale": proposal["rationale"], "reviewer": proposal["reviewer"],
+                     "rationale": proposal["rationale"], "reviewer": proposal.get("steward_reviewer", "Steward"),
+                     "independent_reviewer": proposal.get("independent_reviewer"),
+                     "independent_review_rationale": proposal.get("independent_review_rationale"),
+                     "steward_reviewer": proposal.get("steward_reviewer"),
+                     "steward_review_rationale": proposal.get("steward_review_rationale"),
                      "review_state": "accepted", "status": "accepted", "classification": proposal["classification"], "created_at": _now()}
         self.data["versions"].append(published); proposal["published_version"] = published["version"]; self.save(); return published.copy()
 
