@@ -8,7 +8,7 @@ Status: CANDIDATE VERIFIED; CONTROLLED CUTOVER PENDING
 - Git remote: `https://github.com/ppow1/Riverview.git`
 - Baseline: verified network `origin/main` `ec9075bfec7655fe67e7c4455bfd9c644b2d2d52`
 - Candidate branch: `main`
-- Candidate reconciliation commit: `f87064204fa179e26a0c7ae3d6541ec67419a074` (final local candidate SHA).
+- Candidate reconciliation commit: `82f40c5a643ab3a02d7eaaa862b831bc82ab0308` (final local candidate SHA).
 - Previous live checkout retained unchanged: `A:\Riverview\repo`
 - No historical checkout was deleted, cleaned, reset, moved, or rewritten.
 
