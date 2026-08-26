@@ -1,6 +1,6 @@
 # Hermes / Riverview Integration — Tranche 2 Steward Checkpoint
 
-Status: TECHNICALLY COMPLETE; READY FOR STEWARD REVIEW
+Status: CLOSED; TECHNICALLY AND INSTITUTIONALLY ACCEPTED
 Date: 2026-08-26
 Authority: Steward-controlled Riverview lifecycle and acceptance
 Authoritative checkout: `A:\theestate\Riverview`
@@ -137,8 +137,8 @@ this checkpoint does not create one.
 
 ## Acceptance state
 
-Tranche 2 is technically complete and ready for Steward review. It is not
-institutionally accepted. The next transition belongs to the Steward.
+Tranche 2 is technically complete and institutionally accepted. It is closed.
+The next transition belongs to a separately authorized future tranche.
 
 ## Final completion addendum — 2026-08-26
 
@@ -167,7 +167,8 @@ correspondence defects and completed one fresh real PostgreSQL lifecycle proof.
   metadata `resource:hermes-local`; independent credential correspondence to
   C3 remains unproven and is not claimed.
 
-The automatic READY notification was created by the revalidator PASS transition:
+The automatic READY notification was created by the revalidator PASS transition and subsequently acknowledged by the
+Steward:
 
 - notification: `4cd5506f-a833-437c-9aa1-5c806917b3fa`
 - idempotency key: `runner.steward_attention:ready:5f201dc6-ab6b-4e98-a4e1-fefca3094d40`
@@ -179,12 +180,41 @@ The automatic READY notification was created by the revalidator PASS transition:
 - delivery path: existing Estate `WindowsPresenter` (ding then synchronous
   Windows speech on the default endpoint)
 
-The technical Tranche 2 candidate is now ready for Steward review. Technical
-completion, notification delivery, acknowledgement, and institutional
-acceptance remain distinct. Institutional acceptance has not been performed.
+The technical Tranche 2 candidate was ready for Steward review. The Steward
+has now explicitly accepted it institutionally. Technical completion,
+notification delivery, acknowledgement, and institutional acceptance remain
+distinct and are all recorded separately.
 
 The authoritative Riverview roadmap and integration documents do not define a
 formal Tranche 3 or Tranche 4 scope. Recommended next work is therefore not
 automatically started: the Steward should define and authorize the next bounded
 tranche after reviewing this candidate. No Tranche 3 or Tranche 4 is inferred or
 created by this report.
+
+## Closure addendum — Steward acceptance
+
+The Steward explicitly accepted Tranche 2 institutionally after reviewing the
+successful lifecycle proof. Riverview recorded the decision through its
+authoritative objective/event path rather than through documentation alone:
+
+- objective state: `completed`, `acceptance_state=accepted`
+- objective closure state: `closed`
+- `attention_required`: `false`
+- event type: `steward.institutional_acceptance`
+- idempotency key:
+  `steward.institutional_acceptance:tranche2:5f201dc6-ab6b-4e98-a4e1-fefca3094d40`
+- accepted by: `Steward`
+- basis: final successful proof, validation result
+  `5f201dc6-ab6b-4e98-a4e1-fefca3094d40`
+- ready notification acknowledgement: `acknowledged`
+- acknowledgement remains distinct from audio delivery and technical PASS.
+
+The Hermes source repository is separate from Riverview and remains on its own
+main branch with unpublished working-tree changes in the response-format repair
+chain and associated tests. Those changes were loaded and exercised by the
+gateway used for this proof, but are not silently represented as part of the
+Riverview commit. Their repository/authority boundary remains explicit for a
+future separately governed publication decision.
+
+Tranche 2 is closed. No Tranche 3 or Tranche 4 is defined, authorized, or
+started.
