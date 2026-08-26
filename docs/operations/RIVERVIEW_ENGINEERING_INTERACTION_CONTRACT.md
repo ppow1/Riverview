@@ -1,6 +1,6 @@
 <!--
 File: docs/operations/RIVERVIEW_ENGINEERING_INTERACTION_CONTRACT.md
-Version: 1.2.0
+Version: 1.3.0
 Date: 2026-08-14
 Purpose: Canonical operating contract for Steward-to-AI engineering work on Project Riverview.
 -->
@@ -559,11 +559,12 @@ At the time this contract was created:
 
 - Repository: `ppow1/Riverview`
 - Verified roadmap commit: `d0227867878a1355ed96fcc648a4b9fb93a3ea01`
+- Filesystem/runtime authority: unresolved until the Phase 0 standalone-root reconciliation is accepted; `A:/Riverview/repo` is a live installed checkout and `A:/theestate/Riverview` is a separate current-main checkout, neither permanent authority by path alone.
 - Roadmap revision: `RV-MASTER-2026-08-14`
 - Roadmap size: 103 waypoints
 - Next implementation waypoint: `RV-004.4 — Read-only MCP Relay`
 - Steward Status address when running: `http://127.0.0.1:8770/`
-- The unified runtime supervisor is implemented as `riverview.runtime.supervisor`; installed/running status must still be verified from its status projection.
+- The unified runtime supervisor is implemented as `riverview.runtime.supervisor`; installed/running status and its repository root must still be verified from its status projection.
 - The status server implementation exists but must not be presumed currently running.
 
 Future work must verify these values rather than assuming they remain current.

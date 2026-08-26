@@ -312,7 +312,12 @@ class RiverviewOpenWebUIService:
                         source_sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=2, check=True).stdout.strip()
                     except (OSError, subprocess.SubprocessError):
                         source_sha = "unknown"
-                    self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity, "operator_shell": "v1", "source_sha": source_sha})
+                    try:
+                        source_root = str(Path(__file__).resolve().parents[3])
+                        branch = subprocess.run(["git", "symbolic-ref", "--short", "-q", "HEAD"], cwd=source_root, capture_output=True, text=True, timeout=2, check=False).stdout.strip() or "DETACHED"
+                    except (OSError, subprocess.SubprocessError):
+                        source_root, branch = "unknown", "unknown"
+                    self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity, "operator_shell": "v1", "source_sha": source_sha, "source_root": source_root, "git_branch": branch, "python_executable": os.sys.executable, "provider": "ollama", "default_model": service.authorized_model, "ollama_endpoint": "http://127.0.0.1:11434", "database_target": "configured Riverview PostgreSQL metadata (credentials redacted)", "launch_mechanism": os.environ.get("RIVERVIEW_LAUNCH_MECHANISM", "unknown")})
                 elif urlsplit(self.path).path == "/api/runtime/status" and self._auth():
                     try:
                         status_path = Path(__file__).resolve().parents[3] / "runtime" / "riverview-supervisor" / "status.json"

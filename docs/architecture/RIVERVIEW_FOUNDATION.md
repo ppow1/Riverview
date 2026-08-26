@@ -1,7 +1,7 @@
-<!-- Version: 0.1.0 -->
+<!-- Version: 0.2.0 -->
 # Riverview Foundation Architecture
 
-Status: Designed
+Status: Designed; standalone repository/runtime root pending Phase 0 reconciliation
 
 ## Mission
 
@@ -10,7 +10,8 @@ Preserve the Estate's mission, residents, offices, continuity, engineering capac
 ## Governing model
 
 - **Project Riverview** is the endeavor.
-- **The Estate at Riverview** is the final environment.
+- **The Estate** is the current/legacy operational system and capability source during migration.
+- **Riverview** is a separate successor/replacement system; it is not a subsystem of The Estate.
 - **The River** is the core event-driven architecture.
 - **Riverview Kernel v0.1** is the first implementation.
 - **The Undercurrent** is the restricted high-trust domain.
@@ -28,7 +29,7 @@ The kernel initially owns only:
 7. Grace and Continuous Momentum Engine progression contracts.
 8. MCP mailbox correlation.
 
-Interfaces, residents, visual environments, Open WebUI, SillyTavern, Stream Deck, command-chair devices, voice, Bluetooth, remote access, and Quest/3D presentation remain adapters or consumers—not kernel responsibilities.
+Interfaces, residents, visual environments, Open WebUI, SillyTavern, Stream Deck, command-chair devices, voice, Bluetooth, remote access, and Quest/3D presentation remain adapters or consumers—not kernel responsibilities. Temporary reuse of Estate capabilities is a bounded migration dependency and does not establish repository or architectural subordination.
 
 ## Operational sentence
 

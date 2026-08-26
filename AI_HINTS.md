@@ -5,6 +5,8 @@ Status: Canonical fast-recovery entry point.
 
 Pat is the Steward and final authority. Grace coordinates operational progression but is not the whole Estate at Riverview.
 
+Riverview is a separate successor/replacement system, not a subsystem of The Estate. The Estate remains the legacy operational system while Riverview replaces its capabilities incrementally. Filesystem paths are provenance only; no permanent standalone Riverview root is established until the Phase 0 repository/runtime reconciliation is accepted. Read `docs/operations/roadmap/evidence/RIVERVIEW_RUNTIME_REPOSITORY_PROVENANCE_MAP_PHASE0_2026-08-26.md` before changing runtime ownership or selecting a repository root.
+
 Before creating, modifying, testing, deploying, or promoting Riverview software, read completely:
 
 1. `docs/governance/RIVERVIEW_CHARTER.md`

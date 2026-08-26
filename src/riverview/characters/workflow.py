@@ -6,6 +6,18 @@ from typing import Any
 from .store import CharacterStore
 
 
+JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW = {
+    "workflow_id": "jessica-character-development-v1",
+    "owner": "grace",
+    "resident_role": "Chief Character Architect",
+    "mode": "advisory_workflow",
+    "stages": ("inspect", "propose", "independent_review", "steward_review", "publish"),
+    "required_evidence": ("source_evidence", "rationale", "base_character_version", "review_record"),
+    "authority_boundary": "Grace may coordinate and propose; only an accepted review may publish canon.",
+    "prohibited": ("invent_biography", "invent_visual_canon", "self_authorize_canon", "expand_operational_authority"),
+}
+
+
 class CharacterDesignerWorkflow:
     def __init__(self, store: CharacterStore) -> None:
         self.store = store

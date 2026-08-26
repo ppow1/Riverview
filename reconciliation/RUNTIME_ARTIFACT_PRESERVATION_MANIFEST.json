@@ -1,0 +1,73 @@
+{
+  "source_root": "A:/Riverview/repo",
+  "candidate_root": "A:/Riverview/standalone",
+  "source_head": "c29d6256e05bd0c98188a5113346cb3895f8259a",
+  "artifacts": [
+    {
+      "path": "docs/operations/roadmap/evidence/RIV-EVELYN-ANIMATED-IMMERSIVE-PROTOTYPE-2026-08-23.md",
+      "classification": "evidence/reporting",
+      "sha256": "024083ea1b8281909453e4ae55df25a3e4def74279279fb735a879e8c98415bc",
+      "bytes": 1801
+    },
+    {
+      "path": "docs/operations/roadmap/evidence/RIV-SPATIAL-DESKTOP-LOADING-REPAIR-2026-08-23.md",
+      "classification": "evidence/reporting",
+      "sha256": "7b946f9cad7a0b70f91e9fa21b75df90a6d8bb6ee515398e0aebfc3284665a78",
+      "bytes": 1335
+    },
+    {
+      "path": "docs/operations/roadmap/evidence/RIV-SPATIAL-IMMERSIVE-USABILITY-2026-08-22.md",
+      "classification": "evidence/reporting",
+      "sha256": "cd81bd744a83d4e98b129db0b39748e406dc93875f1a4b0a98e55e3d62891fef",
+      "bytes": 2034
+    },
+    {
+      "path": "docs/operations/roadmap/evidence/spatial/RV-016.5_SPATIAL_CONTRACT_REFERENCE.png",
+      "classification": "evidence/reporting",
+      "sha256": "5e3c765bc374bc86b23219fb2889817fda0f09237d69d0f99dea5296bcf4a69b",
+      "bytes": 2892890
+    },
+    {
+      "path": "docs/operations/troubleshooting/checkpoints/RIV-GRC-0013_PARALLEL_ENGINEERING_A.md",
+      "classification": "evidence/reporting",
+      "sha256": "0471b119ae62f1adc06dd644c72931b10149d48546edaaa53f035f28d1ac411d",
+      "bytes": 95
+    },
+    {
+      "path": "docs/operations/troubleshooting/checkpoints/RIV-GRC-0014_PARALLEL_ENGINEERING_B.md",
+      "classification": "evidence/reporting",
+      "sha256": "09070fb9ab376e117799277edbf7aa52d869b39a1ea4ab89b62c3bc8d5a17d54",
+      "bytes": 141
+    },
+    {
+      "path": "src/riverview/spatial/assets/evelyn-test.glb",
+      "classification": "unique valuable/experimental review",
+      "sha256": "717fe743bf5dab0eb42be862d7fe960cdcd74e2ffe554cfbaa2c6770609248dc",
+      "bytes": 5017904
+    },
+    {
+      "path": "tools/powershell/roadmap/Promote-RiverviewRV0044Completion.ps1",
+      "classification": "evidence/reporting",
+      "sha256": "dab8ac966dcd77c23e6f6f520a4aed39e0c9c35ae9573b439500ce15e38c5c8a",
+      "bytes": 22133
+    },
+    {
+      "path": "tools/powershell/roadmap/Promote-RiverviewRV0051Completion.ps1",
+      "classification": "evidence/reporting",
+      "sha256": "00455e403d408fded5affe5111a90bbd0365b1bc83592520c945e4f5843b2f73",
+      "bytes": 18806
+    },
+    {
+      "path": "tools/powershell/synchronization/Repair-RiverviewLocalMainReconciliation.ps1",
+      "classification": "evidence/reporting",
+      "sha256": "74e53e9549c077e115717f2630e13454f7170f99d99cc1d08a9bf6fa2f3c66a7",
+      "bytes": 11197
+    },
+    {
+      "path": "tools/powershell/synchronization/Sync-RiverviewLocalMainPreserveWorktree.ps1",
+      "classification": "evidence/reporting",
+      "sha256": "d10feb95734851ec536aa4f9cf288d264146b41aaa34cbdd2a338cfb626e5e3b",
+      "bytes": 13529
+    }
+  ]
+}

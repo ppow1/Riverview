@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from riverview.characters import CharacterDesignerWorkflow, CharacterStore, ContinuityStore
+from riverview.characters.workflow import JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW
 from riverview.residents.gateway import ResidentConversationGateway, ResidentProfile
 
 
@@ -48,6 +49,32 @@ def test_room_chat_produces_identity_preserving_provider_turns():
     turns = service.room_chat(room, "Give one bounded greeting.", provider=provider, interface_id="test")
     assert [turn["speaker_name"] for turn in turns] == ["Helen", "Alfred", "Ingrid"]
     assert all(turn["no_authority_expansion"] for turn in turns)
+
+
+def test_jessica_workflow_is_grace_owned_and_review_gated():
+    assert JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW["owner"] == "grace"
+    assert JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW["stages"][-1] == "publish"
+    assert "self_authorize_canon" in JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW["prohibited"]
+
+
+def test_conversational_session_replays_only_bounded_prior_turns():
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from riverview.reasoning import ReasoningResponse
+
+    service = ResidentConversationGateway(profiles())
+    instructions = []
+
+    def provider(request):
+        instructions.append(request.instruction)
+        return ReasoningResponse(uuid4(), request.request_id, request.correlation_id, "local:test", "advice", "bounded", ("evidence",), "operational", datetime.now(UTC))
+
+    session, _, _ = service.chat("Helen", "first turn", provider=provider, interface_id="test")
+    service.chat("Helen", "follow-up turn", provider=provider, interface_id="test", session_id=session.session_id)
+    assert "first turn" in instructions[1]
+    assert "follow-up turn" in instructions[1]
+    assert len(instructions[1]) < 16_000
 
 
 def test_room_chat_preserves_completed_turns_when_later_participant_fails():

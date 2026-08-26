@@ -1,6 +1,6 @@
 <!--
 File: docs/operations/GRACE_ENGINEERING_TASK_SUBMISSION_TEMPLATE.md
-Version: 1.0.0
+Version: 1.1.0
 Date: 2026-08-20
 Purpose: Canonical ChatGPT/Steward template for submitting single or parallel engineering tasks through Grace.
 -->
@@ -51,7 +51,7 @@ The specification should state the engineering result Pat actually wants, not me
 For a normal bounded write, populate the Comms5 formation contract with:
 
 - `repository_identity`: `ppow1/Riverview`
-- `repository_root`: `A:/Riverview/repo`
+- `repository_root`: `<verified standalone Riverview root selected by the current Phase 0 reconciliation>`
 - `expected_base_sha`: current verified `main` SHA
 - `bounded_instruction`: exact implementation task
 - `allowed_paths`: exact paths the task may modify

@@ -513,6 +513,10 @@ class RuntimeSupervisor:
             "schema_version": "riverview-runtime-status-v1",
             "supervisor": "riverview.runtime.supervisor",
             "supervisor_pid": os.getpid(),
+            "repository_root": str(self.repository),
+            "git_branch": self._git_branch(),
+            "python_executable": os.environ.get("PYTHON", os.sys.executable),
+            "launch_mechanism": os.environ.get("RIVERVIEW_LAUNCH_MECHANISM", "unknown"),
             "lock_path": str(self.repository / "runtime" / "riverview-supervisor.lock.d"),
             "started_at": self.started_at,
             "updated_at": _now(),
@@ -550,6 +554,19 @@ class RuntimeSupervisor:
                 timeout=2,
                 check=True,
             ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return "unknown"
+
+    def _git_branch(self) -> str:
+        try:
+            return subprocess.run(
+                ["git", "symbolic-ref", "--short", "-q", "HEAD"],
+                cwd=self.repository,
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            ).stdout.strip() or "DETACHED"
         except (OSError, subprocess.SubprocessError):
             return "unknown"
 

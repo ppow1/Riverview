@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import ipaddress
+import json
+import os
 import ssl
+import time
+from collections import deque
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -13,7 +17,20 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from riverview.spatial.prototype import prototype_html
+from riverview.spatial.prototype import (
+    SPATIAL_BUILD_ID,
+    SPATIAL_DEPLOYMENT_TIMESTAMP,
+    SPATIAL_DEPLOYMENT_TOKEN,
+    SPATIAL_SOURCE_REVISION,
+    prototype_html,
+)
+
+
+def _spatial_model_asset() -> Path:
+    return Path(__file__).parents[1] / "spatial" / "assets" / "evelyn-test.glb"
+
+
+_XR_LOGS: deque[dict[str, object]] = deque(maxlen=200)
 
 
 def _certificate(cert_dir: Path, host: str) -> tuple[Path, Path]:
@@ -36,22 +53,68 @@ def build_server(*, host: str = "192.168.1.88", port: int = 18443, cert_dir: Pat
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
+            cache_control = "no-store"
             if self.path == "/health":
                 body = b'{"status":"healthy","surface":"read-only-spatial"}'
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "application/json")
             elif self.path == "/spatial":
                 body = prototype_html().encode()
+                cache_control = "no-store, no-cache, must-revalidate, max-age=0"
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+            elif self.path == "/spatial-build":
+                body = json.dumps({
+                    "build_id": SPATIAL_BUILD_ID,
+                    "deployment_timestamp": SPATIAL_DEPLOYMENT_TIMESTAMP,
+                    "deployment_token": SPATIAL_DEPLOYMENT_TOKEN,
+                    "source_revision": SPATIAL_SOURCE_REVISION,
+                    "process_id": os.getpid(),
+                    "working_directory": str(Path.cwd()),
+                }, sort_keys=True).encode()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+            elif self.path == "/spatial-xr-log":
+                body = json.dumps(list(_XR_LOGS), sort_keys=True).encode()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+            elif self.path == "/spatial-assets/evelyn-test.glb":
+                asset = _spatial_model_asset()
+                if not asset.is_file():
+                    self.send_error(HTTPStatus.NOT_FOUND)
+                    return
+                body = asset.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "model/gltf-binary")
             else:
                 body = b'{"error":"not_found"}'
                 self.send_response(HTTPStatus.NOT_FOUND)
                 self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", cache_control)
+            if self.path == "/spatial":
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+        def do_POST(self) -> None:
+            if self.path != "/spatial-xr-log":
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            try:
+                length = min(int(self.headers.get("Content-Length", "0")), 8192)
+                event = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(event, dict):
+                    raise ValueError("event must be an object")
+                event["server_received_at"] = time.time()
+                event["server_process_id"] = os.getpid()
+                _XR_LOGS.append(event)
+                self.send_response(HTTPStatus.NO_CONTENT)
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+            except (ValueError, TypeError, json.JSONDecodeError):
+                self.send_error(HTTPStatus.BAD_REQUEST)
 
         def log_message(self, *_args: object) -> None:
             return

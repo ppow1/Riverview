@@ -3,7 +3,7 @@ Clear-Host 2>$null
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$RepositoryPath = 'A:\Riverview\repo'
+$RepositoryPath = Join-Path $PSScriptRoot '..\..\..'
 for ($i = 0; $i -lt $args.Count; $i++) {
     if ($args[$i] -eq '-RepositoryPath' -and $i + 1 -lt $args.Count) { $RepositoryPath = $args[++$i] }
 }
@@ -15,6 +15,7 @@ if (-not (Test-Path $Registry -PathType Leaf)) { throw 'RIV-RUN-0001: runtime se
 
 $env:RIVERVIEW_REPOSITORY = $RepositoryPath
 $env:RIVERVIEW_RUNTIME_REGISTRY = $Registry
+$env:RIVERVIEW_LAUNCH_MECHANISM = 'windows-task:Riverview Runtime Supervisor'
 $env:PYTHONPATH = Join-Path $RepositoryPath 'src'
 Push-Location $RepositoryPath
 try {
