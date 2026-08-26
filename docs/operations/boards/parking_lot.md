@@ -1,4 +1,4 @@
-<!-- Version: 1.2.0 | Date: 2026-08-20 | Status: Active -->
+<!-- Version: 1.3.0 | Date: 2026-08-26 | Status: Active -->
 # Riverview Parking Lot
 
 The Parking Lot preserves valuable ideas without committing Riverview to implementation or interrupting current execution.
@@ -13,5 +13,6 @@ This is not a backlog and not an execution queue. Capturing an item does not aut
 | PL-0002 | Alternative Local AI Inference Runtime Paths | Local AI / Resident Runtime Architecture | Strategic | Steward | 2026-08-20 | CAPTURED | Promote for elaboration after Jessica's onboarding is stable, when the current provider path demonstrably blocks required resident capability, when multi-resident operation makes runtime choice a direct dependency, or upon explicit Steward direction. |
 | PL-0003 | Eight-P100 SXM2 Server for 32B Inference Capacity | Local AI / Compute Capacity / Resident Runtime Architecture | Strategic | Steward | 2026-08-20 | CAPTURED | Promote when actively considering the 8x P100 SXM2 server or similar hardware, when local GPU capacity becomes a direct blocker, when benchmark engineering capacity is available, or upon explicit Steward direction. |
 | PL-0004 | Historical Branch Archaeology and Cleanup | Repository Hygiene / Development Workflow | High | Steward | 2026-08-26 | CAPTURED | Promote after the Grace/Campaign Runner stopping checkpoint and Hermes priority work, or sooner if a historical branch again causes a development-authority, checkout, publication, merge, or validation error. |
+| PL-0005 | Honcho Resident Modeling and Character Continuity | Resident Architecture / Character Architecture / Hermes | Strategic | Steward | 2026-08-26 | CAPTURED | Promote after Hermes reaches a stable operating checkpoint and the Steward is ready to investigate resident experiential modeling/relationship continuity, or sooner only by explicit Steward direction. |
 
 For substantial entries, read the corresponding detailed artifact under `docs/operations/parking_lot/` before acting.
