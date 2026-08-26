@@ -73,6 +73,12 @@ from .home_cognition import (
     HomeCognitionService,
     HomeGenerationObservation,
 )
+from .high_reasoning import (
+    HIGH_REASONING_CAPABILITY, HIGH_REASONING_CHECKPOINT, HIGH_REASONING_VERSION,
+    HIGH_OBSERVATION_EVENT, AuthorizedHighReasoningProvider, HighGenerationObservation,
+    HighReasoningCoordinator, HighReasoningExecutionError, HighReasoningInvocation,
+    HighReasoningOutcome,
+)
 
 __all__ = [
     "CapabilityResourceRequest",
@@ -135,4 +141,8 @@ __all__ = [
     "HomeCognitionOutcome",
     "HomeCognitionService",
     "HomeGenerationObservation",
+    "HIGH_REASONING_CAPABILITY", "HIGH_REASONING_CHECKPOINT", "HIGH_REASONING_VERSION",
+    "HIGH_OBSERVATION_EVENT", "AuthorizedHighReasoningProvider", "HighGenerationObservation",
+    "HighReasoningCoordinator", "HighReasoningExecutionError", "HighReasoningInvocation",
+    "HighReasoningOutcome",
 ]
