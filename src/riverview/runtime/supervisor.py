@@ -173,6 +173,7 @@ class RuntimeSupervisor:
                         "pid": row.get("ProcessId"),
                         "ppid": row.get("ParentProcessId"),
                         "executable": row.get("ExecutablePath") or "",
+                        "cwd": "",
                         "cmdline": row.get("CommandLine") or "",
                     }
                     for row in rows
@@ -188,6 +189,7 @@ class RuntimeSupervisor:
                         "ppid": process.info["ppid"],
                         "executable": process.info.get("exe") or "",
                         "cmdline": " ".join(process.info["cmdline"] or []),
+                        "cwd": process.info.get("cwd") or "",
                     }
                 )
             except (psutil.Error, TypeError):
@@ -213,6 +215,7 @@ class RuntimeSupervisor:
             process
             for process in self._processes()
             if self._process_matches(state.spec, process)
+            and self._process_belongs_to_repository(process)
         ]
         match_pids = {int(process["pid"]) for process in matches}
         roots = [process for process in matches if int(process.get("ppid") or 0) not in match_pids]
@@ -247,7 +250,7 @@ class RuntimeSupervisor:
             raise ValueError("RIV-RUN-0001: unknown managed service.")
         if service_id not in self.states:
             raise ValueError("RIV-RUN-0001: only registered production service recycle is enabled.")
-        matches = [p for p in self._processes() if self._process_matches(state.spec, p)]
+        matches = [p for p in self._processes() if self._process_matches(state.spec, p) and self._process_belongs_to_repository(p)]
         match_pids = {int(process["pid"]) for process in matches}
         roots = [process for process in matches if int(process.get("ppid") or 0) not in match_pids]
         if len(roots) != 1:
@@ -311,6 +314,11 @@ class RuntimeSupervisor:
         if marker.startswith("riverview."):
             return bool(re.search(rf"(?<![A-Za-z0-9_.-])-m\s+{re.escape(marker)}(?:\s|$)", command_line))
         return marker in command_line
+
+    def _process_belongs_to_repository(self, process: dict[str, Any]) -> bool:
+        """Do not adopt a same-command service from another checkout."""
+        cwd = str(process.get("cwd") or "")
+        return not cwd or Path(cwd).resolve() == self.repository
 
     @staticmethod
     def _listener_pids(port: int) -> list[int]:
