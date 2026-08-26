@@ -30,7 +30,7 @@
       "dependencies": [],
       "process_match": "riverview.autonomy.live_service",
       "restart": true,
-      "startup_timeout": 8.0
+      "startup_timeout": 120.0
     },
     {
       "service_id": "comms5-http",
