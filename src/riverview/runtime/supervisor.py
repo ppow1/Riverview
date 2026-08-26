@@ -450,16 +450,20 @@ class RuntimeSupervisor:
 
     def _refresh(self, state: ServiceState) -> None:
         if state.process is not None and state.process.poll() is not None:
-            state.status = "failed"
-            state.last_failure = f"exit:{state.process.returncode}"
-            state.last_change = _now()
+            returncode = state.process.returncode
             state.process = None
-            state.pid = None
             for handle in (state.stdout_handle, state.stderr_handle):
                 if handle is not None:
                     handle.close()
             state.stdout_handle = None
             state.stderr_handle = None
+            if self._adopt(state):
+                state.restart_count = 0
+                return
+            state.status = "failed"
+            state.last_failure = f"exit:{returncode}"
+            state.last_change = _now()
+            state.pid = None
             state.restart_count += 1
             state.backoff_until = time.monotonic() + min(30.0, 2.0 ** min(state.restart_count, 4))
             return
