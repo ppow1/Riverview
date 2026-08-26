@@ -50,6 +50,9 @@ def fenced(role="writer"):
                 "allowed_authority": ["return:advisory"],
             },
             "validator_action_type": "relay.noop",
+            "validator_parameters": {"candidate_identity": "sha256:candidate"},
+            "candidate_identity": "sha256:candidate",
+            "implementation_ref": "candidate://bounded",
         },
         hard_timeout_seconds=60,
         expected_duration_seconds=30,
@@ -74,6 +77,12 @@ def test_campaign_executor_preserves_work_correlation_and_returns_evidence():
     assert result["provider_id"] == "hermes:test"
     assert result["resource_class_ref"] == "hermes:local-test"
     assert result["evidence_refs"] == ["hermes:test:evidence"]
+    assert result["validator_parameters"] == {
+        "candidate_identity": "sha256:candidate",
+        "expected_evidence_refs": ["hermes:test:evidence"],
+    }
+    assert result["result_version_hash"] == "sha256:candidate"
+    assert result["implementation_ref"] == "candidate://bounded"
     assert hermes.requests[0].correlation_id == work.correlation_id
 
 
@@ -110,3 +119,21 @@ def test_campaign_validator_rejects_mismatched_canonical_basis_or_candidate():
     work = _claimed(source)
     with pytest.raises(HermesCampaignExecutionError, match="correspondence"):
         HermesCampaignRoleExecutor(hermes).execute(work)
+
+
+def test_repair_writer_keeps_revalidation_on_substantial_campaign_action():
+    hermes = FakeHermes("repaired candidate summary")
+    work = _claimed(fenced(role="repair_writer"))
+    result = HermesCampaignRoleExecutor(hermes).execute(work)
+    assert result["revalidation_action_type"] == "campaign.hermes.engineering"
+
+
+def test_validator_request_requires_json_object_response_format():
+    hermes = FakeHermes(json.dumps({
+        "verdict": "FAIL", "basis_hash": "basis", "result_version_hash": "sha256:candidate",
+        "evidence_refs": ["hermes:test:evidence"], "findings_summary": "defect",
+        "implementation_ref": "tree:reference", "defects": [],
+    }))
+    result = HermesCampaignRoleExecutor(hermes).execute(_claimed(fenced(role="validator")))
+    assert result["verdict"] == "FAIL"
+    assert hermes.requests[-1].response_format == {"type": "json_object"}

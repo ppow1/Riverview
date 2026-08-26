@@ -25,6 +25,7 @@ from .contracts import ReasoningRequest, ReasoningResponse
 DEFAULT_ENDPOINT = "http://127.0.0.1:8642/v1"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 120.0
+CAMPAIGN_TIMEOUT_SECONDS = 1800.0
 MAX_RESPONSE_BYTES = 128_000
 MAX_RESPONSE_CHARS = 12_000
 
@@ -82,11 +83,15 @@ class HermesReasoningProvider:
         model_ref: str | None = None,
         api_key: str | None = None,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        execution_class: str = "bounded-advisory",
         max_response_chars: int = MAX_RESPONSE_CHARS,
         opener: Callable[..., Any] = urlopen,
     ) -> None:
         _validate_loopback(endpoint)
-        if not 0.1 <= timeout_seconds <= MAX_TIMEOUT_SECONDS:
+        if execution_class not in {"bounded-advisory", "campaign-engineering"}:
+            raise ValueError("execution class is unsupported")
+        timeout_limit = CAMPAIGN_TIMEOUT_SECONDS if execution_class == "campaign-engineering" else MAX_TIMEOUT_SECONDS
+        if not 0.1 <= timeout_seconds <= timeout_limit:
             raise ValueError("timeout is outside its bound")
         if not isinstance(provider_id, str) or not provider_id.startswith("hermes:"):
             raise ValueError("provider_id must identify a Hermes provider")
@@ -101,6 +106,7 @@ class HermesReasoningProvider:
         self.resource_class_ref = resource_class_ref.strip()
         self.model_ref = model_ref.strip() if model_ref else None
         self.timeout_seconds = float(timeout_seconds)
+        self.execution_class = execution_class
         self.max_response_chars = max_response_chars
         self._api_key = api_key if api_key is not None else _api_key_from_environment()
         self._opener = opener
@@ -113,6 +119,7 @@ class HermesReasoningProvider:
             "resource_class_ref": self.resource_class_ref,
             "model_ref": self.model_ref,
             "classification": "provider-declared",
+            "execution_class": self.execution_class,
         }
 
     def generate(self, request: ReasoningRequest) -> ReasoningResponse:
@@ -142,6 +149,8 @@ class HermesReasoningProvider:
         }
         if self.model_ref:
             body["model"] = self.model_ref
+        if request.response_format is not None:
+            body["response_format"] = request.response_format
         payload = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self._api_key:

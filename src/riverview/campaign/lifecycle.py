@@ -96,6 +96,20 @@ class CampaignLifecycleStore:
         )
 
     @staticmethod
+    def _queue_steward_attention(cursor: Any, *, notification_type: str, checkpoint_id: str, summary: str, idempotency_key: str, evidence_refs: tuple[str, ...]) -> None:
+        """Queue one bounded attention record atomically with its transition."""
+        if notification_type not in {"blocked_requires_steward", "ready_for_steward_review"}:
+            raise LifecycleGateError("RIV-NOT-0002: lifecycle attention type is invalid.")
+        if not checkpoint_id.startswith("RIV-") or not summary.strip() or not evidence_refs:
+            raise LifecycleGateError("RIV-NOT-0003: lifecycle attention evidence is incomplete.")
+        cursor.execute(
+            """INSERT INTO steward_notifications(notification_id,idempotency_key,notification_type,checkpoint_id,summary,evidence_refs,state)
+               VALUES(%s,%s,%s,%s,%s,%s::jsonb,'queued')
+               ON CONFLICT(idempotency_key) DO NOTHING""",
+            (uuid4(), idempotency_key, notification_type, checkpoint_id, summary[:1000], json.dumps(evidence_refs)),
+        )
+
+    @staticmethod
     def _basis_hash(specification_content: str | None, specification_ref: str | None) -> str:
         value = specification_content if specification_content is not None else specification_ref
         if not value or not value.strip():
@@ -139,7 +153,7 @@ class CampaignLifecycleStore:
         self, cursor: Any, *, objective_id: UUID, stage_id: UUID, basis_id: UUID,
         role: str, action_type: str, requested_by: str, idempotency_key: str,
         source_work_order_id: UUID | None = None, source_attempt_id: UUID | None = None,
-        parameters: dict[str, Any] | None = None,
+        parameters: dict[str, Any] | None = None, seat_id: str | None = None,
     ) -> UUID:
         if role not in {"writer", "validator", "repair_writer", "revalidator"}:
             raise LifecycleGateError("RIV-CAM-0003: unsupported campaign role.")
@@ -155,15 +169,15 @@ class CampaignLifecycleStore:
             """INSERT INTO work_orders(
                 work_order_id,action_type,action_version,status,parameters,requested_by,
                 idempotency_key,correlation_id,causation_id,expected_duration_seconds,
-                hard_timeout_seconds,objective_id,stage_id,role,validation_basis_id,
+                hard_timeout_seconds,objective_id,stage_id,role,seat_id,validation_basis_id,
                 source_work_order_id,source_attempt_id)
                SELECT %s,%s,%s,'queued',%s::jsonb,%s,%s,o.correlation_id,%s,%s,%s,
-                      %s,%s,%s,%s,%s,%s
+                      %s,%s,%s,%s,%s,%s,%s
                  FROM objectives o WHERE o.objective_id=%s
                ON CONFLICT(idempotency_key) DO NOTHING""",
             (work_order_id, action_type, action[0], json.dumps(parameters or {}), requested_by,
              idempotency_key, source_work_order_id, action[1], action[2], objective_id, stage_id,
-             role, basis_id, source_work_order_id, source_attempt_id, objective_id),
+             role, seat_id, basis_id, source_work_order_id, source_attempt_id, objective_id),
         )
         cursor.execute("SELECT work_order_id FROM work_orders WHERE idempotency_key=%s", (idempotency_key,))
         row = cursor.fetchone()
@@ -174,6 +188,7 @@ class CampaignLifecycleStore:
     def queue_writer(
         self, *, objective_id: UUID, stage_id: UUID, basis_id: UUID, action_type: str,
         requested_by: str, idempotency_key: str, parameters: dict[str, Any] | None = None,
+        seat_id: str | None = None,
     ) -> UUID:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT validation_basis_id,runner_state FROM objective_stages WHERE stage_id=%s AND objective_id=%s FOR UPDATE", (stage_id, objective_id))
@@ -183,7 +198,7 @@ class CampaignLifecycleStore:
             work_order_id = self._queue_work(
                 cursor, objective_id=objective_id, stage_id=stage_id, basis_id=basis_id,
                 role="writer", action_type=action_type, requested_by=requested_by,
-                idempotency_key=idempotency_key, parameters=parameters,
+                idempotency_key=idempotency_key, parameters=parameters, seat_id=seat_id,
             )
             self._event(cursor, stage_id=stage_id, correlation_id=self._stage_correlation(cursor, stage_id),
                         event_type="runner.package.writer_queued", payload={"work_order_id": str(work_order_id)},
@@ -316,6 +331,8 @@ class CampaignLifecycleStore:
                      FROM work_orders WHERE work_order_id=%s FOR UPDATE""", (identity.work_order_id,)
             )
             order = cursor.fetchone()
+            cursor.execute("SELECT seat_id FROM work_orders WHERE work_order_id=%s", (identity.work_order_id,))
+            seat_id = cursor.fetchone()[0]
             cursor.execute("SELECT role FROM work_order_attempts WHERE attempt_id=%s AND work_order_id=%s", (identity.attempt_id, identity.work_order_id))
             attempt_role = cursor.fetchone()
             if order is None or order[3] != "succeeded" or attempt_role is None or attempt_role[0] != "writer" or not order[4]:
@@ -340,7 +357,7 @@ class CampaignLifecycleStore:
                 role="validator", action_type=validator_action_type, requested_by=requested_by,
                 idempotency_key=f"runner.validator:{identity.attempt_id}",
                 source_work_order_id=identity.work_order_id, source_attempt_id=identity.attempt_id,
-                parameters=parameters,
+                parameters=parameters, seat_id=seat_id,
             )
             cursor.execute("UPDATE objective_stages SET runner_state='validation_pending',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))
             self._event(cursor, stage_id=order[1], correlation_id=self._stage_correlation(cursor, order[1]),
@@ -353,6 +370,7 @@ class CampaignLifecycleStore:
         evidence_refs: tuple[str, ...], findings_summary: tuple[str, ...], defects: tuple[DefectInput, ...] = (),
         implementation_ref: str | None = None, repair_action_type: str = "relay.noop",
         revalidation_action_type: str = "relay.noop", requested_by: str = "campaign-runner",
+        repair_parameters: dict[str, Any] | None = None,
     ) -> UUID:
         identity = self._identity(work)
         if verdict not in {"PASS", "FAIL", "BLOCKED"} or not result_version_hash:
@@ -360,6 +378,8 @@ class CampaignLifecycleStore:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT objective_id,stage_id,validation_basis_id,source_work_order_id,source_attempt_id,status FROM work_orders WHERE work_order_id=%s FOR UPDATE", (identity.work_order_id,))
             order = cursor.fetchone()
+            cursor.execute("SELECT seat_id FROM work_orders WHERE work_order_id=%s", (identity.work_order_id,))
+            seat_id = cursor.fetchone()[0]
             cursor.execute("SELECT role FROM work_order_attempts WHERE attempt_id=%s AND work_order_id=%s", (identity.attempt_id, identity.work_order_id))
             attempt_role = cursor.fetchone()
             role = attempt_role[0] if attempt_role else None
@@ -427,12 +447,19 @@ class CampaignLifecycleStore:
                 if not defects:
                     raise LifecycleGateError("RIV-CAM-0023: FAIL requires structured defects.")
                 cursor.execute("UPDATE objective_stages SET runner_state='defects_found',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))
-                repair_id = self._queue_work(cursor, objective_id=order[0], stage_id=order[1], basis_id=order[2], role="repair_writer", action_type=repair_action_type, requested_by=requested_by, idempotency_key=f"runner.repair:{identity.attempt_id}", source_work_order_id=identity.work_order_id, source_attempt_id=identity.attempt_id)
+                repair_id = self._queue_work(cursor, objective_id=order[0], stage_id=order[1], basis_id=order[2], role="repair_writer", action_type=repair_action_type, requested_by=requested_by, idempotency_key=f"runner.repair:{identity.attempt_id}", source_work_order_id=identity.work_order_id, source_attempt_id=identity.attempt_id, parameters=repair_parameters, seat_id=seat_id)
                 cursor.execute("UPDATE objective_stages SET runner_state='repair_pending',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))
                 self._event(cursor, stage_id=order[1], correlation_id=self._stage_correlation(cursor, order[1]), event_type="runner.validation.defects", payload={"validation_result_id": str(result_id), "repair_work_order_id": str(repair_id)}, idempotency_key=f"runner.validation.defects:{result_id}")
             else:
                 cursor.execute("UPDATE objective_stages SET runner_state='blocked',blocked_reason='validation evidence unavailable or denied',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))
                 cursor.execute("UPDATE objectives SET attention_required=true,acceptance_state='rejected',updated_at=now() WHERE objective_id=%s", (order[0],))
+                self._queue_steward_attention(
+                    cursor, notification_type="blocked_requires_steward",
+                    checkpoint_id="RIV-HERMES-TRANCHE2-BLOCKED",
+                    summary="Riverview Hermes needs your assistance.",
+                    idempotency_key=f"runner.steward_attention:blocked:{identity.attempt_id}",
+                    evidence_refs=(f"stage:{order[1]}", f"validation_attempt:{identity.attempt_id}", "reason:validation-evidence-unavailable"),
+                )
             return result_id
 
     def acceptance_gate(self, *, stage_id: UUID, validation_result_id: UUID,
@@ -483,13 +510,22 @@ class CampaignLifecycleStore:
             cursor.execute("UPDATE objectives SET acceptance_state='accepted',status='completed',completed_at=now(),updated_at=now() WHERE objective_id=%s", (objective_id,))
         else:
             cursor.execute("UPDATE objectives SET acceptance_state='awaiting_validation',updated_at=now() WHERE objective_id=%s", (objective_id,))
+        self._queue_steward_attention(
+            cursor, notification_type="ready_for_steward_review",
+            checkpoint_id="RIV-HERMES-TRANCHE2-READY",
+            summary="Riverview Hermes is ready for your review.",
+            idempotency_key=f"runner.steward_attention:ready:{validation_result_id}",
+            evidence_refs=(f"stage:{stage_id}", f"validation_result:{validation_result_id}", f"validation_attempt:{validation_attempt_id}"),
+        )
         self._event(cursor, stage_id=stage_id, correlation_id=self._stage_correlation(cursor, stage_id), event_type="runner.validation.pass", payload={"validation_result_id": str(validation_result_id), "validation_attempt_id": str(validation_attempt_id)}, idempotency_key=f"runner.validation.pass:{validation_result_id}")
 
-    def record_repair_completion(self, work: ClaimedWork, *, revalidation_action_type: str = "relay.noop", requested_by: str = "campaign-runner") -> UUID:
+    def record_repair_completion(self, work: ClaimedWork, *, revalidation_action_type: str = "relay.noop", revalidation_parameters: dict[str, Any] | None = None, requested_by: str = "campaign-runner") -> UUID:
         identity = self._identity(work)
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT objective_id,stage_id,validation_basis_id,source_attempt_id,status FROM work_orders WHERE work_order_id=%s FOR UPDATE", (identity.work_order_id,))
             order = cursor.fetchone()
+            cursor.execute("SELECT seat_id FROM work_orders WHERE work_order_id=%s", (identity.work_order_id,))
+            seat_id = cursor.fetchone()[0]
             cursor.execute("SELECT role FROM work_order_attempts WHERE attempt_id=%s AND work_order_id=%s", (identity.attempt_id, identity.work_order_id))
             attempt_role = cursor.fetchone()
             if order is None or order[4] != "succeeded" or attempt_role is None or attempt_role[0] != "repair_writer":
@@ -509,7 +545,7 @@ class CampaignLifecycleStore:
                 evidence_refs=repair_evidence,
             )
             cursor.execute("UPDATE campaign_validation_defects SET repair_attempt_id=%s WHERE stage_id=%s AND state='unresolved'", (identity.attempt_id, order[1]))
-            revalidation_id = self._queue_work(cursor, objective_id=order[0], stage_id=order[1], basis_id=order[2], role="revalidator", action_type=revalidation_action_type, requested_by=requested_by, idempotency_key=f"runner.revalidation:{identity.attempt_id}", source_work_order_id=identity.work_order_id, source_attempt_id=identity.attempt_id)
+            revalidation_id = self._queue_work(cursor, objective_id=order[0], stage_id=order[1], basis_id=order[2], role="revalidator", action_type=revalidation_action_type, requested_by=requested_by, idempotency_key=f"runner.revalidation:{identity.attempt_id}", source_work_order_id=identity.work_order_id, source_attempt_id=identity.attempt_id, parameters=revalidation_parameters, seat_id=seat_id)
             cursor.execute("UPDATE objective_stages SET runner_state='revalidation_pending',last_state_transition_at=now(),updated_at=now() WHERE stage_id=%s", (order[1],))
             self._event(cursor, stage_id=order[1], correlation_id=self._stage_correlation(cursor, order[1]), event_type="runner.state_transition", payload={"from": "repair_running", "to": "revalidation_pending", "repair_attempt_id": str(identity.attempt_id), "revalidation_work_order_id": str(revalidation_id)}, idempotency_key=f"runner.revalidation.pending:{identity.attempt_id}")
             return revalidation_id
@@ -527,14 +563,14 @@ class CampaignLifecycleStore:
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """SELECT objective_id,stage_id,validation_basis_id,source_work_order_id,
-                              source_attempt_id,status,error_checkpoint,result_report
+                              source_attempt_id,seat_id,status,error_checkpoint,result_report
                      FROM work_orders WHERE work_order_id=%s FOR UPDATE""",
                 (failed_repair_work_order_id,),
             )
             failed = cursor.fetchone()
             if failed is None:
                 raise LifecycleGateError("RIV-CAM-0045: failed repair work order is missing.")
-            objective_id, stage_id, basis_id, validator_order_id, validator_attempt_id, status, checkpoint, report = failed
+            objective_id, stage_id, basis_id, validator_order_id, validator_attempt_id, seat_id, status, checkpoint, report = failed
             if status != "failed" or checkpoint != "RIV-REC-0004":
                 raise LifecycleGateError("RIV-CAM-0046: repair failure is not an explicitly recoverable reconciliation failure.")
             if not isinstance(report, dict) or report.get("status") != "failed":
@@ -640,7 +676,7 @@ class CampaignLifecycleStore:
                 cursor, objective_id=objective_id, stage_id=stage_id, basis_id=basis_id,
                 role="repair_writer", action_type=action_type, requested_by=requested_by,
                 idempotency_key=retry_key, source_work_order_id=validator_order_id,
-                source_attempt_id=validator_attempt_id, parameters=parameters,
+                source_attempt_id=validator_attempt_id, parameters=parameters, seat_id=seat_id,
             )
             cursor.execute(
                 """UPDATE objective_stages

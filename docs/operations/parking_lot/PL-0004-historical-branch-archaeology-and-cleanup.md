@@ -47,6 +47,20 @@ At capture time, the remote branch inventory showed **31 non-main branches plus 
 
 `main` is the current development authority. Presence of any branch above is not authorization to use it.
 
+## Alternate-checkout finding — 2026-08-26
+
+`A:\Riverview\repo` is a separate detached checkout, not the authoritative
+`A:\theestate\Riverview` working copy. It points at the same GitHub remote but
+is detached from local commit `ad28eb5` ancestry, has a dirty spatial/operator
+worktree, and contains uncommitted and untracked Quest/spatial evidence,
+roadmap, and synchronization artifacts. Its local `main` is not a safe proxy
+for authoritative Riverview state, and the checkout has no demonstrated
+dependency that authorizes Hermes or Campaign Runner to use it.
+
+Do not delete, clean, reset, or merge this checkout during ordinary work. Future
+cleanup should first inventory its dirty files and branch-only commits, then
+quarantine or recover useful material through an explicit reviewed package.
+
 ## Why It Is Parked
 
 The inventory exposed a recurring operational hazard: a coding worker can discover an old branch, or find itself in an old checkout, and incorrectly treat that branch as the active development line. This already caused Grace work to continue on `codex/c484-operator-persistent-service` after development was intended to be on `main`, requiring reconciliation back to main.

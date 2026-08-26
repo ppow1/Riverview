@@ -155,3 +155,19 @@ def test_current_phase_has_no_objective_level_authority() -> None:
         cursor.execute("""SELECT column_name FROM information_schema.columns
                          WHERE table_name='objective_stages' AND column_name IN ('sort_order','status')""")
         assert {row[0] for row in cursor.fetchall()} == {"sort_order", "status"}
+
+
+def test_substantial_action_lease_covers_hard_timeout_with_grace() -> None:
+    assert RelayStore.lease_seconds_for(1800) == 1860
+    assert RelayStore.lease_seconds_for(30) == 30
+    assert RelayStore.lease_seconds_for(1800, requested=120) == 120
+
+
+def test_generic_relay_worker_cannot_claim_internal_campaign_action() -> None:
+    store = RelayStore()
+    order = store.enqueue("campaign.hermes.engineering", {}, "run003-internal", f"run003-internal:{uuid4()}")
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("UPDATE work_orders SET seat_id='C3' WHERE work_order_id=%s", (order.work_order_id,))
+    assert store.claim_fenced(
+        "relay.primary", uuid4(), seat_id="C3", role="writer", work_order_id=order.work_order_id,
+    ) is None

@@ -18,7 +18,7 @@ REPORT = {"status": "succeeded", "result_version_hash": VERSION,
 
 def _runner(roles, executors, objective_id, relay):
     workers = tuple(
-        WorkerSlot(f"run004b-{role}", seat, (role,), uuid4())
+        WorkerSlot(f"run004b-{role}", "C3", (role,), uuid4())
         for role, seat in (("writer", "C1"), ("validator", "C2"),
                            ("repair_writer", "C3"), ("revalidator", "C2"))
         if role in roles
@@ -36,7 +36,7 @@ def test_live_one_go_writer_validator_pass_requires_no_manual_handoff():
     lifecycle, relay, objective_id, stage_id, basis_id, _ = _package()
     lifecycle.queue_writer(objective_id=objective_id, stage_id=stage_id, basis_id=basis_id,
                            action_type="relay.noop", requested_by="run004b-test",
-                           idempotency_key=f"run004b-writer:{uuid4()}", parameters={"delay_seconds": 1})
+                           idempotency_key=f"run004b-writer:{uuid4()}", parameters={"delay_seconds": 1}, seat_id="C3")
     basis_hash = _basis_hash(basis_id)
     runner = _runner(("writer", "validator"), {
         "writer": lambda _work: REPORT,
@@ -52,7 +52,7 @@ def test_live_one_go_fail_repair_revalidation_accepts_and_preserves_history():
     lifecycle, relay, objective_id, stage_id, basis_id, _ = _package()
     lifecycle.queue_writer(objective_id=objective_id, stage_id=stage_id, basis_id=basis_id,
                            action_type="relay.noop", requested_by="run004b-test",
-                           idempotency_key=f"run004b-repair-cycle:{uuid4()}", parameters={"delay_seconds": 1})
+                           idempotency_key=f"run004b-repair-cycle:{uuid4()}", parameters={"delay_seconds": 1}, seat_id="C3")
     basis_hash = _basis_hash(basis_id)
     defect = DefectInput("criterion-1", "blocking", "valid", "invalid", "evidence:run004b", "repair")
     runner = _runner(("writer", "validator", "repair_writer", "revalidator"), {
@@ -67,6 +67,8 @@ def test_live_one_go_fail_repair_revalidation_accepts_and_preserves_history():
     with connect() as connection, connection.cursor() as cursor:
         cursor.execute("SELECT runner_state,status FROM objective_stages WHERE stage_id=%s", (stage_id,))
         assert cursor.fetchone() == ("accepted", "completed")
+        cursor.execute("SELECT a.role,a.seat_id FROM work_orders w JOIN work_order_attempts a ON a.work_order_id=w.work_order_id WHERE w.objective_id=%s ORDER BY a.started_at", (objective_id,))
+        assert cursor.fetchall() == [("writer", "C3"), ("validator", "C3"), ("repair_writer", "C3"), ("revalidator", "C3")]
         cursor.execute(
             "SELECT result_report FROM work_orders WHERE objective_id=%s AND result_report->>'verdict'='FAIL'",
             (objective_id,),

@@ -117,8 +117,25 @@ class FencedClaimedWork:
 
 
 class RelayStore:
+    SUBSTANTIAL_HARD_TIMEOUT_SECONDS = 600
+    LEASE_GRACE_SECONDS = 60
+
     def __init__(self, config: DatabaseConfig | None = None) -> None:
         self._config = config
+
+    @classmethod
+    def lease_seconds_for(cls, hard_timeout_seconds: int, requested: int | None = None) -> int:
+        """Derive a bounded lease without widening ordinary relay work."""
+        lease_seconds = requested
+        if lease_seconds is None:
+            lease_seconds = (
+                int(hard_timeout_seconds) + cls.LEASE_GRACE_SECONDS
+                if int(hard_timeout_seconds) > cls.SUBSTANTIAL_HARD_TIMEOUT_SECONDS
+                else 30
+            )
+        if isinstance(lease_seconds, bool) or not 1 <= int(lease_seconds) <= 3_600:
+            raise ValueError("RIV-WRK-0010: lease_seconds must be between 1 and 3600.")
+        return int(lease_seconds)
 
     @staticmethod
     def _append_event(cursor: Any, *, event_type: str, work_order_id: UUID, correlation_id: UUID,
@@ -175,9 +192,10 @@ class RelayStore:
         *,
         seat_id: str,
         role: str,
-        lease_seconds: int = 30,
+        lease_seconds: int | None = None,
         work_order_id: UUID | None = None,
         objective_id: UUID | None = None,
+        allow_internal: bool = False,
     ) -> FencedClaimedWork | None:
         """Claim one order and persist one exact, transactionally fenced attempt."""
         if seat_id not in {"C1", "C2", "C3"}:
@@ -188,30 +206,33 @@ class RelayStore:
         fencing_token = uuid4()
         with connect(self._config) as connection, connection.cursor() as cursor:
             claim_sql = """SELECT w.work_order_id, w.action_type, w.action_version, w.parameters,
-                          hard_timeout_seconds, expected_duration_seconds, correlation_id
-                     FROM work_orders w
-                    WHERE w.status = 'queued' AND w.active_attempt_id IS NULL
-                      AND (w.role IS NULL OR w.role=%s)
-                      AND (w.seat_id IS NULL OR w.seat_id=%s)
-                      AND NOT EXISTS (
+                      w.hard_timeout_seconds, w.expected_duration_seconds, w.correlation_id
+                 FROM work_orders w
+                 JOIN approved_actions aa ON aa.action_type=w.action_type AND aa.action_version=w.action_version
+                WHERE w.status = 'queued' AND w.active_attempt_id IS NULL
+                  AND (w.role IS NULL OR w.role=%s)
+                  AND (w.seat_id IS NULL OR w.seat_id=%s)
+                  AND (%s OR aa.command_path NOT LIKE 'internal:%%')
+                  AND NOT EXISTS (
                           SELECT 1 FROM work_order_attempts source_attempt
                            WHERE source_attempt.attempt_id = w.source_attempt_id
                              AND w.role IN ('validator','revalidator')
                              AND source_attempt.worker_instance_id = %s
                       )
                 """
-            claim_params: list[Any] = [role, seat_id, worker_instance_id]
+            claim_params: list[Any] = [role, seat_id, allow_internal, worker_instance_id]
             if work_order_id is not None:
                 claim_sql += " AND w.work_order_id=%s"
                 claim_params.append(work_order_id)
             if objective_id is not None:
                 claim_sql += " AND w.objective_id=%s"
                 claim_params.append(objective_id)
-            claim_sql += " ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1"
+            claim_sql += " ORDER BY w.created_at FOR UPDATE SKIP LOCKED LIMIT 1"
             cursor.execute(claim_sql, claim_params)
             row = cursor.fetchone()
             if not row:
                 return None
+            lease_seconds = self.lease_seconds_for(row[4], lease_seconds)
             cursor.execute("SELECT COALESCE(MAX(lease_generation), 0) + 1 FROM work_order_attempts WHERE work_order_id=%s", (row[0],))
             attempt = int(cursor.fetchone()[0])
             cursor.execute(

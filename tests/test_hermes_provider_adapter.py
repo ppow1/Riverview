@@ -104,9 +104,22 @@ def test_provider_preserves_riverview_correspondence_and_emits_evidence() -> Non
         "resource_class_ref": "hermes:local-4090",
         "model_ref": None,
         "classification": "provider-declared",
+        "execution_class": "bounded-advisory",
     }
     assert captured["body"]["messages"][0]["content"].startswith("Riverview is authoritative")
     assert captured["body"]["messages"][1]["content"] == source.instruction
+
+
+def test_provider_forwards_structured_response_format() -> None:
+    captured: dict[str, object] = {}
+
+    def opener(req, **_kwargs):
+        captured["body"] = json.loads(req.data)
+        return FakeResponse(response())
+
+    provider = HermesReasoningProvider(opener=opener)
+    provider.generate(request(response_format={"type": "json_object"}))
+    assert captured["body"]["response_format"] == {"type": "json_object"}
 
 
 def test_provider_restricts_endpoint_and_timeout() -> None:
@@ -116,6 +129,13 @@ def test_provider_restricts_endpoint_and_timeout() -> None:
         HermesReasoningProvider(timeout_seconds=0.01)
     with pytest.raises(ValueError, match="timeout"):
         HermesReasoningProvider(timeout_seconds=121)
+    campaign = HermesReasoningProvider(
+        timeout_seconds=1800,
+        execution_class="campaign-engineering",
+    )
+    assert campaign.resource_metadata()["execution_class"] == "campaign-engineering"
+    with pytest.raises(ValueError, match="timeout"):
+        HermesReasoningProvider(timeout_seconds=1801, execution_class="campaign-engineering")
 
 
 def test_provider_maps_authentication_failure_without_leaking_secret() -> None:

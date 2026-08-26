@@ -100,6 +100,8 @@ def test_validator_pass_is_the_acceptance_gate() -> None:
         assert cursor.fetchone() == ("PASS", validator.attempt_id, writer.attempt_id)
         cursor.execute("SELECT runner_state,status FROM objective_stages WHERE stage_id=%s", (stage_id,))
         assert cursor.fetchone() == ("accepted", "completed")
+        cursor.execute("SELECT notification_type,summary,state,acknowledged_at FROM steward_notifications WHERE idempotency_key=%s", (f"runner.steward_attention:ready:{result_id}",))
+        assert cursor.fetchone() == ("ready_for_steward_review", "Riverview Hermes is ready for your review.", "queued", None)
 
 
 def test_validator_fail_persists_defects_and_repair_linkage() -> None:

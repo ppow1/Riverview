@@ -10,7 +10,7 @@ from riverview.database import connect
 
 class NotificationStore:
     def emit(self, *, idempotency_key: str, notification_type: str, checkpoint_id: str, summary: str, evidence_refs: tuple[str, ...]) -> UUID:
-        if notification_type not in {"steward_checkpoint", "critical_failure", "important_completion", "binding_condition"}:
+        if notification_type not in {"steward_checkpoint", "critical_failure", "important_completion", "binding_condition", "blocked_requires_steward", "ready_for_steward_review"}:
             raise ValueError("RIV-NOT-0001: notification type is closed.")
         if not checkpoint_id.startswith("RIV-") or not 1 <= len(summary.strip()) <= 1000 or not evidence_refs:
             raise ValueError("RIV-NOT-0001: notification payload is missing or unbounded.")

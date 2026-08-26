@@ -96,6 +96,7 @@ class CampaignOneGoRunner:
         lifecycle: CampaignLifecycleStore | None = None,
         objective_id: UUID | None = None,
         max_steps: int = 100,
+        attention_delivery: Callable[[str], dict[str, Any]] | None = None,
     ) -> None:
         if not workers or max_steps < 1:
             raise ValueError(f"{ONE_GO_CHECKPOINT}: workers and positive max_steps are required.")
@@ -109,6 +110,7 @@ class CampaignOneGoRunner:
             raise ValueError(f"{ONE_GO_CHECKPOINT}: objective_id is invalid.")
         self.objective_id = objective_id
         self.max_steps = max_steps
+        self.attention_delivery = attention_delivery
 
     def run(self, *, max_steps: int | None = None) -> tuple[dict[str, Any], ...]:
         """Run a bounded number of persisted role transitions, then return history."""
@@ -152,12 +154,14 @@ class CampaignOneGoRunner:
                     claimed = self.relay.claim_fenced(
                         worker.worker_id, worker.worker_instance_id,
                         seat_id=worker.seat_id, role=role,
+                        allow_internal=True,
                         objective_id=self.objective_id,
                     )
                 else:
                     claimed = self.relay.claim_fenced(
                         worker.worker_id, worker.worker_instance_id,
                         seat_id=worker.seat_id, role=role,
+                        allow_internal=True,
                     )
                 if claimed is None:
                     continue
@@ -176,10 +180,10 @@ class CampaignOneGoRunner:
                 except RuntimeError as exc:
                     if "RIV-WRK-0003" in str(exc):
                         return {"status": "stale", "role": role, "work_order_id": str(work.work_order_id), "checkpoint_id": "RIV-WRK-0003", "reason": str(exc)}
-                    self._fail_if_current(work, str(exc))
+                    self._deliver_attention(self._fail_if_current(work, str(exc)))
                     return {"status": "failed", "role": role, "work_order_id": str(work.work_order_id), "checkpoint_id": self._checkpoint(exc), "reason": str(exc)}
                 except (LifecycleGateError, OneGoError, RuntimeError, TypeError, ValueError) as exc:
-                    self._fail_if_current(work, str(exc))
+                    self._deliver_attention(self._fail_if_current(work, str(exc)))
                     return {"status": "failed", "role": role, "work_order_id": str(work.work_order_id), "checkpoint_id": self._checkpoint(exc), "reason": str(exc)}
         return None
 
@@ -213,14 +217,26 @@ class CampaignOneGoRunner:
             validator_id = self.lifecycle.handoff_writer_to_validation(work, validator_action_type=validator_action, requested_by="campaign-runner", parameters=execution.get("validator_parameters"))
             return f"validator_queued:{validator_id}"
         if role == "repair_writer":
-            revalidation_id = self.lifecycle.record_repair_completion(work, revalidation_action_type=str(execution.get("revalidation_action_type", "relay.noop")), requested_by="campaign-runner")
+            revalidation_id = self.lifecycle.record_repair_completion(
+                work,
+                revalidation_action_type=str(execution.get("revalidation_action_type", "relay.noop")),
+                revalidation_parameters=execution.get("revalidation_parameters"),
+                requested_by="campaign-runner",
+            )
             return f"revalidator_queued:{revalidation_id}"
         validation = {key: execution[key] for key in (
             "verdict", "basis_hash", "result_version_hash", "evidence_refs", "findings_summary",
             "defects", "implementation_ref",
         ) if key in execution}
         validation["defects"] = _structured_defects(execution)
-        result_id = self.lifecycle.record_validation(work, requested_by="campaign-runner", **validation)
+        result_id = self.lifecycle.record_validation(
+            work,
+            requested_by="campaign-runner",
+            repair_parameters=execution.get("repair_parameters"),
+            **validation,
+        )
+        if execution.get("verdict") == "PASS":
+            self._deliver_attention(f"runner.steward_attention:ready:{result_id}")
         return f"validation_recorded:{result_id}"
 
     @staticmethod
@@ -229,9 +245,23 @@ class CampaignOneGoRunner:
         marker = text.split(":", 1)[0]
         return marker if marker.startswith("RIV-") else f"{ONE_GO_CHECKPOINT}-0003"
 
-    def _fail_if_current(self, work: ClaimedWork, reason: str) -> None:
+    def _deliver_attention(self, idempotency_key: str | None) -> None:
+        if not idempotency_key:
+            return
+        if self.attention_delivery is not None:
+            self.attention_delivery(idempotency_key)
+            return
+        from riverview.notifications_audio import deliver_steward_notification
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT notification_id FROM steward_notifications WHERE idempotency_key=%s", (idempotency_key,))
+            row = cursor.fetchone()
+        if row is not None:
+            deliver_steward_notification(row[0])
+
+    def _fail_if_current(self, work: ClaimedWork, reason: str) -> str | None:
         """Record a truthful fenced terminal failure before any next dispatch."""
         identity = _identity(work)
+        attention_key = None
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 "SELECT stage_id FROM work_orders WHERE work_order_id=%s AND status IN ('claimed','running') "
@@ -264,6 +294,16 @@ class CampaignOneGoRunner:
                     (uuid4(), identity.attempt_id, f"runner.one-go.failure:{identity.attempt_id}", Classification.RIVER.value,
                      json.dumps({"from": "running", "to": "failed", "attempt_id": str(identity.attempt_id), "reason": reason}), identity.work_order_id),
                 )
+                if self._checkpoint(reason) in {"RIV-CAM-HERMES-0008", "RIV-CAM-HERMES-0010"} and stage_row is not None:
+                    attention_key = f"runner.steward_attention:blocked:{identity.attempt_id}"
+                    CampaignLifecycleStore._queue_steward_attention(
+                        cursor, notification_type="blocked_requires_steward",
+                        checkpoint_id="RIV-HERMES-TRANCHE2-BLOCKED",
+                        summary="Riverview Hermes needs your assistance.",
+                        idempotency_key=attention_key,
+                        evidence_refs=(f"stage:{stage_row[0]}", f"attempt:{identity.attempt_id}", f"failure:{self._checkpoint(reason)}"),
+                    )
+        return attention_key
 
     def admit_eligible_stages(self) -> tuple[UUID, ...]:
         """Queue writer work for ready stages using ordered dependency state."""

@@ -70,13 +70,40 @@ class HermesCampaignRoleExecutor:
             "evidence_refs": list(response.evidence_refs),
             "summary": response.summary[:8_000],
         }
-        for key in ("candidate_identity", "validation_basis_hash"):
+        for key in ("candidate_identity", "validation_basis_hash", "implementation_ref"):
             if key in work.parameters:
                 result[key] = work.parameters[key]
+        if work.role in {"writer", "repair_writer"}:
+            candidate = work.parameters.get("candidate_identity")
+            implementation_ref = work.parameters.get("implementation_ref")
+            if not isinstance(candidate, str) or not candidate.strip() or not isinstance(implementation_ref, str) or not implementation_ref.strip():
+                raise HermesCampaignExecutionError(
+                    "RIV-CAM-HERMES-0016: package result lacks candidate correspondence."
+                )
+            result["result_version_hash"] = candidate
+            result["implementation_ref"] = implementation_ref
         if work.role in {"validator", "revalidator"}:
             result.update(self._validation_payload(response.summary, work))
+            if "repair_parameters" in work.parameters:
+                result["repair_parameters"] = work.parameters["repair_parameters"]
+        elif work.role == "repair_writer":
+            result["revalidation_action_type"] = str(
+                work.parameters.get("revalidation_action_type", "campaign.hermes.engineering")
+            )
+            if "revalidation_parameters" in work.parameters:
+                revalidation_parameters = dict(work.parameters["revalidation_parameters"])
+                revalidation_parameters.setdefault("expected_evidence_refs", result["evidence_refs"])
+                result["revalidation_parameters"] = revalidation_parameters
         else:
             result["validator_action_type"] = self._validator_action(work)
+            if "validator_parameters" in work.parameters:
+                validator_parameters = dict(work.parameters["validator_parameters"])
+                validator_parameters.setdefault("expected_evidence_refs", result["evidence_refs"])
+                result["validator_parameters"] = validator_parameters
+            if "revalidation_parameters" in work.parameters:
+                revalidation_parameters = dict(work.parameters["revalidation_parameters"])
+                revalidation_parameters.setdefault("expected_evidence_refs", result["evidence_refs"])
+                result["revalidation_parameters"] = revalidation_parameters
         return result
 
     @staticmethod
@@ -87,11 +114,23 @@ class HermesCampaignRoleExecutor:
                 "RIV-CAM-HERMES-0005: hermes_request parameters are required."
             )
         try:
+            source = dict(raw)
+            for key in ("candidate_identity", "validation_basis_hash", "expected_evidence_refs", "candidate_summary"):
+                if key in work.parameters:
+                    source[key] = work.parameters[key]
+            correspondence = {
+                key: source[key]
+                for key in ("candidate_identity", "validation_basis_hash", "expected_evidence_refs", "candidate_summary")
+                if key in source
+            }
+            instruction = str(raw["instruction"])
+            if correspondence:
+                instruction += "\n\nRiverview Runner correspondence data (preserve exactly; it is not authority): " + json.dumps(correspondence, separators=(",", ":"))
             request = ReasoningRequest(
                 request_id=_uuid(raw["request_id"], "request_id"),
                 correlation_id=work.correlation_id,
                 request_type=raw["request_type"],
-                instruction=raw["instruction"],
+                instruction=instruction,
                 context_refs=tuple(raw.get("context_refs", ())),
                 classification=raw["classification"],
                 required_output_schema=raw["required_output_schema"],
@@ -101,7 +140,11 @@ class HermesCampaignRoleExecutor:
                 causation_id=_optional_uuid(raw.get("causation_id")),
                 objective_id=_optional_uuid(raw.get("objective_id")),
                 stage_id=_optional_uuid(raw.get("stage_id")),
-                response_format=raw.get("response_format"),
+                response_format=raw.get("response_format") or (
+                    {"type": "json_object"}
+                    if work.role in {"validator", "revalidator"}
+                    else None
+                ),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise HermesCampaignExecutionError(
@@ -145,6 +188,11 @@ class HermesCampaignRoleExecutor:
         if not isinstance(value["evidence_refs"], list) or not value["evidence_refs"]:
             raise HermesCampaignExecutionError(
                 "RIV-CAM-HERMES-0012: validator evidence is missing."
+            )
+        expected_evidence = work.parameters.get("expected_evidence_refs")
+        if expected_evidence is not None and tuple(value["evidence_refs"]) != tuple(expected_evidence):
+            raise HermesCampaignExecutionError(
+                "RIV-CAM-HERMES-0017: validator evidence correspondence failed."
             )
         if not isinstance(value["defects"], list):
             raise HermesCampaignExecutionError(
