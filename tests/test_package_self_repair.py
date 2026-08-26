@@ -169,3 +169,20 @@ def test_postgres_package_ledger_and_restart_projection_survive_store_recreation
     assert projection["state"] == "accepted"
     assert projection["acceptance_dispatch_count"] == 1
     assert recreated.package_ledger(package_run_id=outcome.package_run_id)[0]["required_repair"] == defect.defect.required_repair
+
+
+def test_postgres_multi_defect_and_independent_fail_return_to_repair():
+    lifecycle, _relay, objective_id, stage_id, _basis_id, _key = _package()
+    defects = tuple(_defect(number) for number in range(201, 204))
+    executor = FakeExecutor([PackagePass((defect,)) for defect in defects])
+    verdicts = iter((AcceptanceResult(False, (_defect(300), _defect(301)), "independent findings"),
+                     AcceptanceResult(True)))
+    outcome = PackageEngineerLoop(
+        lifecycle, objective_id=objective_id, stage_id=stage_id,
+        worktree_ref="A:/Riverview/package-worktree", executor=executor,
+        independent_acceptance=lambda candidate, *, worktree_ref: next(verdicts),
+    ).run()
+    assert outcome.state == "accepted"
+    assert outcome.acceptance_dispatches == 2
+    assert len(lifecycle.package_ledger(package_run_id=outcome.package_run_id)) == 5
+    assert lifecycle.package_run(stage_id=stage_id)["state"] == "accepted"
