@@ -238,8 +238,10 @@ class ResidentConversationGateway:
             "Return only the JSON object required by the response format. Put the human-readable "
             "answer in response_text. Set proposal to null unless the request is bounded engineering "
             "work. For bounded engineering work, proposal must contain one complete self-contained "
-            "typed specification and a non-shell read-only formation_contract. Do not claim approval "
-            "or authority; the server validates and persists any proposal separately.\n"
+            "typed specification and a non-shell read-only formation_contract. You may formulate this "
+            "as a non-binding advisory draft for Steward review; you must not approve it, execute it, "
+            "grant authority, or claim that it is accepted. The server validates and persists any "
+            "proposal separately.\n"
             f"Operator message: {instruction}"
             f"{history_context}"
         )
