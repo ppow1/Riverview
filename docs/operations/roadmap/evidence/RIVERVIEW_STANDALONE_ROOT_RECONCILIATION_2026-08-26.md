@@ -8,7 +8,7 @@ Status: TECHNICALLY VERIFIED; STEWARD ACCEPTANCE PENDING
 - Git remote: `https://github.com/ppow1/Riverview.git`
 - Initial reconciliation baseline: `ec9075bfec7655fe67e7c4455bfd9c644b2d2d52`
 - Candidate branch: `main`
-- Candidate source SHA at final runtime verification: `fcc0d43b7c5ec96210078d13ef18cdeb79a04415`.
+- Candidate source SHA at final evidence commit: `62afdf1d68e6b3285e7150336925088183c20bd3`.
 - Network `origin/main`: `cb4a203274fd0d543ae5140cc036190a4625828c`; candidate is 13 commits ahead and 1 commit behind by ancestry, with the upstream launch-hints content already represented in the candidate tree.
 - Previous live checkout retained unchanged: `A:\Riverview\repo`
 - No historical checkout was deleted, cleaned, reset, moved, or rewritten.

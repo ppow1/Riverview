@@ -11,7 +11,7 @@ Status: TECHNICALLY VERIFIED — STEWARD ACCEPTANCE PENDING
 Authority: Steward-controlled Riverview lifecycle and acceptance
 Authoritative checkout: `A:\Riverview\standalone`
 Branch: `main`
-Verified candidate HEAD: `fcc0d43b7c5ec96210078d13ef18cdeb79a04415`
+Verified candidate HEAD: `62afdf1d68e6b3285e7150336925088183c20bd3`
 Verified GitHub `origin/main`: `cb4a203274fd0d543ae5140cc036190a4625828c`
 
 ## Scope
