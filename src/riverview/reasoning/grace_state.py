@@ -102,7 +102,7 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
         try:
             payload = json.loads(registry_path.read_text(encoding="utf-8"))
             registry = [
-                {"name": str(row["name"]), "role": str(row["office"]), "resident_id": str(row["resident_id"])}
+                {"name": str(row["name"]), "role": str(row["office"]), "resident_id": str(row["resident_id"]), "responsibility_domains": ["research"] if "research" in str(row["office"]).casefold() else []}
                 for row in payload.get("records", [])[:32]
                 if isinstance(row, dict) and row.get("name") and row.get("office") and row.get("resident_id")
             ]
@@ -114,7 +114,7 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
             durable = []
         by_name = {item["name"].casefold(): item for item in registry}
         for item in durable:
-            by_name[str(item["name"]).casefold()] = {"name": str(item["name"]), "role": str(item["role"]), "resident_id": str(item["resident_id"])}
+            by_name[str(item["name"]).casefold()] = {"name": str(item["name"]), "role": str(item["role"]), "resident_id": str(item["resident_id"]), "responsibility_domains": ["research"] if "research" in str(item["role"]).casefold() else []}
         registry = sorted(by_name.values(), key=lambda item: item["name"])[:32]
         try:
             cme = CMEStatusStore().read()

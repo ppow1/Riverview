@@ -44,11 +44,16 @@ def compose_resident_speech(
     last_error: RuntimeError | None = None
     last_response: ReasoningResponse | None = None
     registry_names: set[str] = set()
+    domain_matches: dict[str, str] = {}
     no_owner_capability = False
     for raw in context_material:
         try:
             value = json.loads(raw).get("value", {}).get("metadata", {})
             registry_names.update(str(row["name"]) for row in value.get("registry", ()) if isinstance(row, dict) and row.get("name"))
+            for row in value.get("registry", ()):
+                if isinstance(row, dict) and row.get("name") and row.get("responsibility_domains"):
+                    for domain in row["responsibility_domains"]:
+                        domain_matches[str(domain).casefold()] = f"{row['name']}, {row.get('role', 'resident')}"
             no_owner_capability = no_owner_capability or any(item.get("human_owner_known") is False and not item.get("suitable_resident_ids") for item in value.get("capabilities", ()) if isinstance(item, dict))
         except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
             continue
@@ -61,7 +66,8 @@ def compose_resident_speech(
             if not isinstance(speech, str) or not speech.strip() or any(marker in speech.casefold() for marker in _FORBIDDEN):
                 raise RuntimeError("RIV-RES-0002: resident speech composer returned internal scaffolding.")
             named_residents = {name.casefold() for name in registry_names if name.casefold() in speech.casefold() and name.casefold() != "grace"}
-            if no_owner_capability and named_residents and not any(term in instruction.casefold() for term in ("other residents", "who lives", "resident registry", "which residents")):
+            unsupported_self_claim = "research" in instruction.casefold() and "authoritative contact" in speech.casefold() and not any(candidate.casefold() in speech.casefold() for domain, candidate in domain_matches.items() if domain == "research")
+            if (no_owner_capability and named_residents and not any(term in instruction.casefold() for term in ("other residents", "who lives", "resident registry", "which residents"))) or unsupported_self_claim:
                 raise RuntimeError("RIV-RES-0002: resident speech composer assigned an unsupported capability owner.")
             break
         except json.JSONDecodeError as exc:
@@ -72,7 +78,10 @@ def compose_resident_speech(
     else:
         if last_response is None:
             raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
-        speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
+        if "research" in instruction.casefold() and "research" in domain_matches:
+            speech = f"{domain_matches['research']} is the authoritative Riverview role for research questions. I can route the question for that office's advisory consideration without executing any work."
+        else:
+            speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
         return ReasoningResponse(
             response_id=last_response.response_id, request_id=request.request_id,
             correlation_id=result.correlation_id, provider_id=f"resident-speech:fallback:{last_response.provider_id}",

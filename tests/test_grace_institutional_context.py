@@ -18,7 +18,9 @@ def test_institutional_projection_is_bounded_read_only_and_authoritative(monkeyp
     item = projection["state_records"][0]
     material = item["bounded_metadata"]
     grace = next(row for row in material["registry"] if row["name"] == "Grace")
-    assert grace == {"name": "Grace", "role": "Director of Operations", "resident_id": "durable-grace"}
+    assert grace["name"] == "Grace"
+    assert grace["role"] == "Director of Operations"
+    assert grace["resident_id"] == "durable-grace"
     assert {row["name"] for row in material["registry"]} >= {"Alfred", "Grace", "Marie"}
     assert material["subsystems"][0]["meaning"] == "Continuous Momentum Engine"
     engineering = next(item for item in material["capabilities"] if item["capability"] == "codex.engineering.v1")
