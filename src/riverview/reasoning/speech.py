@@ -12,8 +12,8 @@ from .claim_grounding import ground_claims
 
 _SPEECH_FORMAT = {
     "type": "object",
-    "properties": {"speech": {"type": "string", "minLength": 1, "maxLength": 4000}, "institutional_claims": {"type": "array", "maxItems": 16, "items": {"type": "object"}}},
-    "required": ["speech", "institutional_claims"],
+    "properties": {"speech": {"type": "string", "minLength": 1, "maxLength": 4000}, "assertion_mode": {"enum": ["ordinary", "institutional"]}, "institutional_claims": {"type": "array", "maxItems": 16, "items": {"type": "object"}}},
+    "required": ["speech", "assertion_mode", "institutional_claims"],
     "additionalProperties": False,
 }
 _FORBIDDEN = ("response_text", "rationale:", "acknowledge the greeting", "home_cognition")
@@ -74,9 +74,12 @@ def compose_resident_speech(
             value = json.loads(response.summary)
             speech = value.get("speech") if isinstance(value, dict) else None
             claims = value.get("institutional_claims") if isinstance(value, dict) else None
+            mode = value.get("assertion_mode", "ordinary") if isinstance(value, dict) else "ordinary"
+            if mode not in {"ordinary", "institutional"}:
+                raise RuntimeError("RIV-RES-0002: resident speech composer returned an invalid assertion mode.")
             grounding = ground_claims(claims, context_material)
-            if grounding.unsupported:
-                raise RuntimeError("RIV-RES-0002: resident speech composer returned unsupported institutional claims.")
+            if mode == "institutional" and (not isinstance(claims, list) or not claims or grounding.unsupported or not grounding.supported):
+                raise RuntimeError("RIV-RES-0002: resident speech composer returned ungrounded institutional claims.")
             if not isinstance(speech, str) or not speech.strip() or any(marker in speech.casefold() for marker in _FORBIDDEN):
                 raise RuntimeError("RIV-RES-0002: resident speech composer returned internal scaffolding.")
             named_residents = {name.casefold() for name in registry_names if name.casefold() in speech.casefold() and name.casefold() != "grace"}

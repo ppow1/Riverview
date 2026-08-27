@@ -47,6 +47,13 @@ def test_unsupported_named_resident_is_not_presented_as_capability_owner():
     assert "does not execute" in response.summary
 
 
+def test_institutional_speech_without_typed_claims_is_recomposed():
+    material = (json.dumps({"value": {"metadata": {"capabilities": [{"capability": "codex.engineering.v1", "human_owner_known": False, "suitable_resident_ids": []}]}}}),)
+    response = compose_resident_speech(provider_with({"speech": "Jessica is appropriate.", "assertion_mode": "institutional", "institutional_claims": []}), "qwen3-coder:30b", "What resource is appropriate for this work?", result(), material)
+    assert "Jessica" not in response.summary
+    assert "codex.engineering.v1" in response.summary
+
+
 @pytest.mark.parametrize("speech", [
     '{"response_text":"Hello","proposal":null}',
     "Acknowledge the greeting and respond appropriately.",
