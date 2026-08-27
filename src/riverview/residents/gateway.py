@@ -239,7 +239,7 @@ class ResidentConversationGateway:
         correlation = correlation_id or uuid4()
         if profile.is_grace and self.home_cognition is not None:
             from riverview.reasoning.home_runtime import invocation_for_message
-            prior_history = tuple(f"{turn['role']}: {str(turn['text'])[:2_000]}" for turn in self._bounded_history(session.history))
+            prior_history = tuple(f"{turn['role']}: {str(turn['text'])[:400]}" for turn in self._bounded_history(session.history))
             outcome = self.home_cognition.execute(invocation_for_message(instruction=instruction, correlation_id=correlation, classification=classification, prior_history=prior_history))
             if outcome.result is None:
                 raise RuntimeError("RIV-COG-E1-0001: HOME cognition did not return an advisory result.")
