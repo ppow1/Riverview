@@ -6,9 +6,10 @@ Status: CANDIDATE VERIFIED; CONTROLLED CUTOVER PENDING
 
 - Candidate root: `A:\Riverview\standalone`
 - Git remote: `https://github.com/ppow1/Riverview.git`
-- Baseline: verified network `origin/main` `ec9075bfec7655fe67e7c4455bfd9c644b2d2d52`
+- Initial reconciliation baseline: `ec9075bfec7655fe67e7c4455bfd9c644b2d2d52`
 - Candidate branch: `main`
-- Candidate reconciliation commit: `82f40c5a643ab3a02d7eaaa862b831bc82ab0308` (final local candidate SHA).
+- Candidate source SHA at final runtime verification: `8bda39ea9f84970bcce012485043bf46f4b87d14`.
+- Network `origin/main`: `cb4a203274fd0d543ae5140cc036190a4625828c`; candidate is 13 commits ahead and 1 commit behind by ancestry, with the upstream launch-hints content already represented in the candidate tree.
 - Previous live checkout retained unchanged: `A:\Riverview\repo`
 - No historical checkout was deleted, cleaned, reset, moved, or rewritten.
 
@@ -107,3 +108,48 @@ not claimed by this report.
 
 No 3060, small-brain/big-brain, shared-cognition, or escalation optimization
 work is included.
+
+## Final settled runtime proof — 2026-08-26
+
+After the controlled restart and a settled interval:
+
+- one `Riverview Runtime Supervisor` task instance owns the runtime;
+- all managed services are running from `A:\\Riverview\\standalone`;
+- CME has one logical launcher/child topology and Relay has one logical
+  launcher/child topology; Windows venv launcher children are not counted as
+  separate service instances;
+- no managed Riverview process has working directory `A:\\Riverview\\repo`;
+- Operator `/health` and authenticated `/api/runtime/status` report the same
+  root, branch, Python environment, and SHA as the candidate runtime;
+- PostgreSQL read-only connectivity succeeds as `riverview_app` to database
+  `riverview` on PostgreSQL 18.6;
+- `A:\\Riverview\\repo` remains preserved as rollback/reference evidence.
+
+The runtime ownership boundary is technically settled, subject to later
+Steward acceptance of the standalone-root transition.
+
+## HOME cognition boundary — 2026-08-26
+
+The accepted `HomeCognitionService` and E1/F1/F2/F3/P1/P2 implementation was
+read and remains unmodified. Its production invocation requires a real
+`AuthoritativeGraceState` containing UUID-backed resident/occupant, office,
+implementation, authority, non-stale `ContextBundle`, authoritative state
+references, and evidence references.
+
+Read-only PostgreSQL inspection found:
+
+- `grace_identities` contains Grace and her authority rules;
+- `resident_occupants` contains Jessica and test fixtures, but no Grace;
+- no active Grace occupancy exists in `resident_occupancies`;
+- no Grace implementation binding exists;
+- no Grace current assignment/state projection exists from which a non-stale
+  context bundle can be assembled.
+
+Therefore the Operator cannot yet invoke HOME cognition for Grace without
+inventing UUID-backed institutional state or authority. The correct current
+behavior remains fail-closed; direct provider fallback must not be used to
+mask this absence. The precise remaining decision is to establish the
+authoritative Grace resident/occupant, office assignment, implementation
+binding, and current-assignment/context projection with provenance, or to
+explicitly authorize a canonical identity-mapping design. No such decision is
+assumed by this tranche.

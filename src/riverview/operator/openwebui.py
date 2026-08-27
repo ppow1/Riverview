@@ -33,6 +33,7 @@ from riverview.operator.room_admin import RoomAdministration
 from riverview.operator.snapshot import build_snapshot
 from riverview.operator.ui import UI_HTML as CLEAN_UI_HTML
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
+from riverview.reasoning.home_runtime import build_grace_home_cognition
 from riverview.residents.direct_grace import DirectGraceFormation, extract_typed_proposal
 from riverview.residents.gateway import ResidentConversationGateway, RoomTurnPartialFailure
 
@@ -111,6 +112,7 @@ class OpenWebUIConfig:
     data_path: str = r"A:\Riverview\runtime\operator\openwebui"
     bearer_token: str = ""
     default_model: str = "qwen3-coder:30b-qwencode-20k"
+    home_cognition_enabled: bool = False
 
     def __post_init__(self) -> None:
         if self.host not in {"127.0.0.1", "localhost"} or not 1024 <= self.port <= 65535:
@@ -125,6 +127,8 @@ class RiverviewOpenWebUIService:
         self.provider = provider
         self.authorized_model = config.default_model
         self.resident_gateway = resident_gateway or ResidentConversationGateway.from_evidence()
+        if config.home_cognition_enabled and self.resident_gateway.home_cognition is None:
+            self.resident_gateway.home_cognition = build_grace_home_cognition(self.provider, self.authorized_model)
         self.jessica_workflow = CharacterDesignerWorkflow(self.resident_gateway.character_store)
         self.sessions: set[str] = set()
         # The projection owns UI history only; resident continuity/canon remains

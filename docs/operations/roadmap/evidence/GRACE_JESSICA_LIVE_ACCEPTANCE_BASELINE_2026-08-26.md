@@ -88,30 +88,53 @@ The reusable `CharacterDesignerWorkflow` remains valid and preserves:
 - prior-version lineage;
 - no self-authorized canon mutation.
 
-The Grace-owned Jessica workflow contract is exposed in the resident gateway,
-but no live Jessica conversation was accepted in this baseline, and the
-Operator does not yet provide a dedicated interactive inspect/discuss/propose
-character-development control surface. The existing generic proposal/review
-workflow is implementation evidence, not live behavioral acceptance.
+The live standalone Operator now provides `/jessica` and authenticated
+`/api/jessica/character-development` actions for inspect, discuss, propose,
+independent review, Steward review, and publish. A real Jessica discussion and
+proposal were exercised through Ollama; the proposal retained base version,
+source evidence, rationale, and independent-review evidence. Publish without
+Steward review was rejected, and no canon was changed.
+
+## Settled runtime verification — 2026-08-26
+
+- Candidate root: `A:\\Riverview\\standalone`.
+- Runtime source SHA: `8bda39ea9f84970bcce012485043bf46f4b87d14`.
+- GitHub `origin/main`: `cb4a203274fd0d543ae5140cc036190a4625828c`.
+- Candidate relation: 13 commits ahead and 1 commit behind by ancestry; the
+  upstream launch-hints content is already represented in the candidate tree.
+- One scheduled Runtime Supervisor owner and one logical CME/Relay service
+  topology are present; Windows venv launcher/child pairs are one service.
+- Operator health and runtime status report matching root, branch, Python
+  environment, and SHA. PostgreSQL read-only access succeeds.
+- Old `A:\\Riverview\\repo` and the preserved artifact subtree remain intact.
+
+## HOME cognition boundary
+
+The accepted `HomeCognitionService` implementation and E1/F1/F2/F3/P1/P2
+seams are present and tested, but the live Grace route still uses the direct
+provider-neutral gateway. Read-only PostgreSQL inspection found `grace_identities`
+but no Grace row in `resident_occupants`, no active Grace occupancy, no Grace
+implementation binding, and no current assignment/context bundle. The required
+`AuthoritativeGraceState` therefore cannot be constructed without inventing
+UUID-backed institutional state or authority. No direct fallback was upgraded
+into HOME cognition.
 
 ## Supporting verification
 
-- Targeted Grace/Jessica/operator/cognition tests: `30 passed`.
-- Python compilation: passed.
+- Final bounded candidate regression: `68 passed`.
+- Grace live multi-turn Operator probe: real Ollama/Qwen response, six durable
+  messages, role/correlation/provider evidence, and a valid non-binding proposal.
+- Jessica live Operator workflow probe: inspect/discuss/propose/independent
+  review succeeded; publish-before-Steward-review failed closed.
+- Candidate runtime settled proof: all managed services `running` after restart.
 - `git diff --check`: passed.
-- System Python without `PYTHONPATH=src`: blocked by package-install environment;
-  this is not used as capability evidence.
-- Live Operator health: HTTP 200, but alternate-checkout SHA mismatch means it
-  is not authoritative evidence for this checkout.
 
 ## Notification / stop boundary
 
-This report is a genuine Steward boundary because proceeding requires both:
-
-1. an authoritative Grace cognition-state/runtime adapter decision; and
-2. reconciliation of the installed Operator lifecycle owner with the intended
-   authoritative checkout without disturbing unrelated alternate-checkout work.
-
-No READY_FOR_STEWARD_REVIEW claim is made. The next safe action is to resolve
-that bounded authority/runtime decision, then implement and live-test the E1
-cognition adapter and the interactive Jessica character-development path.
+No READY_FOR_STEWARD_REVIEW claim is made. Runtime ownership is technically
+settled. Grace HOME cognition is not proven live because authoritative Grace
+state is absent. The remaining Steward action is to establish the authoritative
+Grace resident/occupant, office assignment, implementation binding, and
+current-assignment/context projection with provenance, or explicitly authorize
+a canonical identity-mapping design. After that state exists, wire and live-test
+HOME cognition before issuing a READY notification.

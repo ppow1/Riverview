@@ -40,8 +40,10 @@ class CharacterStore(_JsonStore):
     @classmethod
     def from_profiles(cls, profiles: tuple[Any, ...], path: Path | None = None) -> CharacterStore:
         store = cls(path)
-        if not store.data["versions"]:
-            for profile in profiles:
+        existing = {v["resident_id"] for v in store.data["versions"]}
+        missing = [profile for profile in profiles if profile.resident_id not in existing]
+        if missing:
+            for profile in missing:
                 store.data["versions"].append({
                     "resident_id": profile.resident_id, "version": "v1", "name": profile.name,
                     "role": profile.role, "identity": {"name": profile.name, "role": profile.role},
