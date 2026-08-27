@@ -51,7 +51,7 @@ def compose_resident_speech(
     for raw in context_material:
         if '"human_owner_known":false' in raw and '"suitable_resident_ids":[]' in raw:
             no_owner_capability = True
-        if '"capability":"codex.engineering.v1"' in raw:
+        if "codex.engineering.v1" in raw:
             engineering_capability_known = True
         if '"name":"Jessica"' in raw:
             registry_names.add("Jessica")
@@ -97,8 +97,10 @@ def compose_resident_speech(
             raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
         if "research" in instruction.casefold():
             speech = "Marie, Manager of Research, is the authoritative Riverview role for research questions. I can route the question for that office's advisory consideration without executing any work."
-        else:
+        elif engineering_capability_known:
             speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
+        else:
+            speech = "I don't have an authoritative Riverview resident or office assignment for that responsibility. I can state the uncertainty and leave any routing decision to the governed institutional process."
         return ReasoningResponse(
             response_id=last_response.response_id, request_id=request.request_id,
             correlation_id=result.correlation_id, provider_id=f"resident-speech:fallback:{last_response.provider_id}",

@@ -40,7 +40,7 @@ def test_governed_proposal_word_is_allowed_in_natural_speech():
 
 
 def test_unsupported_named_resident_is_not_presented_as_capability_owner():
-    material = (json.dumps({"value": {"metadata": {"registry": [{"name": "Jessica"}], "capabilities": [{"human_owner_known": False, "suitable_resident_ids": []}]}}}),)
+    material = (json.dumps({"value": {"metadata": {"registry": [{"name": "Jessica"}], "capabilities": [{"capability": "codex.engineering.v1", "human_owner_known": False, "suitable_resident_ids": []}]}}}),)
     response = compose_resident_speech(provider_with({"speech": "Jessica is the right person to handle that."}), "qwen3-coder:30b", "What internal resource is appropriate?", result(), material)
     assert "Jessica" not in response.summary
     assert "codex.engineering.v1" in response.summary
