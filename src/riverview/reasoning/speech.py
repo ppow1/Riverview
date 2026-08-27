@@ -8,11 +8,12 @@ from uuid import UUID, uuid4
 
 from .contracts import ReasoningRequest, ReasoningResponse
 from .cognition_contracts import CognitionResult
+from .claim_grounding import ground_claims
 
 _SPEECH_FORMAT = {
     "type": "object",
-    "properties": {"speech": {"type": "string", "minLength": 1, "maxLength": 4000}},
-    "required": ["speech"],
+    "properties": {"speech": {"type": "string", "minLength": 1, "maxLength": 4000}, "institutional_claims": {"type": "array", "maxItems": 16, "items": {"type": "object"}}},
+    "required": ["speech", "institutional_claims"],
     "additionalProperties": False,
 }
 _FORBIDDEN = ("response_text", "rationale:", "acknowledge the greeting", "home_cognition")
@@ -69,6 +70,10 @@ def compose_resident_speech(
             last_response = response
             value = json.loads(response.summary)
             speech = value.get("speech") if isinstance(value, dict) else None
+            claims = value.get("institutional_claims") if isinstance(value, dict) else None
+            grounding = ground_claims(claims, context_material)
+            if grounding.unsupported:
+                raise RuntimeError("RIV-RES-0002: resident speech composer returned unsupported institutional claims.")
             if not isinstance(speech, str) or not speech.strip() or any(marker in speech.casefold() for marker in _FORBIDDEN):
                 raise RuntimeError("RIV-RES-0002: resident speech composer returned internal scaffolding.")
             named_residents = {name.casefold() for name in registry_names if name.casefold() in speech.casefold() and name.casefold() != "grace"}
