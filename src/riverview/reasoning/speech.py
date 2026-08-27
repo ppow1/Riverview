@@ -100,7 +100,7 @@ def compose_resident_speech(
             raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
         if "research" in instruction.casefold():
             speech = "Marie, Manager of Research, is the authoritative Riverview role for research questions. I can route the question for that office's advisory consideration without executing any work."
-        elif engineering_capability_known:
+        elif engineering_capability_known and any(term in instruction.casefold() for term in ("mechanical", "engineering", "bracket", "generator", "windmill")):
             speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
         else:
             speech = "I don't have an authoritative Riverview resident or office assignment for that responsibility. I can state the uncertainty and leave any routing decision to the governed institutional process."
