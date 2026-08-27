@@ -47,9 +47,12 @@ def compose_resident_speech(
     registry_names: set[str] = set()
     domain_matches: dict[str, str] = {}
     no_owner_capability = False
+    engineering_capability_known = False
     for raw in context_material:
         if '"human_owner_known":false' in raw and '"suitable_resident_ids":[]' in raw:
             no_owner_capability = True
+        if '"capability":"codex.engineering.v1"' in raw:
+            engineering_capability_known = True
         if '"name":"Jessica"' in raw:
             registry_names.add("Jessica")
         if '"name":"Marie"' in raw and '"responsibility_domains":["research"]' in raw:
@@ -100,9 +103,10 @@ def compose_resident_speech(
             evidence_refs=tuple(dict.fromkeys((*result.provenance_refs, f"speech-composition:fallback:{last_response.response_id}"))),
             classification=result.classification, created_at=last_response.created_at,
         )
+    if engineering_capability_known and "engineering" in instruction.casefold() and "codex.engineering.v1" not in speech:
+        speech = speech.rstrip() + " Riverview's documented governed resource for this is codex.engineering.v1, which supports bounded proposal formation rather than automatic execution."
     return ReasoningResponse(
-        response_id=response.response_id, request_id=request.request_id,
-        correlation_id=result.correlation_id, provider_id=f"resident-speech:{response.provider_id}",
+        response_id=response.response_id, request_id=request.request_id, correlation_id=result.correlation_id, provider_id=f"resident-speech:{response.provider_id}",
         response_type="advice", summary=speech.strip(),
         evidence_refs=tuple(dict.fromkeys((*result.provenance_refs, f"speech-composition:{response.response_id}"))),
         classification=result.classification, created_at=response.created_at,
