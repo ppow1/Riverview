@@ -1,4 +1,4 @@
-<!-- Version: 0.6.2 -->
+<!-- Version: 0.6.3 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -66,6 +66,14 @@ Rules:
 - For Steward-requested engineering work through Grace, read `docs/operations/GRACE_ENGINEERING_TASK_SUBMISSION_TEMPLATE.md` before forming or submitting the task. It is the canonical single-task and parallel-task Comms5/Grace submission, one-approval, lineage-following, and same-lineage recovery template.
 - Preserve valuable but uncommitted ideas in `docs/operations/boards/parking_lot.md`; substantial parked ideas use `docs/operations/parking_lot/PL-####-slug.md`. Parking does not authorize implementation.
 - Use `docs/operations/boards/ready_bench.md` only for Steward-committed work that has been sufficiently elaborated into durable specification, roadmap/execution sequence, bounded work packages, dependencies, acceptance criteria, and scope boundaries. Read `docs/operations/PARKING_LOT_AND_READY_BENCH.md` before promoting work between these states.
+
+## HERMES / C1-C2-C3 CODEX RESOURCE ORCHESTRATION
+
+For Hermes resource scheduling, C1/C2/C3 authentication, Codex capacity/fuel, quota windows, reset/rollover strategy, resource policy, resource claims/bindings, planner decisions, Grace resource visibility, or multi-job Hermes/Codex execution, read **`docs/operations/HERMES_C1_C2_C3_RESOURCE_ORCHESTRATION.md`** before modifying or diagnosing the system.
+
+That operational summary records the accepted C1/C2/C3 `CODEX_HOME`/safe-fingerprint mappings, telemetry and reset semantics, durable PostgreSQL policy modes, Riverview -> Hermes -> native Codex execution path, Grace/Comms5/Operator visibility, exactly-once and governed recovery behavior, current conservative claim/lease semantics, and the PL-0013 follow-up for non-exclusive resource binding and reset-first default scheduling.
+
+The detailed acceptance evidence remains in `docs/operations/roadmap/evidence/C1_C2_C3_HERMES_NATIVE_BINDING_2026-08-27.md`.
 
 ## HERMES WINDOWS LAUNCH / RECOVERY
 
