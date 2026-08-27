@@ -31,6 +31,38 @@ class ClaimGrounding:
     unsupported: tuple[InstitutionalClaim, ...]
 
 
+def requested_responsibility_domain(instruction: str) -> str:
+    """Classify the responsibility being requested, not merely the object domain."""
+    text = instruction.casefold()
+    if any(token in text for token in ("legal review", "legal counsel", "attorney", "counsel")):
+        return "legal"
+    if any(token in text for token in ("security review", "security responsibility", "security contact")):
+        return "security"
+    if any(token in text for token in ("research questions", "research responsibility", "research contact")):
+        return "research"
+    if any(token in text for token in ("character review", "character development", "canon")):
+        return "character"
+    if any(token in text for token in ("mechanical", "structural", "cad", "fabrication", "engineering", "generator", "windmill")):
+        return "engineering"
+    return "unknown"
+
+
+def contains_institutional_assertion(speech: str, context_material: tuple[str, ...]) -> bool:
+    """Detect responsibility-shaped claims independently of provider assertion_mode."""
+    text = speech.casefold()
+    subjects: set[str] = set()
+    for raw in context_material:
+        try:
+            metadata = json.loads(raw)["value"]["metadata"]
+            subjects.update(str(row["name"]).casefold() for row in metadata.get("registry", ()) if isinstance(row, dict) and row.get("name"))
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+    subject_present = any(name and name in text for name in subjects)
+    responsibility_shape = any(token in text for token in ("authoritative contact", "responsible for", "right person", "appropriate resource", "qualified for", "owns ", "handles those inquiries", "should handle"))
+    self_assignment = "i'm the authoritative" in text or "i am the authoritative" in text
+    return (subject_present and responsibility_shape) or self_assignment
+
+
 def ground_claims(raw_claims: Any, context_material: tuple[str, ...]) -> ClaimGrounding:
     registry: dict[str, set[str]] = {}
     capability_owners: dict[str, set[str]] = {}
