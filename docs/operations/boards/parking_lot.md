@@ -1,4 +1,4 @@
-<!-- Version: 1.4.0 | Date: 2026-08-26 | Status: Active -->
+<!-- Version: 1.5.0 | Date: 2026-08-26 | Status: Active -->
 # Riverview Parking Lot
 
 The Parking Lot preserves valuable ideas without committing Riverview to implementation or interrupting current execution.
@@ -20,5 +20,6 @@ This is not a backlog and not an execution queue. Capturing an item does not aut
 | PL-0009 | Hermes Liaison Resident or Office | Resident and Office Architecture / Hermes | Strategic | Steward | 2026-08-26 | CAPTURED | Promote only after explicit authority, identity, privacy, character, and acceptance specification. |
 | PL-0010 | Hermes Citizenship or Residency Question | Institutional Membership / Resident Architecture / Hermes | Strategic | Steward | 2026-08-26 | CAPTURED | Promote only after separate Steward consideration and an accepted institutional and character-architecture specification. |
 | PL-0011 | Riverview Remote Machine Control Surface | Operator UX / Stream Deck / Remote Compute / Infrastructure | High | Steward | 2026-08-26 | CAPTURED | Promote as Octominer 2/daily-driver identities become known, shutdown/Wake-on-LAN becomes active work, migration settles the durable layout, or upon explicit Steward direction. |
+| PL-0012 | Riverview Linux/Ubuntu Hosting and Cross-Platform Portability | Runtime Architecture / Infrastructure / Cross-Platform Portability / Local AI | Strategic | Steward | 2026-08-26 | CAPTURED | Promote when the Steward directs Linux migration elaboration, the current migration reaches a stable checkpoint, Linux hosting becomes a compute dependency, Windows becomes a material blocker, or durable server/core placement is being selected. |
 
 For substantial entries, read the corresponding detailed artifact under `docs/operations/parking_lot/` before acting.
