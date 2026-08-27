@@ -603,6 +603,8 @@ class HomeCognitionService:
                 },
                 "objective": packet.objective,
                 "question": packet.question,
+                "context_priority": "For Riverview-specific questions, use authoritative Riverview context_material before generic world knowledge. If the context_material does not answer the question, state the uncertainty instead of substituting a confident generic meaning.",
+                "resident_facing_policy": "Answer naturally as the authoritative Riverview resident in the stated office role. Read/context capability is not execution authority.",
                 "constraints": list(packet.constraints),
                 "known_deterministic_results": list(packet.known_deterministic_results),
                 "context_material": list(packet.context_material),
