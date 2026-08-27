@@ -73,6 +73,17 @@ from .home_cognition import (
     HomeCognitionService,
     HomeGenerationObservation,
 )
+from .occupational import (
+    CapabilityAuthority,
+    CapabilityResultStatus,
+    ResidentCapabilityBroker,
+    ResidentCapabilityDescriptor,
+    ResidentCapabilityRequest,
+    ResidentCapabilityResult,
+    ResidentOfficeCapabilityPackage,
+    ResidentOccupationalReasoner,
+    ResidentOccupationalRun,
+)
 from .high_reasoning import (
     HIGH_REASONING_CAPABILITY, HIGH_REASONING_CHECKPOINT, HIGH_REASONING_VERSION,
     HIGH_OBSERVATION_EVENT, AuthorizedHighReasoningProvider, HighGenerationObservation,
@@ -153,6 +164,9 @@ __all__ = [
     "HomeCognitionOutcome",
     "HomeCognitionService",
     "HomeGenerationObservation",
+    "CapabilityAuthority", "CapabilityResultStatus", "ResidentCapabilityBroker",
+    "ResidentCapabilityDescriptor", "ResidentCapabilityRequest", "ResidentCapabilityResult",
+    "ResidentOfficeCapabilityPackage", "ResidentOccupationalReasoner", "ResidentOccupationalRun",
     "HIGH_REASONING_CAPABILITY", "HIGH_REASONING_CHECKPOINT", "HIGH_REASONING_VERSION",
     "HIGH_OBSERVATION_EVENT", "AuthorizedHighReasoningProvider", "HighGenerationObservation",
     "HighReasoningCoordinator", "HighReasoningExecutionError", "HighReasoningInvocation",
