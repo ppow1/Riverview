@@ -62,6 +62,18 @@ def test_runtime_supervisor_rejects_nonpositive_poll(tmp_path: Path):
         )
 
 
+def test_runtime_supervisor_process_lock_allows_one_owner(tmp_path: Path):
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
+    first = supervisor._acquire_process_lock(tmp_path / "supervisor.lock")
+    second = supervisor._acquire_process_lock(tmp_path / "supervisor.lock")
+    assert first is not None
+    assert second is None
+    supervisor._release_process_lock(first)
+    third = supervisor._acquire_process_lock(tmp_path / "supervisor.lock")
+    assert third is not None
+    supervisor._release_process_lock(third)
+
+
 def test_runtime_command_expands_windows_environment_syntax(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("RIVERVIEW_TEST_HOME", "C:/Users/example")
     assert RuntimeSupervisor._expand_command_item(

@@ -11,6 +11,7 @@ status, logs, command lines, or River.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -618,20 +619,12 @@ class RuntimeSupervisor:
     def run(self) -> None:
         lock = self.repository / "runtime" / "riverview-supervisor.lock.d"
         lock.parent.mkdir(parents=True, exist_ok=True)
+        process_lock = self._acquire_process_lock(self.repository / "runtime" / "riverview-supervisor.lock")
+        if process_lock is None:
+            return
         try:
+            shutil.rmtree(lock, ignore_errors=True)
             lock.mkdir()
-        except FileExistsError:
-            owner_pid = None
-            try:
-                owner_pid = int(json.loads((lock / "owner.json").read_text(encoding="utf-8"))["pid"])
-            except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
-                pass
-            if owner_pid is None or not self._pid_exists(owner_pid):
-                shutil.rmtree(lock, ignore_errors=True)
-                lock.mkdir()
-            else:
-                return
-        try:
             (lock / "owner.json").write_text(
                 json.dumps({"pid": os.getpid(), "started_at": self.started_at}), encoding="utf-8"
             )
@@ -646,6 +639,7 @@ class RuntimeSupervisor:
                 lock.rmdir()
             except OSError:
                 pass
+            self._release_process_lock(process_lock)
 
     @staticmethod
     def _pid_exists(pid: int) -> bool:
@@ -656,6 +650,42 @@ class RuntimeSupervisor:
         except (OSError, ProcessLookupError):
             return False
         return True
+
+    @staticmethod
+    def _acquire_process_lock(path: Path) -> Any | None:
+        """Acquire an OS-held singleton lock; return None when held."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if os.name == "nt":
+            import ctypes
+            name = "Local\\RiverviewRuntimeSupervisor-" + hashlib.sha256(str(path.resolve()).encode()).hexdigest()
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.CreateMutexW(None, True, name)
+            if not handle:
+                raise OSError("RIV-RUN-0001: unable to create Supervisor mutex.")
+            if kernel32.GetLastError() == 183:
+                kernel32.CloseHandle(handle)
+                return None
+            return ("windows", handle)
+        handle = path.open("a+b")
+        import fcntl
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            handle.close()
+            return None
+        return ("posix", handle)
+
+    @staticmethod
+    def _release_process_lock(lock: Any) -> None:
+        kind, value = lock
+        if kind == "windows":
+            import ctypes
+            ctypes.windll.kernel32.ReleaseMutex(value)
+            ctypes.windll.kernel32.CloseHandle(value)
+        else:
+            import fcntl
+            fcntl.flock(value.fileno(), fcntl.LOCK_UN)
+            value.close()
 
     def stop_all(self) -> None:
         self.stop_requested = True
