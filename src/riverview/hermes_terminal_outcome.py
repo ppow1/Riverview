@@ -31,6 +31,40 @@ ATTENTION_OUTCOMES = frozenset(
     }
 )
 NON_ATTENTION_OUTCOMES = frozenset({"CONTINUE", "COMPLETED_NO_ATTENTION"})
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.IGNORECASE)
+_SHA_RE = re.compile(r"^[0-9a-f]{7,64}$", re.IGNORECASE)
+_CHECKPOINT_RE = re.compile(r"^RIV-[A-Z0-9-]+$", re.IGNORECASE)
+_LEADING_ARTICLES = frozenset({"a", "an", "the"})
+
+
+def first_window_word(description: Any, fallback: Any = "Hermes") -> str:
+    """Return the first safe human-facing word from a visible window title."""
+    for candidate in (description, fallback, "Hermes"):
+        if not isinstance(candidate, str):
+            continue
+        text = candidate.strip()
+        while text:
+            parts = text.split(None, 1)
+            token = re.sub(r"^[^\w]+|[^\w]+$", "", parts[0], flags=re.UNICODE)
+            remainder = parts[1] if len(parts) == 2 else ""
+            if token and token.lower() not in _LEADING_ARTICLES:
+                if _UUID_RE.fullmatch(token) or _SHA_RE.fullmatch(token) or _CHECKPOINT_RE.fullmatch(token):
+                    break
+                return token
+            text = remainder.lstrip()
+        # An unsafe or empty title must not cause us to speak its identifier.
+    return "Hermes"
+
+
+def attention_speech(outcome: str, *, window_description: Any = None, lane: Any = None) -> str:
+    """Build the short spoken projection for an attention boundary."""
+    word = first_window_word(window_description, lane)
+    suffix = {
+        "READY_FOR_STEWARD_REVIEW": "needs your review.",
+        "BLOCKED_REQUIRES_STEWARD": "needs your assistance.",
+        "STEWARD_DECISION_REQUIRED": "needs your decision.",
+    }[outcome]
+    return f"{word} {suffix}"
 
 
 def _text(value: Any, field: str, *, limit: int = 1000) -> str:
@@ -65,6 +99,7 @@ def process_terminal_outcome(
     response_text: str,
     *,
     session_id: str,
+    window_description: str | None = None,
     submit: Callable[..., Mapping[str, Any]] = submit_hermes_attention,
 ) -> str:
     """Process one normal Hermes final response and return report text.
@@ -105,6 +140,7 @@ def process_terminal_outcome(
             objective_id=envelope.get("objective_id"),
             work_order_id=envelope.get("work_order_id"),
             summary=envelope.get("summary"),
+            window_description=window_description,
         )
         delivery = result.get("delivery") if isinstance(result, Mapping) else None
         if not isinstance(delivery, Mapping):
@@ -118,4 +154,4 @@ def process_terminal_outcome(
         return _diagnostic(clean, str(exc))
 
 
-__all__ = ["VERSION", "process_terminal_outcome"]
+__all__ = ["VERSION", "attention_speech", "first_window_word", "process_terminal_outcome"]

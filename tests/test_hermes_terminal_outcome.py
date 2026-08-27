@@ -4,7 +4,11 @@ import json
 from uuid import UUID, uuid4
 
 from riverview.hermes_attention import submit_hermes_attention
-from riverview.hermes_terminal_outcome import process_terminal_outcome
+from riverview.hermes_terminal_outcome import (
+    attention_speech,
+    first_window_word,
+    process_terminal_outcome,
+)
 
 
 class FakeStore:
@@ -244,3 +248,49 @@ def test_project_plugin_transform_is_disabled_for_non_riverview_sessions(monkeyp
     monkeypatch.delenv("RIVERVIEW_HERMES_ENGINEERING", raising=False)
     response = _attention_marker()
     assert module._transform_riverview_outcome(response, session_id="session-1") == response
+
+
+def test_first_window_word_uses_visible_title_and_skips_articles_and_punctuation():
+    assert first_window_word("Audit C1 C2 C3 Codex fuel...") == "Audit"
+    assert first_window_word("  ... Restore Grace reasoning...  ") == "Restore"
+    assert first_window_word("\u2026Audit\tC1 fuel") == "Audit"
+    assert first_window_word("The Reconcile and publish Steward notification") == "Reconcile"
+    assert first_window_word("Document Riverview Operator...") == "Document"
+
+
+def test_attention_speech_maps_each_terminal_state_to_short_window_identifier():
+    assert attention_speech("READY_FOR_STEWARD_REVIEW", window_description="Audit C1") == "Audit needs your review."
+    assert attention_speech("BLOCKED_REQUIRES_STEWARD", window_description="Restore Grace") == "Restore needs your assistance."
+    assert attention_speech("STEWARD_DECISION_REQUIRED", window_description="Reconcile and publish") == "Reconcile needs your decision."
+
+
+def test_window_identifier_fallback_rejects_uuid_sha_and_checkpoint():
+    assert first_window_word(None, "Runtime repair") == "Runtime"
+    assert first_window_word("550e8400-e29b-41d4-a716-446655440000", "Runtime repair") == "Runtime"
+    assert first_window_word("deadbeefcafebabe", "Runtime repair") == "Runtime"
+    assert first_window_word("RIV-HERMES-AUTO-ATTN", "Runtime repair") == "Runtime"
+    assert first_window_word(None, None) == "Hermes"
+
+
+def test_automatic_outcome_uses_window_description_for_persisted_speech_and_replay_is_silent():
+    store = FakeStore()
+    delivery = QueuedDelivery()
+    response = _attention_marker(summary="ignored by the audible projection")
+    submit = lambda **kwargs: _submit(store, delivery, **kwargs)
+
+    first = process_terminal_outcome(
+        response,
+        session_id="hermes-session-1",
+        window_description="Audit C1 C2 C3 Codex fuel...",
+        submit=submit,
+    )
+    second = process_terminal_outcome(
+        response,
+        session_id="hermes-session-1",
+        window_description="Audit C1 C2 C3 Codex fuel...",
+        submit=submit,
+    )
+
+    assert first == second == ""
+    assert len(delivery.presenter_calls) == 1
+    assert store.calls[0]["summary"] == "Audit needs your review."

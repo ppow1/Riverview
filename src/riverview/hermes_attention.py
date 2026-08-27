@@ -46,6 +46,7 @@ def submit_hermes_attention(
     objective_id: str | None = None,
     work_order_id: str | None = None,
     summary: str | None = None,
+    window_description: str | None = None,
     store: NotificationStore | None = None,
     deliver=deliver_steward_notification,
 ) -> dict[str, Any]:
@@ -70,7 +71,15 @@ def submit_hermes_attention(
     objective_value = _optional_text(objective_id, "objective_id")
     work_order_value = _optional_text(work_order_id, "work_order_id")
 
-    if summary is None:
+    if window_description is not None:
+        from riverview.hermes_terminal_outcome import attention_speech
+
+        summary_value = attention_speech(
+            boundary_value,
+            window_description=window_description,
+            lane=lane_value,
+        )
+    elif summary is None:
         summary_value = (
             f"{lane_value} work is ready for your review."
             if notification_type == "ready_for_steward_review"

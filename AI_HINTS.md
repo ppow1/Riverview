@@ -127,8 +127,13 @@ The project plugin automatically processes one structured
 Estate presenter path; `CONTINUE`, `COMPLETED_NO_ATTENTION`, ordinary turns,
 intermediate test results, and retryable failures remain silent. The model
 declares the semantic outcome as part of its report and does not make a second
-notification-tool call. The manual `riverview_steward_attention` operation
-remains available for bounded diagnostic/recovery use only.
+notification-tool call. The spoken identifier is the first safe word of the
+same Hermes session title rendered in the yellow lower-right status-bar badge;
+leading `A`, `An`, and `The` are skipped, and UUIDs, SHAs, and checkpoint IDs
+fall back to the bounded lane label or `Hermes`. The templates are `<word>
+needs your review.`, `<word> needs your assistance.`, and `<word> needs your
+decision.` The manual `riverview_steward_attention` operation remains available
+for bounded diagnostic/recovery use only.
 
 Useful launch diagnostics:
 

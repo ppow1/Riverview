@@ -88,7 +88,27 @@ def _transform_riverview_outcome(response_text: str, session_id: str = "", **_: 
         return response_text
     from riverview.hermes_terminal_outcome import process_terminal_outcome
 
-    return process_terminal_outcome(response_text, session_id=session_id or "")
+    return process_terminal_outcome(
+        response_text,
+        session_id=session_id or "",
+        window_description=_session_title(session_id),
+    )
+
+
+def _session_title(session_id: str) -> str | None:
+    """Read the same persisted title rendered by Hermes' status bar."""
+    if not session_id:
+        return None
+    try:
+        from hermes_state import SessionDB
+
+        db = SessionDB(read_only=True)
+        try:
+            return db.get_session_title(session_id) or None
+        finally:
+            db.close()
+    except Exception:
+        return None
 
 
 def register(ctx) -> None:
