@@ -72,8 +72,17 @@ def test_failed_ordinary_composition_does_not_use_institutional_unknown_owner_fa
         raise RuntimeError("provider unavailable")
 
     response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "hi", result())
-    assert response.summary == "I’m here with you, Steward. How can I help?"
-    assert "authoritative Riverview resident" not in response.summary
+    assert response.summary != "I’m here with you, Steward. How can I help?"
+    assert "good to hear" in response.summary
+
+
+def test_failed_social_composition_uses_natural_recovery_not_generic_catch_all():
+    def failing_provider(model, request):
+        raise RuntimeError("provider unavailable")
+
+    response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "Hey good lookin'", result())
+    assert response.summary != "I’m here with you, Steward. How can I help?"
+    assert "good to hear" in response.summary
 
 
 def test_failed_title_composition_preserves_authoritative_grace_role():
@@ -91,3 +100,24 @@ def test_failed_known_resident_composition_uses_registry_role():
     material = (json.dumps({"value": {"metadata": {"registry": [{"name": "Alfred", "role": "Manager of Administration", "responsibility_domains": ["administration"]}]}}}),)
     response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "Who is Alfred?", result(), material)
     assert response.summary == "Alfred is the Manager of Administration at Riverview."
+
+
+def test_failed_cme_composition_uses_structured_institutional_context():
+    def failing_provider(model, request):
+        raise RuntimeError("provider unavailable")
+
+    material = (json.dumps({"value": {"metadata": {"subsystems": [{"subsystem": "CME", "meaning": "Continuous Momentum Engine"}]}}}),)
+    response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "What is the CME?", result(), material)
+    assert "Continuous Momentum Engine" in response.summary
+    assert "event-driven" in response.summary
+
+
+def test_failed_pla_composition_is_useful_without_inventing_fabrication_tools():
+    def failing_provider(model, request):
+        raise RuntimeError("provider unavailable")
+
+    material = (json.dumps({"value": {"metadata": {"capabilities": [{"capability": "codex.engineering.v1", "human_owner_known": False, "suitable_resident_ids": []}]}}}),)
+    response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "I need a small object made out of PLA. How should I make that happen?", result(), material)
+    assert "conceptual advice" in response.summary
+    assert "fabrication or 3D-printing tool" in response.summary
+    assert "Steward authorization" in response.summary

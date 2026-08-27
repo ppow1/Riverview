@@ -50,6 +50,8 @@ def compose_resident_speech(
     last_response: ReasoningResponse | None = None
     registry_names: set[str] = set()
     registry_roles: dict[str, str] = {}
+    subsystem_meanings: dict[str, str] = {}
+
     domain_matches: dict[str, str] = {}
     no_owner_capability = False
     engineering_capability_known = False
@@ -72,6 +74,10 @@ def compose_resident_speech(
                         registry_roles[str(row["name"]).casefold()] = str(row["role"])
                     for domain in row.get("responsibility_domains", ()):
                         domain_matches[str(domain).casefold()] = f"{row['name']}, {row.get('role', 'resident')}"
+            for subsystem in value.get("subsystems", ()):
+                if isinstance(subsystem, dict) and subsystem.get("subsystem") and subsystem.get("meaning"):
+                    subsystem_meanings[str(subsystem["subsystem"]).casefold()] = str(subsystem["meaning"])
+
             no_owner_capability = no_owner_capability or any(item.get("human_owner_known") is False and not item.get("suitable_resident_ids") for item in value.get("capabilities", ()) if isinstance(item, dict))
         except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
             continue
@@ -107,7 +113,14 @@ def compose_resident_speech(
         fallback_provider_id = last_response.provider_id if last_response is not None else "unavailable"
         fallback_created_at = last_response.created_at if last_response is not None else datetime.now(UTC)
         lowered_instruction = instruction.casefold()
-        if "title" in lowered_instruction and ("your" in lowered_instruction or "grace" in lowered_instruction):
+        social_turn = requested_domain == "unknown" and (re.search(r"\b(hello|hi|hey|greetings|good morning|good evening)\b", lowered_instruction) is not None or ("good" in lowered_instruction and any(token in lowered_instruction for token in ("look", "looking", "beautiful", "handsome"))))
+        if "cme" in lowered_instruction and "cme" in subsystem_meanings:
+            speech = f"CME means {subsystem_meanings['cme']}. It is Riverview’s event-driven, dependency-aware engine for keeping accepted work moving within bounded authority and evidence limits."
+        elif "pla" in lowered_instruction and ("object" in lowered_instruction or "make" in lowered_instruction or "fabricat" in lowered_instruction):
+            speech = "I can give conceptual advice for designing a small PLA object, including fit, wall thickness, support strategy, and print orientation. I do not currently see an authoritative Riverview fabrication or 3D-printing tool in the projected capabilities; the available engineering capability is for bounded proposal formation and requires separate Steward authorization before any work is formed or executed."
+        elif social_turn:
+            speech = "Hello, Steward. It’s good to hear from you. I’m here and happy to talk, while keeping my professional role and boundaries clear. How can I help?"
+        elif "title" in lowered_instruction and ("your" in lowered_instruction or "grace" in lowered_instruction):
             speech = "I’m Grace, the Director of Operations here at Riverview."
         elif "what do you do" in lowered_instruction or "what is your role" in lowered_instruction:
             speech = "I’m Grace, the Director of Operations here at Riverview. I provide bounded operational guidance and leave decisions requiring authority to the Steward and governed institutional process."

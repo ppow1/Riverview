@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 from riverview.autonomy.runtime import CMEStatusStore
+from riverview.characters.store import CharacterStore
 from riverview.residents.context import AssignmentContext, BudgetSpec, ContextItem, PostgresContextSource, ResidentContextAssembler
 from riverview.residents.persistence import ResidentContinuityStore, stable_id
 
@@ -106,6 +107,18 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
 
     def _add_institutional_projection(self, projection: dict[str, object]) -> dict[str, object]:
         """Add bounded read-only Riverview facts to the existing rehydration projection."""
+        character = {}
+        character_path = Path(__file__).resolve().parents[3] / "runtime" / "operator" / "character_store.json"
+        try:
+            character_store = CharacterStore(path=character_path)
+            current = character_store.current(str(GRACE_OCCUPANT_ID))
+            proposal = next((item for item in reversed(character_store.data.get("proposals", [])) if item.get("resident_id") == "grace" and item.get("status") == "accepted" and item.get("published_version") == "v2"), None)
+            character = {
+                "current": {"resident_id": current.get("resident_id"), "name": current.get("name"), "role": current.get("role"), "version": current.get("version"), "traits": current.get("traits", {}), "source_evidence": current.get("source_evidence", ())},
+                "accepted_proposal": {"resident_id": proposal.get("resident_id"), "published_version": proposal.get("published_version"), "status": proposal.get("status"), "traits": {key: value for key, value in (proposal.get("changes") or {}).get("traits", {}).items() if key != "private_interpersonal_continuity"}, "source_evidence": proposal.get("source_evidence", ())} if proposal else None,
+            }
+        except (LookupError, OSError, TypeError, ValueError, json.JSONDecodeError):
+            character = {}
         registry_path = Path(__file__).resolve().parents[3] / "docs/operations/roadmap/evidence/RV-014.1_RESIDENT_REGISTRY.json"
         registry: list[dict[str, str]] = []
         try:
@@ -131,6 +144,7 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
         except (OSError, RuntimeError, TypeError, ValueError):
             cme_facts = {"subsystem": "CME", "meaning": "Continuous Momentum Engine", "status": "unavailable", "source": "riverview://cme-runtime-status"}
         material = {
+            "character": character,
             "registry": registry,
             "subsystems": [cme_facts, {"subsystem": "River", "meaning": "authoritative event stream", "source": "riverview://river"}, {"subsystem": "Relay", "meaning": "bounded work-order execution relay", "source": "riverview://relay"}],
             "capabilities": [

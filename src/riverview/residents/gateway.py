@@ -260,6 +260,7 @@ class ResidentConversationGateway:
                 "cognition_result_id": str(result.result_id), "cognition_request_id": str(result.request_id),
                 "cognition_session_id": str(outcome.session.session_id), "cognition_correlation_id": str(result.correlation_id),
                 "cognition_provenance_refs": list(result.provenance_refs), "provider_binding": result.provider_ref,
+                "character_version": session.character_version,
                 "authority_scope": list(result.authority_scope), "role_authority_expanded": False,
                 "engineering_proposal_separate": True,
             }
