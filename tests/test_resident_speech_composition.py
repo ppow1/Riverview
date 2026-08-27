@@ -39,6 +39,14 @@ def test_governed_proposal_word_is_allowed_in_natural_speech():
     assert "proposal" in response.summary
 
 
+def test_unsupported_named_resident_is_not_presented_as_capability_owner():
+    material = (json.dumps({"value": {"metadata": {"registry": [{"name": "Jessica"}], "capabilities": [{"human_owner_known": False, "suitable_resident_ids": []}]}}}),)
+    response = compose_resident_speech(provider_with({"speech": "Jessica is the right person to handle that."}), "qwen3-coder:30b", "What internal resource is appropriate?", result(), material)
+    assert "Jessica" not in response.summary
+    assert "codex.engineering.v1" in response.summary
+    assert "does not execute" in response.summary
+
+
 @pytest.mark.parametrize("speech", [
     '{"response_text":"Hello","proposal":null}',
     "Acknowledge the greeting and respond appropriately.",
@@ -46,5 +54,7 @@ def test_governed_proposal_word_is_allowed_in_natural_speech():
 ])
 def test_home_speech_composer_rejects_internal_scaffolding(speech):
     value = json.loads(speech) if speech.startswith("{") else {"speech": speech}
-    with pytest.raises(RuntimeError, match="internal scaffolding"):
-        compose_resident_speech(provider_with(value), "qwen3-coder:30b", "Hello", result())
+    response = compose_resident_speech(provider_with(value), "qwen3-coder:30b", "Hello", result())
+    assert "response_text" not in response.summary
+    assert "Rationale:" not in response.summary
+    assert "Acknowledge the greeting" not in response.summary

@@ -245,7 +245,7 @@ class ResidentConversationGateway:
                 raise RuntimeError("RIV-COG-E1-0001: HOME cognition did not return an advisory result.")
             result = outcome.result
             from riverview.reasoning.speech import compose_resident_speech
-            response = compose_resident_speech(self.home_cognition.speech_provider, self.home_cognition.speech_model, instruction, result)
+            response = compose_resident_speech(self.home_cognition.speech_provider, self.home_cognition.speech_model, instruction, result, outcome.packet.context_material)
             session.history.append({"role": "user", "text": instruction})
             session.history.append({"role": "resident", "text": response.summary})
             self.continuity_store.record_session(profile.resident_id, str(session.session_id), session.history)

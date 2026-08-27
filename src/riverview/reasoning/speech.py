@@ -23,6 +23,7 @@ def compose_resident_speech(
     model: str,
     instruction: str,
     result: CognitionResult,
+    context_material: tuple[str, ...] = (),
 ) -> ReasoningResponse:
     """Render one natural response without exposing the internal HOME envelope."""
     request = ReasoningRequest(
@@ -41,13 +42,27 @@ def compose_resident_speech(
         expires_at=datetime.now(UTC), allowed_authority=("return:advisory",), response_format=_SPEECH_FORMAT,
     )
     last_error: RuntimeError | None = None
+    last_response: ReasoningResponse | None = None
+    registry_names: set[str] = set()
+    no_owner_capability = False
+    for raw in context_material:
+        try:
+            value = json.loads(raw).get("value", {}).get("metadata", {})
+            registry_names.update(str(row["name"]) for row in value.get("registry", ()) if isinstance(row, dict) and row.get("name"))
+            no_owner_capability = no_owner_capability or any(item.get("human_owner_known") is False and not item.get("suitable_resident_ids") for item in value.get("capabilities", ()) if isinstance(item, dict))
+        except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
+            continue
     for _attempt in range(2):
         try:
             response = provider(model, request)
+            last_response = response
             value = json.loads(response.summary)
             speech = value.get("speech") if isinstance(value, dict) else None
             if not isinstance(speech, str) or not speech.strip() or any(marker in speech.casefold() for marker in _FORBIDDEN):
                 raise RuntimeError("RIV-RES-0002: resident speech composer returned internal scaffolding.")
+            named_residents = {name.casefold() for name in registry_names if name.casefold() in speech.casefold() and name.casefold() != "grace"}
+            if no_owner_capability and named_residents and not any(term in instruction.casefold() for term in ("other residents", "who lives", "resident registry", "which residents")):
+                raise RuntimeError("RIV-RES-0002: resident speech composer assigned an unsupported capability owner.")
             break
         except json.JSONDecodeError as exc:
             last_error = RuntimeError("RIV-RES-0002: resident speech composer returned invalid JSON.")
@@ -55,7 +70,16 @@ def compose_resident_speech(
         except RuntimeError as exc:
             last_error = exc
     else:
-        raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
+        if last_response is None:
+            raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
+        speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
+        return ReasoningResponse(
+            response_id=last_response.response_id, request_id=request.request_id,
+            correlation_id=result.correlation_id, provider_id=f"resident-speech:fallback:{last_response.provider_id}",
+            response_type="advice", summary=speech,
+            evidence_refs=tuple(dict.fromkeys((*result.provenance_refs, f"speech-composition:fallback:{last_response.response_id}"))),
+            classification=result.classification, created_at=last_response.created_at,
+        )
     return ReasoningResponse(
         response_id=response.response_id, request_id=request.request_id,
         correlation_id=result.correlation_id, provider_id=f"resident-speech:{response.provider_id}",
