@@ -43,7 +43,16 @@ def check_annunciation_capability() -> dict[str, Any]:
 
 
 def _estate_presenter():
-    estate_src = Path(__file__).resolve().parents[3] / "src"
+    # The Estate repository is a separate authoritative checkout. Prefer its
+    # canonical Windows source root; retain the historical sibling fallback for
+    # portable/test layouts. Do not silently substitute a second presenter.
+    candidates = (
+        Path(r"A:\theestate\src"),
+        Path(__file__).resolve().parents[3] / "src",
+    )
+    estate_src = next((path for path in candidates if path.is_dir()), None)
+    if estate_src is None:
+        raise RuntimeError("RIV-NOT-0004: canonical Estate source root is unavailable.")
     if str(estate_src) not in sys.path:
         sys.path.insert(0, str(estate_src))
     from estate.core.steward_annunciator import WindowsPresenter

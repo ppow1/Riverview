@@ -108,6 +108,22 @@ Important Windows distinction:
 - `hermes sessions list` lists saved sessions.
 - `hermes profile` manages profiles described by the installed CLI as "multiple isolated Hermes instances"; inspect `hermes profile --help` before relying on profiles for concurrent credential/resource isolation.
 
+For a Riverview engineering lane, the canonical Hermes working root is
+`A:\Riverview\standalone`. Launch from that root with project plugins explicitly
+enabled so the shared `riverview_steward_attention` terminal-boundary tool is
+available. This is infrastructure, not a per-handoff reminder:
+
+```powershell
+Set-Location 'A:\Riverview\standalone'
+$env:HERMES_ENABLE_PROJECT_PLUGINS = '1'
+hermes plugins enable riverview-steward-attention
+hermes
+```
+
+The tool is used only for a genuine terminal `READY_FOR_STEWARD_REVIEW`,
+`BLOCKED_REQUIRES_STEWARD`, or `STEWARD_DECISION_REQUIRED` boundary. Ordinary
+progress, intermediate test results, and retryable failures remain silent.
+
 Useful launch diagnostics:
 
 ```powershell

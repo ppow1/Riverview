@@ -1,0 +1,6 @@
+name: riverview-steward-attention
+version: 0.1.0
+description: "Shared terminal-boundary bridge from Hermes engineering lanes to Riverview Steward attention."
+author: "Project Riverview"
+provides_tools:
+  - riverview_steward_attention
