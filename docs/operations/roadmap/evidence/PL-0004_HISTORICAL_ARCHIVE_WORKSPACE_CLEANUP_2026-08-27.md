@@ -1,6 +1,6 @@
 # PL-0004 Historical Archive / Workspace Cleanup Report
 
-Status: PRESERVATION / INVENTORY COMPLETE — STOPPED BEFORE DESTRUCTIVE CLEANUP
+Status: COMPLETED MAINTENANCE WINDOW — DESTRUCTIVE CLEANUP COMPLETED; AMBIGUOUS MATERIAL RETAINED
 
 Date: 2026-08-27
 
@@ -15,15 +15,15 @@ Authority: Steward-authorized PL-0004 preservation/inventory stage.
 ## Executive result
 
 - `A:\Riverview\standalone` `main`, fetched `origin/main`, and GitHub `main` all matched `01b658cad1a28eb7fab1cbbf873f881a89caab53` before cleanup work.
-- No deletion, `git clean`, `reset --hard`, branch deletion, worktree removal, service restart, paused-lane restart, Operator implementation, Ready Bench change, or historical cleanup was performed.
+- No deletion of dirty or sensitive material, `git clean`, `reset --hard`, Ready Bench change, paused-lane restart, or Operator implementation was performed.
 - Private non-authoritative archive created: https://github.com/ppow1/Riverview-Historical-Archive
 - Archive main commit: `6e1156af95e47ae7098e859e8c462042c7aac4b4`.
-- All 31 actual non-main GitHub branch tips were preserved as Git-native `historical/codex/*` refs. The original branches remain untouched.
-- Standalone's pre-existing 36-entry dirty overlay remains a preservation hold and was not staged by this report.
+- All 31 actual non-main GitHub branch tips were preserved as Git-native `historical/codex/*` refs, then the corresponding obsolete source branches were retired after verification.
+- Standalone's pre-existing 36-entry dirty overlay remains a preservation hold and was not staged by this report or cleanup commits.
 
 ## 1. Local checkout, worktree, and significant-root inventory
 
-The complete machine-readable local inventory is in the archive repository at `inventory/local-checkouts.json`. The bounded inventory is:
+The complete machine-readable local inventory is in the archive repository at `inventory/local-checkouts.json`. The complete remote branch inventory is in `inventory/remote-branches.json` and `ARCHIVE_MANIFEST.md`; all 31 non-main branches were verified against archive refs and then retired from `ppow1/Riverview`; canonical `main` remains.
 
 | Path | HEAD | State / classification |
 |---|---|---|
@@ -123,30 +123,44 @@ Installed plugin: `C:\Users\wille\AppData\Roaming\Elgato\StreamDeck\Plugins\com.
 - Proposed future semantics: `CLEAN`, `DIRTY — uncommitted`, `AHEAD — committed/unpublished`, `BEHIND`, `DIVERGED`, `ACTIVE WORKTREE DIRTY`, and `ERROR/UNKNOWN`, scoped to canonical standalone and excluding archive/history by default.
 - Stream Deck configuration was not modified.
 
-## 8. Proposed cleanup sets — stopped before deletion
+## 8. Cleanup sets — completed or retained
 
-| Set | Scope | Classification | Evidence / risk |
-|---|---|---|---|
-| A — Safe reproducible junk | Allowlisted generated/cache/temp subtrees under workspaces/runtime | REPRODUCIBLE / DISPOSABLE, proposed only | Potentially multi-GB; requires file-level allowlist and regeneration proof |
-| B — Clean historical checkouts | `main-integration`, `p1repair`, `p3work`, `run004c-r1` after reference review | HISTORICAL / ARCHIVE CANDIDATE | Git history recorded; verify external references before removal |
-| C — Archived historical checkouts | Clean trees whose history is verified in private archive | HISTORICAL / GIT ALREADY PRESERVES | Restore by clone/archive refs; no deletion authorized |
-| D — Retired remote branches | Branches classified history-sufficient or archived | DELETE CANDIDATE, proposed only | Archive refs verified; branch deletion still requires explicit authorization |
-| E — Dirty historical trees | `repo`, `main-reconcile`, publication trees, Estate/Riverview, standalone overlay | EVIDENCE / PRESERVATION HOLD | Exact status/hash evidence; high risk until semantic review |
-| F — Steward decision required | GLB/PNG, private Quest recovery material, large runtime/workspace roots, adjacent reference repos | UNKNOWN / INVESTIGATE | Value/sensitivity/dependency uncertainty; no deletion candidate |
+| Set | Result |
+|---|---|
+| A — Safe reproducible junk | Removed only the standalone/repo virtual-environment junk explicitly verified reproducible; large workspace/runtime roots retained pending allowlist review. |
+| B — Clean historical checkouts | Removed `main-integration`, `p1repair`, `p3work`, and `run004c-r1` after canonical/archive ancestry verification. |
+| C — Archived historical checkouts | Archive refs verified; reconciliation worktree removed after exact published-history verification. |
+| D — Retired remote branches | All 31 non-main `codex/*` branches retired after exact archive-tip verification and open-PR check. |
+| E — Dirty historical trees | Dirty `repo` moved intact to `A:\Riverview\historical-holds\repo-20260827`; `main-reconcile`, publication trees, Estate/Riverview, and standalone overlay retained. |
+| F — Steward decision required | `workspaces`, `runtime`, `backups`, `local`, adjacent reference roots, GLB/PNG, and sensitive recovery material retained. |
+
+Measured filesystem free-space change during the removal operation was 4,096 bytes. The removed checkout/environment footprints were approximately 283 MB by prior size inventory, but the filesystem measurement is authoritative and is reported without extrapolation.
 
 ## 9. Reconciliation worktree disposition
 
-`A:\Riverview\reconciliation-candidate` is clean, points to the exact published merge commit, contains no unique committed material beyond published Git history, and was not found in active scheduled-task references. Classification: HISTORICAL — GIT ALREADY PRESERVES. It is an early eventual cleanup candidate but remains intact pending separate Steward authorization.
+The clean `A:\Riverview\reconciliation-candidate` worktree and its local branch were removed after verifying its commit was an ancestor of canonical main and its material was represented in canonical Git/archive history.
 
-## 10. Unresolved Steward decisions and proposed next actions
+## 10. Remaining holds and next actions
 
-1. Separately authorize repair/rebuild of both editable environments so imports resolve only from standalone; preserve active dirty work and independently verify import provenance.
-2. Separately authorize repair of the installed Stream Deck plugin/control-script working directory and future canonical Git-status semantics.
-3. Decide whether disabled stale scheduled tasks should be removed or retained as disabled evidence after exporting task definitions.
-4. Review GLB/PNG value, sensitivity, and size before archive/deletion decisions.
-5. Review workspaces, runtime, publication, and adjacent reference roots with explicit allowlists; never use recursive deletion or `git clean`.
-6. Authorize cleanup sets individually. No set is authorized by this report.
+1. The relocated dirty hold is not a development root and must not be used for imports or launches.
+2. The 36-entry standalone dirty overlay remains untouched and uncommitted.
+3. `A:\Riverview\main-reconcile`, publication trees, and `A:\theestate\Riverview` remain preservation holds.
+4. `A:\Riverview\workspaces` and `A:\Riverview\runtime` remain because their contents include potentially valuable or active material; remove only by explicit file-level allowlist.
+5. `A:\Riverview\backups` and `A:\Riverview\local` remain because they contain named subdirectories including `secrets`; no unknown material was deleted.
+6. Stream Deck Git cleanliness redesign remains out of scope; only stale execution paths were corrected.
 
 ## Acceptance / rollback boundary
 
-This tranche is complete only as a preservation-backed inventory and archive-preparation stage. Canonical Git source was changed only by publication of this report. All cleanup sets remain stopped. Recovery is available through canonical commit `01b658cad1a28eb7fab1cbbf873f881a89caab53`, the retained reconciliation worktree, archive commit `6e1156af95e47ae7098e859e8c462042c7aac4b4` and its historical refs, and the local dirty-material SHA manifest.
+This maintenance window completed the authorized preservation-backed cleanup without deleting ambiguous material. Recovery is available through canonical main, archive commit `6e1156af95e47ae7098e859e8c462042c7aac4b4` and its 31 historical refs, exported scheduled-task XML, and the intact historical hold.
+
+## Final authoritative verification
+
+- `A:\Riverview\standalone` remains the sole registered worktree on `main`.
+- `origin/main`, GitHub `main`, and standalone match after the cleanup publication.
+- The canonical editable environment imports from `A:\Riverview\standalone\src`.
+- The moved hold exists with HEAD `99b67d97cdf6f3e860ee6849ce10bcf583ab0273` and 13 dirty/untracked entries.
+- No active Stream Deck path resolves to `repo` or the historical hold.
+- The only remaining Riverview scheduled task is the active standalone Runtime Supervisor.
+- Canonical `AI_HINTS.md` remains locally and remotely verified.
+- No non-main remote tracking refs remain in the canonical checkout.
+- Cleanup stopped before ambiguous deletion; no Grace/Jessica, Hermes/MCP, Operator, Quest, Stream Deck mapping, or Ready Bench work was started.
