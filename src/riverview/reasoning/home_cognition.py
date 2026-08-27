@@ -605,6 +605,7 @@ class HomeCognitionService:
                 "question": packet.question,
                 "constraints": list(packet.constraints),
                 "known_deterministic_results": list(packet.known_deterministic_results),
+                "context_material": list(packet.context_material),
                 "requested_output": _OUTPUT_FORMAT,
             },
             sort_keys=True,

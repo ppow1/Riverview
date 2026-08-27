@@ -1,9 +1,13 @@
 """Authoritative PostgreSQL projection for Grace HOME cognition."""
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 from uuid import UUID
 
+from riverview.autonomy.runtime import CMEStatusStore
 from riverview.residents.context import AssignmentContext, BudgetSpec, PostgresContextSource, ResidentContextAssembler
 from riverview.residents.persistence import ResidentContinuityStore, stable_id
 
@@ -17,6 +21,22 @@ GRACE_CONTEXT_STATE_KEY = "state:grace:home-cognition:authority-context:v1"
 GRACE_BINDING_PURPOSE = "HOME_COGNITION"
 
 
+class _GraceProjectionSource:
+    """Context-source adapter that preserves one validated read projection."""
+
+    def __init__(self, store: ResidentContinuityStore, projection: dict[str, Any]) -> None:
+        self.store = store
+        self.projection = projection
+
+    def rehydration_projection(self, occupant_id: UUID) -> dict[str, Any]:
+        if occupant_id != GRACE_OCCUPANT_ID:
+            raise LookupError("Grace projection requested for a different occupant.")
+        return self.projection
+
+    def health(self) -> dict[str, Any]:
+        return self.store.health()
+
+
 class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
     """Build one fail-closed Grace state from existing continuity authority."""
 
@@ -28,6 +48,7 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
             projection = self.store.rehydration_projection(GRACE_OCCUPANT_ID)
         except (LookupError, RuntimeError, ValueError) as exc:
             raise HomeCognitionExecutionError("authoritative-state-unavailable", "Grace continuity projection is unavailable.") from exc
+        projection = self._add_institutional_projection(projection)
         occupant = projection.get("occupant") or {}
         occupancy = projection.get("occupancy")
         bindings = projection.get("bindings") or []
@@ -50,7 +71,7 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
             expected_output="bounded advisory reasoning with uncertainty and provenance",
         )
         try:
-            bundle = ResidentContextAssembler(PostgresContextSource(self.store)).assemble(
+            bundle = ResidentContextAssembler(_GraceProjectionSource(self.store, projection)).assemble(
                 GRACE_OCCUPANT_ID,
                 purpose="ENGINEERING_REVIEW",
                 budget=BudgetSpec(),
@@ -73,3 +94,44 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
             observed_at=observed,
             classification=occupant["classification"],
         )
+
+    def _add_institutional_projection(self, projection: dict[str, object]) -> dict[str, object]:
+        """Add bounded read-only Riverview facts to the existing rehydration projection."""
+        registry_path = Path(__file__).resolve().parents[3] / "docs/operations/roadmap/evidence/RV-014.1_RESIDENT_REGISTRY.json"
+        registry: list[dict[str, str]] = []
+        try:
+            payload = json.loads(registry_path.read_text(encoding="utf-8"))
+            registry = [
+                {"name": str(row["name"]), "role": str(row["office"]), "resident_id": str(row["resident_id"])}
+                for row in payload.get("records", [])[:32]
+                if isinstance(row, dict) and row.get("name") and row.get("office") and row.get("resident_id")
+            ]
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            registry = []
+        try:
+            durable = self.store.accepted_operator_residents()
+        except (LookupError, RuntimeError, ValueError):
+            durable = []
+        by_name = {item["name"].casefold(): item for item in registry}
+        for item in durable:
+            by_name[str(item["name"]).casefold()] = {"name": str(item["name"]), "role": str(item["role"]), "resident_id": str(item["resident_id"])}
+        registry = sorted(by_name.values(), key=lambda item: item["name"])[:32]
+        try:
+            cme = CMEStatusStore().read()
+            cme_facts = {"subsystem": "CME", "meaning": "Continuous Momentum Engine", "status": cme.get("effective_state"), "heartbeat_health": cme.get("heartbeat_health"), "last_river_sequence_seen": cme.get("last_river_sequence_seen"), "source": "riverview://cme-runtime-status"}
+        except (OSError, RuntimeError, TypeError, ValueError):
+            cme_facts = {"subsystem": "CME", "meaning": "Continuous Momentum Engine", "status": "unavailable", "source": "riverview://cme-runtime-status"}
+        material = {
+            "registry": registry,
+            "subsystems": [cme_facts, {"subsystem": "River", "meaning": "authoritative event stream", "source": "riverview://river"}, {"subsystem": "Relay", "meaning": "bounded work-order execution relay", "source": "riverview://relay"}],
+            "capabilities": [
+                {"capability": "codex.engineering.v1", "purpose": "bounded engineering proposal/work formation", "mode": "advisory proposal only", "execution": "requires separate Steward-authorized formation and lifecycle gate", "source": "riverview://capability/codex.engineering.v1"},
+                {"capability": "resident-continuity.read", "purpose": "read bounded resident identity, office, and role projections", "mode": "read-only", "execution": "none", "source": "riverview://capability/resident-continuity.read"},
+            ],
+            "authority_boundary": "Reading institutional context does not grant mutation or execution authority.",
+        }
+        projection = dict(projection)
+        states = list(projection.get("state_records") or [])
+        states.append({"state_id": str(stable_id("state:grace:bounded-institutional-context:v1")), "state_class": "professional_doctrine", "value_kind": "structured_projection", "value_ref": "riverview:bounded-institutional-context:v1", "bounded_metadata": material, "classification": "operational", "retrieval_policy_ref": "grace-home-cognition-policy:v1", "status": "active", "effective_from": datetime.now(UTC).isoformat(), "provenance_id": "RV-014.1;RIV-COG-E1-0001"})
+        projection["state_records"] = states[-32:]
+        return projection

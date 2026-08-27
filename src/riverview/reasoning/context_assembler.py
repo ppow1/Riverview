@@ -110,6 +110,7 @@ def _context_total(packet: dict[str, Any]) -> int:
         packet["unresolved_ambiguity"],
         packet["relevant_prior_decisions"],
         packet["known_deterministic_results"],
+        packet["context_material"],
         packet["home_assessment"],
         packet["requested_output_schema"],
         packet["egress_policy"],
@@ -134,13 +135,14 @@ def _bounded_packet_preflight(packet: dict[str, Any]) -> None:
         "relevant_prior_decisions": MAX_CONTEXT_REFS,
         "unresolved_ambiguity": MAX_CONTEXT_REFS,
         "known_deterministic_results": MAX_CONTEXT_REFS,
+        "context_material": MAX_CONTEXT_REFS,
         "constraints": 32,
     }
     for name, limit in collection_limits.items():
         values = packet[name]
         if not isinstance(values, tuple) or len(values) > limit:
             raise ReasoningContextAssemblyError("packet-bound-exceeded", f"{name} exceeds its collection bound.")
-        value_limit = 4_000 if name in {"constraints", "unresolved_ambiguity", "known_deterministic_results"} else 500
+        value_limit = 4_000 if name in {"constraints", "unresolved_ambiguity", "known_deterministic_results", "context_material"} else 500
         if not all(isinstance(value, str) and value.strip() and len(value) <= value_limit for value in values):
             raise ReasoningContextAssemblyError("packet-field-invalid", f"{name} contains an invalid value.")
     if _context_total(packet) > MAX_CONTEXT_CHARS:
@@ -227,6 +229,11 @@ class ResidentReasoningPacketAssembler:
             "unresolved_ambiguity": _unique(ambiguity),
             "relevant_prior_decisions": _unique(prior_decisions),
             "known_deterministic_results": _unique(list(request.known_deterministic_results)),
+            "context_material": tuple(
+                json.dumps({"layer": item.layer, "source_ref": item.source_ref, "value": dict(item.value)}, sort_keys=True, default=str, separators=(",", ":"))
+                for item in sorted(bundle.items, key=lambda item: (item.priority_tier, item.layer, item.item_id))
+                if item.source_ref.startswith(("riverview:", "resident_continuity:", "grace:", "RV-014.1"))
+            ),
             "home_assessment": request.home_assessment,
             "requested_output_schema": request.requested_output_schema,
             "egress_policy": request.egress_policy,
@@ -288,6 +295,7 @@ class ResidentReasoningPacketAssembler:
                 expires_at=request.expires_at,
                 source_context_id=bundle.bundle_id,
                 causation_id=request.causation_id,
+                context_material=packet["context_material"],
                 contract_version=COGNITION_CONTRACT_VERSION,
             )
         except (TypeError, ValueError) as exc:

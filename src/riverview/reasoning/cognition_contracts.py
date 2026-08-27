@@ -212,6 +212,7 @@ class ResidentReasoningPacket:
     expires_at: datetime
     source_context_id: UUID | None = None
     causation_id: UUID | None = None
+    context_material: tuple[str, ...] = ()
     contract_version: str = COGNITION_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -219,6 +220,7 @@ class ResidentReasoningPacket:
             _uuid(value, name)
         _optional_uuid(self.source_context_id, "source_context_id")
         _optional_uuid(self.causation_id, "causation_id")
+        _context_texts(self.context_material, "context_material")
         _bounded_text(self.authority_ref, "authority_ref", 500)
         object.__setattr__(self, "cognition_tier", _tier(self.cognition_tier))
         _bounded_text(self.request_class, "request_class", 200)
@@ -272,6 +274,7 @@ class ResidentReasoningPacket:
             "correlation_id": str(self.correlation_id),
             "causation_id": str(self.causation_id) if self.causation_id else None,
             "source_context_id": str(self.source_context_id) if self.source_context_id else None,
+            "context_material": list(self.context_material),
             "packet_digest": self.packet_digest,
             "expires_at": self.expires_at.isoformat(),
         }
@@ -309,6 +312,7 @@ class ResidentReasoningPacket:
             expires_at=_payload_datetime(payload, "expires_at"),
             source_context_id=_payload_optional_uuid(payload, "source_context_id"),
             causation_id=_payload_optional_uuid(payload, "causation_id"),
+            context_material=_payload_tuple(payload, "context_material"),
             contract_version=payload["schema_version"],
         )
 
