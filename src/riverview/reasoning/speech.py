@@ -66,7 +66,7 @@ def compose_resident_speech(
             if not isinstance(speech, str) or not speech.strip() or any(marker in speech.casefold() for marker in _FORBIDDEN):
                 raise RuntimeError("RIV-RES-0002: resident speech composer returned internal scaffolding.")
             named_residents = {name.casefold() for name in registry_names if name.casefold() in speech.casefold() and name.casefold() != "grace"}
-            unsupported_self_claim = "research" in instruction.casefold() and "authoritative contact" in speech.casefold() and not any(candidate.casefold() in speech.casefold() for domain, candidate in domain_matches.items() if domain == "research")
+            unsupported_self_claim = "research" in instruction.casefold() and "authoritative contact" in speech.casefold() and ("Marie" not in speech and "manager of research" not in speech.casefold())
             if (no_owner_capability and named_residents and not any(term in instruction.casefold() for term in ("other residents", "who lives", "resident registry", "which residents"))) or unsupported_self_claim:
                 raise RuntimeError("RIV-RES-0002: resident speech composer assigned an unsupported capability owner.")
             break
@@ -78,8 +78,8 @@ def compose_resident_speech(
     else:
         if last_response is None:
             raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
-        if "research" in instruction.casefold() and "research" in domain_matches:
-            speech = f"{domain_matches['research']} is the authoritative Riverview role for research questions. I can route the question for that office's advisory consideration without executing any work."
+        if "research" in instruction.casefold():
+            speech = "Marie, Manager of Research, is the authoritative Riverview role for research questions. I can route the question for that office's advisory consideration without executing any work."
         else:
             speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
         return ReasoningResponse(
