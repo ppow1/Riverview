@@ -381,6 +381,15 @@ class RuntimeSupervisor:
                 return False
         return True
 
+    @staticmethod
+    def _cme_recovering() -> bool:
+        try:
+            from riverview.autonomy.runtime import CMEStatusStore
+            status = CMEStatusStore().read()
+            return bool(status and status.get("current_state") in {"STARTING", "EVALUATING"})
+        except (OSError, RuntimeError, TypeError, ValueError):
+            return False
+
     def _environment(self, spec: ServiceSpec) -> dict[str, str]:
         environment = os.environ.copy()
         environment["PYTHONPATH"] = (
@@ -468,6 +477,9 @@ class RuntimeSupervisor:
             state.backoff_until = time.monotonic() + min(30.0, 2.0 ** min(state.restart_count, 4))
             return
         if state.process is not None and state.status == "running" and not self._healthy(state.spec):
+            if state.spec.service_id == "cme-supervisor" and self._cme_recovering():
+                state.status = "starting"
+                return
             if state.process.poll() is None:
                 state.process.terminate()
             state.status = "failed"
@@ -487,6 +499,9 @@ class RuntimeSupervisor:
                     for process in self._processes()
                 )
             if not healthy:
+                if state.spec.service_id == "cme-supervisor" and self._cme_recovering():
+                    state.status = "starting"
+                    return
                 state.status = "failed"
                 state.last_failure = "adopted-process-unhealthy"
                 state.last_change = _now()
@@ -503,6 +518,8 @@ class RuntimeSupervisor:
             and time.monotonic() - state.started_monotonic > state.spec.startup_timeout
             and not self._healthy(state.spec)
         ):
+            if state.spec.service_id == "cme-supervisor" and self._cme_recovering():
+                return
             if state.process is not None and state.process.poll() is None:
                 state.process.terminate()
             state.status = "failed"
