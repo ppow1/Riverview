@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -48,6 +49,7 @@ def compose_resident_speech(
     last_error: RuntimeError | None = None
     last_response: ReasoningResponse | None = None
     registry_names: set[str] = set()
+    registry_roles: dict[str, str] = {}
     domain_matches: dict[str, str] = {}
     no_owner_capability = False
     engineering_capability_known = False
@@ -65,8 +67,10 @@ def compose_resident_speech(
             value = json.loads(raw).get("value", {}).get("metadata", {})
             registry_names.update(str(row["name"]) for row in value.get("registry", ()) if isinstance(row, dict) and row.get("name"))
             for row in value.get("registry", ()):
-                if isinstance(row, dict) and row.get("name") and row.get("responsibility_domains"):
-                    for domain in row["responsibility_domains"]:
+                if isinstance(row, dict) and row.get("name"):
+                    if row.get("role"):
+                        registry_roles[str(row["name"]).casefold()] = str(row["role"])
+                    for domain in row.get("responsibility_domains", ()):
                         domain_matches[str(domain).casefold()] = f"{row['name']}, {row.get('role', 'resident')}"
             no_owner_capability = no_owner_capability or any(item.get("human_owner_known") is False and not item.get("suitable_resident_ids") for item in value.get("capabilities", ()) if isinstance(item, dict))
         except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
@@ -99,20 +103,37 @@ def compose_resident_speech(
         except RuntimeError as exc:
             last_error = exc
     else:
-        if last_response is None:
-            raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
-        if requested_domain == "research":
-            speech = "Marie, Manager of Research, is the authoritative Riverview role for research questions. I can route the question for that office's advisory consideration without executing any work."
-        elif requested_domain == "engineering" and engineering_capability_known:
-            speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
+        fallback_response_id = last_response.response_id if last_response is not None else uuid4()
+        fallback_provider_id = last_response.provider_id if last_response is not None else "unavailable"
+        fallback_created_at = last_response.created_at if last_response is not None else datetime.now(UTC)
+        lowered_instruction = instruction.casefold()
+        if "title" in lowered_instruction and ("your" in lowered_instruction or "grace" in lowered_instruction):
+            speech = "I’m Grace, the Director of Operations here at Riverview."
+        elif "what do you do" in lowered_instruction or "what is your role" in lowered_instruction:
+            speech = "I’m Grace, the Director of Operations here at Riverview. I provide bounded operational guidance and leave decisions requiring authority to the Steward and governed institutional process."
         else:
-            speech = "I don't have an authoritative Riverview resident or office assignment for that responsibility. I can state the uncertainty and leave any routing decision to the governed institutional process."
+            resident_match = re.search(r"\bwho is\s+([a-z][a-z -]*)", lowered_instruction)
+            resident_name = resident_match.group(1).strip() if resident_match else ""
+            if resident_name and resident_name in registry_roles:
+                display_name = next((name for name in registry_names if name.casefold() == resident_name), resident_name.title())
+                speech = f"{display_name} is the {registry_roles[resident_name]} at Riverview."
+            elif requested_domain == "research":
+                speech = "Marie, Manager of Research, is the authoritative Riverview role for research questions. I can route the question for that office's advisory consideration without executing any work."
+            elif requested_domain == "engineering" and engineering_capability_known:
+                speech = "I can identify codex.engineering.v1 as the governed engineering resource. No authoritative Riverview resident owner for mechanical design is currently recorded. The next step is Steward-authorized formation of a bounded engineering proposal; that does not execute the work."
+            elif requested_domain == "unknown":
+                if "runtime status" in lowered_instruction or "operator status" in lowered_instruction:
+                    speech = "I can help interpret the current Operator status from its authoritative live projection without changing runtime state."
+                else:
+                    speech = "I’m here with you, Steward. How can I help?"
+            else:
+                speech = "I don't have an authoritative Riverview resident or office assignment for that responsibility. I can state the uncertainty and leave any routing decision to the governed institutional process."
         return ReasoningResponse(
-            response_id=last_response.response_id, request_id=request.request_id,
-            correlation_id=result.correlation_id, provider_id=f"resident-speech:fallback:{last_response.provider_id}",
+            response_id=fallback_response_id, request_id=request.request_id,
+            correlation_id=result.correlation_id, provider_id=f"resident-speech:fallback:{fallback_provider_id}",
             response_type="advice", summary=speech,
-            evidence_refs=tuple(dict.fromkeys((*result.provenance_refs, f"speech-composition:fallback:{last_response.response_id}"))),
-            classification=result.classification, created_at=last_response.created_at,
+            evidence_refs=tuple(dict.fromkeys((*result.provenance_refs, f"speech-composition:fallback:{fallback_response_id}"))),
+            classification=result.classification, created_at=fallback_created_at,
         )
     if requested_domain == "engineering" and engineering_capability_known and no_owner_capability and "codex.engineering.v1" not in speech:
         speech = speech.rstrip() + " Riverview's documented governed resource for this is codex.engineering.v1, which supports bounded proposal formation rather than automatic execution."

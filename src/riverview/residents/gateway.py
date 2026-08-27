@@ -234,6 +234,8 @@ class ResidentConversationGateway:
         session = self._sessions.get(session_id) if session_id else None
         if session is None:
             session = self.open_session(profile.resident_id, interface_id=interface_id, classification=classification)
+        elif profile.is_grace and session.classification in {"operational", "internal"} and classification in {"operational", "internal"}:
+            classification = session.classification
         if session.resident_id != profile.resident_id or session.classification != classification:
             raise PermissionError("RIV-RES-0002: resident session identity or classification mismatch.")
         correlation = correlation_id or uuid4()
@@ -245,7 +247,8 @@ class ResidentConversationGateway:
                 raise RuntimeError("RIV-COG-E1-0001: HOME cognition did not return an advisory result.")
             result = outcome.result
             from riverview.reasoning.speech import compose_resident_speech
-            response = compose_resident_speech(self.home_cognition.speech_provider, self.home_cognition.speech_model, instruction, result, outcome.packet.context_material)
+            registry_context = json.dumps({"value": {"metadata": {"registry": [{"name": item["name"], "role": item["role"], "responsibility_domains": []} for item in self.residents()]}}}, separators=(",", ":"))
+            response = compose_resident_speech(self.home_cognition.speech_provider, self.home_cognition.speech_model, instruction, result, (*outcome.packet.context_material, registry_context))
             session.history.append({"role": "user", "text": instruction})
             session.history.append({"role": "resident", "text": response.summary})
             self.continuity_store.record_session(profile.resident_id, str(session.session_id), session.history)

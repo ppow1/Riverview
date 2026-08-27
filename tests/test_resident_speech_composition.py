@@ -65,3 +65,29 @@ def test_home_speech_composer_rejects_internal_scaffolding(speech):
     assert "response_text" not in response.summary
     assert "Rationale:" not in response.summary
     assert "Acknowledge the greeting" not in response.summary
+
+
+def test_failed_ordinary_composition_does_not_use_institutional_unknown_owner_fallback():
+    def failing_provider(model, request):
+        raise RuntimeError("provider unavailable")
+
+    response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "hi", result())
+    assert response.summary == "I’m here with you, Steward. How can I help?"
+    assert "authoritative Riverview resident" not in response.summary
+
+
+def test_failed_title_composition_preserves_authoritative_grace_role():
+    def failing_provider(model, request):
+        raise RuntimeError("provider unavailable")
+
+    response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "What is your title?", result())
+    assert response.summary == "I’m Grace, the Director of Operations here at Riverview."
+
+
+def test_failed_known_resident_composition_uses_registry_role():
+    def failing_provider(model, request):
+        raise RuntimeError("provider unavailable")
+
+    material = (json.dumps({"value": {"metadata": {"registry": [{"name": "Alfred", "role": "Manager of Administration", "responsibility_domains": ["administration"]}]}}}),)
+    response = compose_resident_speech(failing_provider, "qwen3-coder:30b", "Who is Alfred?", result(), material)
+    assert response.summary == "Alfred is the Manager of Administration at Riverview."

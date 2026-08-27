@@ -44,6 +44,14 @@ def test_grace_is_addressable_but_prose_work_request_is_not_authorized() -> None
     assert not authorized["role_authority_expanded"]
 
 
+def test_grace_session_accepts_both_allowed_boundary_classifications() -> None:
+    service = gateway()
+    first, _, _ = service.chat("Grace", "Hello.", provider=provider, interface_id="browser", classification="internal")
+    second, _, _ = service.chat("Grace", "Good evening.", provider=provider, interface_id="browser", classification="operational", session_id=first.session_id)
+    assert second.session_id == first.session_id
+    assert len(second.history) == 4
+
+
 def test_grace_structured_provider_response_is_validated_and_rendered_for_pending_approval() -> None:
     contract = {
         "repository_identity": "ppow1/Riverview",
