@@ -51,16 +51,19 @@ def contains_institutional_assertion(speech: str, context_material: tuple[str, .
     """Detect responsibility-shaped claims independently of provider assertion_mode."""
     text = speech.casefold()
     subjects: set[str] = set()
+    capabilities: set[str] = set()
     for raw in context_material:
         try:
             metadata = json.loads(raw)["value"]["metadata"]
             subjects.update(str(row["name"]).casefold() for row in metadata.get("registry", ()) if isinstance(row, dict) and row.get("name"))
+            capabilities.update(str(item["capability"]).casefold() for item in metadata.get("capabilities", ()) if isinstance(item, dict) and item.get("capability"))
         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             continue
     subject_present = any(name and name in text for name in subjects)
     responsibility_shape = any(token in text for token in ("authoritative contact", "responsible for", "right person", "appropriate resource", "qualified for", "owns ", "handles those inquiries", "should handle"))
     self_assignment = "i'm the authoritative" in text or "i am the authoritative" in text
-    return (subject_present and responsibility_shape) or self_assignment
+    capability_assertion = any(capability in text for capability in capabilities)
+    return (subject_present and responsibility_shape) or self_assignment or capability_assertion
 
 
 def ground_claims(raw_claims: Any, context_material: tuple[str, ...]) -> ClaimGrounding:
