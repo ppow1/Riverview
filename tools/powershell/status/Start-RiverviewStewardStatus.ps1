@@ -4,7 +4,7 @@
 # Updated: 2026-08-14
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo',[int]$Port=8770)
+param([string]$RepositoryPath='A:\Riverview\standalone',[int]$Port=8770)
 
 CLS
 $ErrorActionPreference='Stop'

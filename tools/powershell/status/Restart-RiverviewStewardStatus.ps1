@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$RepositoryPath='A:\Riverview\repo',
+    [string]$RepositoryPath='A:\Riverview\standalone',
     [int]$Port=8770
 )
 

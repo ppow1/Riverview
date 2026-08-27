@@ -1,7 +1,7 @@
 param(
     [ValidateSet('cme-supervisor', 'relay-worker', 'operator', 'comms5-http', 'comms5-transport')]
     [string]$ServiceId = 'cme-supervisor',
-    [string]$RepositoryPath = 'A:\Riverview\repo',
+    [string]$RepositoryPath = 'A:\Riverview\standalone',
     [int]$TimeoutSeconds = 30
 )
 $ErrorActionPreference = 'Stop'

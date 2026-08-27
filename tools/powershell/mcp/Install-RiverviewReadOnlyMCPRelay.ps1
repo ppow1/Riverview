@@ -4,7 +4,7 @@
 # Updated: 2026-08-14
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo')
+param([string]$RepositoryPath='A:\Riverview\standalone')
 
 CLS
 $ErrorActionPreference='Stop'
@@ -711,7 +711,7 @@ def test_no_action_adapter_is_exposed_by_server_module() -> None:
 # Updated: 2026-08-14
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo')
+param([string]$RepositoryPath='A:\Riverview\standalone')
 
 CLS
 $ErrorActionPreference='Stop'

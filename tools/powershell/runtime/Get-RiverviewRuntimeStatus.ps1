@@ -2,7 +2,7 @@ Clear-Host 2>$null
 # Read the bounded unified Riverview lifecycle projection. Version: 1.0.0
 
 $ErrorActionPreference = 'Stop'
-$RepositoryPath = 'A:\Riverview\repo'
+$RepositoryPath = 'A:\Riverview\standalone'
 for ($i = 0; $i -lt $args.Count; $i++) {
     if ($args[$i] -eq '-RepositoryPath' -and $i + 1 -lt $args.Count) { $RepositoryPath = $args[++$i] }
 }

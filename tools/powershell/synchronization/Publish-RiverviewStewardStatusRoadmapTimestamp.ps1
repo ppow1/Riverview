@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$RepositoryPath='A:\Riverview\repo',
+    [string]$RepositoryPath='A:\Riverview\standalone',
     [string]$RemoteName='origin',
     [string]$RemoteBranch='main'
 )

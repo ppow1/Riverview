@@ -1,5 +1,5 @@
 param(
-    [string]$RepositoryPath = 'A:\Riverview\repo',
+    [string]$RepositoryPath = 'A:\Riverview\standalone',
     [int]$TimeoutSeconds = 30
 )
 $ErrorActionPreference = 'Stop'

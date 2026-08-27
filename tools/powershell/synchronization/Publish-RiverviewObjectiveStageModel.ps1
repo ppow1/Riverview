@@ -4,7 +4,7 @@
 # Purpose: Publish the LF-normalized, fully accepted RV-005.2 slice with exact-scope staging, Git whitespace validation, remote verification, and non-destructive local reconciliation.
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo')
+param([string]$RepositoryPath='A:\Riverview\standalone')
 
 CLS
 $ErrorActionPreference='Stop'

@@ -4,7 +4,7 @@
 # Updated: 2026-08-14
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo')
+param([string]$RepositoryPath='A:\Riverview\standalone')
 
 CLS
 $ErrorActionPreference='Stop'
@@ -289,7 +289,7 @@ def test_status_server_rejects_nonlocal_bind() -> None:
 # Updated: 2026-08-14
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo',[int]$Port=8770)
+param([string]$RepositoryPath='A:\Riverview\standalone',[int]$Port=8770)
 
 CLS
 $ErrorActionPreference='Stop'
@@ -307,7 +307,7 @@ if($LASTEXITCODE -ne 0){throw "RIV-UI-0006: Steward Status exited with code $LAS
   @('RIV-UI-0002_PROJECTION_FAILURE.md','RIV-UI-0002 — Status projection unavailable','Check PostgreSQL health and DPAPI credential ownership. The server returns bounded failure JSON and must not substitute cached authority.'),
   @('RIV-UI-0003_BIND_BOUNDARY.md','RIV-UI-0003 — Nonlocal bind rejected','The initial Steward Status surface is localhost-only. Do not widen the bind address without an authenticated remote-access design.'),
   @('RIV-UI-0004_HTTP_ACCEPTANCE.md','RIV-UI-0004 — HTTP acceptance invariant','Verify `/healthz`, `/api/status`, HTML identity, required projection sections, and bounded server shutdown.'),
-  @('RIV-UI-0005_ENVIRONMENT.md','RIV-UI-0005 — Python environment missing','Restore `A:\Riverview\repo\.venv` using the repository dependency process, then rerun health acceptance.'),
+  @('RIV-UI-0005_ENVIRONMENT.md','RIV-UI-0005 — Python environment missing','Restore `A:\Riverview\standalone\.venv` using the repository dependency process, then rerun health acceptance.'),
   @('RIV-UI-0006_SERVER_EXIT.md','RIV-UI-0006 — Status server exited','Inspect the exit code, port ownership, database health, and the nearest `RIV-DB-*` or `RIV-UI-*` checkpoint before restart.')
  )){Write-RepoFile ("docs\operations\troubleshooting\checkpoints\"+$Pair[0]) ("<!-- Version: 0.7.1 -->`n# "+$Pair[1]+"`n`n"+$Pair[2]+"`n")}
  $IndexPath=Join-Path $RepositoryPath 'docs\operations\troubleshooting\README.md';$Index=Get-Content $IndexPath -Raw

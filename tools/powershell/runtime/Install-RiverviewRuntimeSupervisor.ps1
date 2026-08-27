@@ -3,7 +3,7 @@ Clear-Host 2>$null
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$RepositoryPath = 'A:\Riverview\repo'
+$RepositoryPath = 'A:\Riverview\standalone'
 $MigratePeerTasks = $false
 for ($i = 0; $i -lt $args.Count; $i++) {
     if ($args[$i] -eq '-RepositoryPath' -and $i + 1 -lt $args.Count) { $RepositoryPath = $args[++$i] }

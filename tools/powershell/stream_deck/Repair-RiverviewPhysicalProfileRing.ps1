@@ -1,6 +1,6 @@
 param(
     [string]$ProfilesRoot = 'C:\Users\wille\AppData\Roaming\Elgato\StreamDeck\ProfilesV3',
-    [string]$RingConfig = 'A:\Riverview\repo\config\stream_deck\Riverview-Physical-Profile-Ring.json',
+    [string]$RingConfig = 'A:\Riverview\standalone\config\stream_deck\Riverview-Physical-Profile-Ring.json',
     [string]$BackupRoot = 'C:\Users\wille\AppData\Roaming\Elgato\StreamDeck-Backups'
 )
 

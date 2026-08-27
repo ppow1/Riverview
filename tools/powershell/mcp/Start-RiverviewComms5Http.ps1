@@ -2,7 +2,7 @@
 # The approved Caddy ingress must proxy /comms5/mcp to 127.0.0.1:11826.
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo')
+param([string]$RepositoryPath='A:\Riverview\standalone')
 
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
