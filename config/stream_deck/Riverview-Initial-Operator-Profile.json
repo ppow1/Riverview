@@ -4,7 +4,7 @@
   "profile_name": "Riverview Initial Operator",
   "version": "1.0.0",
   "purpose": "Three bounded Riverview controls; Estate Stream Deck remains separate.",
-  "launcher": "A:\\Riverview\\repo\\tools\\powershell\\stream_deck\\Invoke-RiverviewStreamDeckControl.ps1",
+  "launcher": "A:\\Riverview\\standalone\\tools\\powershell\\stream_deck\\Invoke-RiverviewStreamDeckControl.ps1",
   "stream_deck_action": "external-command",
   "gesture_support": "The selected Stream Deck action/plugin must map single, double, and long events to the listed gesture arguments.",
   "keys": [

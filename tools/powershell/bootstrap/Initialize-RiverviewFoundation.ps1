@@ -7,7 +7,7 @@
 param(
     [Parameter()]
     [ValidateNotNullOrEmpty()]
-    [string]$RepositoryPath = 'A:\Riverview\repo'
+    [string]$RepositoryPath = 'A:\Riverview\standalone'
 )
 
 CLS

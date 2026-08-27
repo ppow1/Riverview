@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$RepositoryPath = 'A:\Riverview\repo',
+    [string]$RepositoryPath = 'A:\Riverview\standalone',
     [string]$HostName = '127.0.0.1',
     [ValidateRange(1, 65535)][int]$Port = 5432,
     [ValidatePattern('^[a-z][a-z0-9_]{0,62}$')][string]$DatabaseName = 'riverview',

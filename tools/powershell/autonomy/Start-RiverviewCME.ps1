@@ -2,7 +2,7 @@
 # The supervisor owns only the CME child; River/objective authority remains in PostgreSQL.
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo')
+param([string]$RepositoryPath='A:\Riverview\standalone')
 
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest

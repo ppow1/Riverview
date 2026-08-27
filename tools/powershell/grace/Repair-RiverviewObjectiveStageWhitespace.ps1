@@ -7,7 +7,7 @@
 # No functional logic change, commit, push, roadmap mutation, or migration rewrite is permitted.
 
 [CmdletBinding()]
-param([string]$RepositoryPath='A:\Riverview\repo')
+param([string]$RepositoryPath='A:\Riverview\standalone')
 
 CLS
 $ErrorActionPreference='Stop'

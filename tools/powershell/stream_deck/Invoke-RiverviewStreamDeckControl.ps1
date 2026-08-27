@@ -3,7 +3,7 @@ param(
     [string]$Control,
     [ValidateSet('single', 'double', 'long')]
     [string]$Gesture = 'single',
-    [string]$RepositoryPath = 'A:\Riverview\repo'
+    [string]$RepositoryPath = 'A:\Riverview\standalone'
 )
 
 Clear-Host 2>$null

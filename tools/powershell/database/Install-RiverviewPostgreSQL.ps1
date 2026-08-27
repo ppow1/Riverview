@@ -7,7 +7,7 @@
 param(
     [Parameter()]
     [ValidateNotNullOrEmpty()]
-    [string]$RepositoryPath = 'A:\Riverview\repo',
+    [string]$RepositoryPath = 'A:\Riverview\standalone',
 
     [Parameter()]
     [ValidateRange(1, 65535)]
