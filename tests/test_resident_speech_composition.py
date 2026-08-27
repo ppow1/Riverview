@@ -34,6 +34,11 @@ def test_home_result_composes_natural_speech_without_internal_envelope():
     assert "home:event:1" in response.evidence_refs
 
 
+def test_governed_proposal_word_is_allowed_in_natural_speech():
+    response = compose_resident_speech(provider_with({"speech": "The next step is a bounded engineering proposal for Steward review."}), "qwen3-coder:30b", "What resources are available?", result())
+    assert "proposal" in response.summary
+
+
 @pytest.mark.parametrize("speech", [
     '{"response_text":"Hello","proposal":null}',
     "Acknowledge the greeting and respond appropriately.",

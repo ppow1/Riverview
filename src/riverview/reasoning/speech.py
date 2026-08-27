@@ -15,7 +15,7 @@ _SPEECH_FORMAT = {
     "required": ["speech"],
     "additionalProperties": False,
 }
-_FORBIDDEN = ("response_text", "proposal", "rationale:", "acknowledge the greeting", "home_cognition")
+_FORBIDDEN = ("response_text", "rationale:", "acknowledge the greeting", "home_cognition")
 
 
 def compose_resident_speech(
