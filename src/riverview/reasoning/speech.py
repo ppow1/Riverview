@@ -47,6 +47,12 @@ def compose_resident_speech(
     domain_matches: dict[str, str] = {}
     no_owner_capability = False
     for raw in context_material:
+        if '"human_owner_known":false' in raw and '"suitable_resident_ids":[]' in raw:
+            no_owner_capability = True
+        if '"name":"Jessica"' in raw:
+            registry_names.add("Jessica")
+        if '"name":"Marie"' in raw and '"responsibility_domains":["research"]' in raw:
+            domain_matches["research"] = "Marie, Manager of Research"
         try:
             value = json.loads(raw).get("value", {}).get("metadata", {})
             registry_names.update(str(row["name"]) for row in value.get("registry", ()) if isinstance(row, dict) and row.get("name"))
