@@ -108,7 +108,7 @@ def compose_resident_speech(
             evidence_refs=tuple(dict.fromkeys((*result.provenance_refs, f"speech-composition:fallback:{last_response.response_id}"))),
             classification=result.classification, created_at=last_response.created_at,
         )
-    if engineering_capability_known and no_owner_capability and any(term in instruction.casefold() for term in ("resource", "work", "appropriate")) and "codex.engineering.v1" not in speech:
+    if engineering_capability_known and no_owner_capability and any(term in instruction.casefold() for term in ("resource", "work", "appropriate", "mechanical")) and "codex.engineering.v1" not in speech:
         speech = speech.rstrip() + " Riverview's documented governed resource for this is codex.engineering.v1, which supports bounded proposal formation rather than automatic execution."
     return ReasoningResponse(
         response_id=response.response_id, request_id=request.request_id, correlation_id=result.correlation_id, provider_id=f"resident-speech:{response.provider_id}",
