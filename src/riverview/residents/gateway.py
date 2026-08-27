@@ -151,7 +151,7 @@ class ResidentConversationGateway:
             )
             for row in payload["records"]
         ]
-        profiles.append(ResidentProfile("grace", "Grace", "Director of Operations", "riverview://grace", "riverview://grace", is_grace=True))
+        profiles.append(ResidentProfile("grace", "Grace", "Director of Operations", "riverview://grace", "riverview://grace", classification="internal", is_grace=True))
         # Reconcile already-accepted durable residents into the Operator
         # discovery surface.  This reads existing authority; it does not
         # create, rename, or promote resident records.
@@ -204,7 +204,7 @@ class ResidentConversationGateway:
 
     def open_session(self, resident: str, *, interface_id: str, classification: str = "operational") -> ResidentSession:
         profile = self.resolve(resident)
-        if classification != profile.classification:
+        if classification != profile.classification and not (profile.is_grace and classification == "operational"):
             raise PermissionError("RIV-RES-0002: session classification does not match resident boundary.")
         session = ResidentSession(uuid4(), profile.resident_id, interface_id, classification, character_version=self.character_store.current(profile.resident_id)["version"])
         self._sessions[session.session_id] = session
