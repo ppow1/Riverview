@@ -1,11 +1,37 @@
-<!-- Version: 0.6.1 -->
+<!-- Version: 0.6.2 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
 
 Pat is the Steward and final authority. Grace coordinates operational progression but is not the whole Estate at Riverview.
 
-Riverview is a separate successor/replacement system, not a subsystem of The Estate. The Estate remains the legacy operational system while Riverview replaces its capabilities incrementally. Filesystem paths are provenance only; no permanent standalone Riverview root is established until the Phase 0 repository/runtime reconciliation is accepted. Read `docs/operations/roadmap/evidence/RIVERVIEW_RUNTIME_REPOSITORY_PROVENANCE_MAP_PHASE0_2026-08-26.md` before changing runtime ownership or selecting a repository root.
+Riverview is a separate successor/replacement system, not a subsystem of The Estate. The Estate remains the legacy operational system while Riverview replaces its capabilities incrementally. The accepted canonical local Riverview working root is `A:\Riverview\standalone`; historical/archive/hold trees are provenance or evidence, not development authority. Read `docs/operations/roadmap/evidence/RIVERVIEW_RUNTIME_REPOSITORY_PROVENANCE_MAP_PHASE0_2026-08-26.md` before changing runtime ownership or selecting a different repository root.
+
+## MANDATORY RIVERVIEW CLEAN-STATE PREFLIGHT
+
+Every Riverview engineering session — including Hermes/Codex work that inspects, modifies, tests, troubleshoots, reconciles, validates, publishes, or implements Riverview — must apply the canonical clean-state discipline in:
+
+`tools/hermes/skills/riverview-clean-state/SKILL.md`
+
+The companion contract is:
+
+`tools/hermes/skills/riverview-clean-state/references/clean-state-contract.md`
+
+If Hermes has the `riverview-clean-state` skill installed, load/use it. The repository copy above is canonical recovery material and must still be consulted when the installed skill is missing, stale, or its provenance is uncertain. Do not rely on skill discovery alone and do not rely on this AI_HINTS entry alone; the two mechanisms intentionally reinforce each other.
+
+Before Riverview engineering action, at minimum:
+
+- re-anchor to `A:\Riverview\standalone`, current `AI_HINTS.md`, and fetched `origin/main`;
+- verify repository root, branch, HEAD, upstream/divergence, registered worktrees, and dirty state;
+- preserve unrelated dirty overlays exactly;
+- verify Python/import provenance when Python is involved and reject stale historical checkout contamination;
+- capture the base SHA for bounded work;
+- use non-destructive hygiene automatically rather than asking the Steward to approve ordinary fetch/status/provenance checks;
+- require explicit Steward confirmation before destructive or authority-changing actions unless that bounded action was already explicitly authorized;
+- after publication, independently verify the remote ref before claiming success;
+- keep temporary branches/worktrees bounded and retire them promptly after verified integration instead of allowing new parallel authorities to accumulate.
+
+If the installed skill and canonical repository copy disagree, STOP authority-changing/destructive work and use the current canonical `ppow1/Riverview` main copy as the recovery source. Do not reconstruct clean-state policy from conversation memory.
 
 Before creating, modifying, testing, deploying, or promoting Riverview software, read completely:
 
@@ -72,7 +98,7 @@ hermes
 
 Important Windows distinction:
 
-- **Do not use `\.\hermes` as the normal PowerShell launcher.** `A:\AI\Tools\Hermes\hermes-agent\hermes` is a 273-byte extensionless Python source wrapper (`#!/usr/bin/env python3`) which imports `hermes_cli.main`; it is not the installed Windows command.
+- **Do not use `.\hermes` as the normal PowerShell launcher.** `A:\AI\Tools\Hermes\hermes-agent\hermes` is a 273-byte extensionless Python source wrapper (`#!/usr/bin/env python3`) which imports `hermes_cli.main`; it is not the installed Windows command.
 - `Get-Command hermes` should resolve to `A:\AI\Tools\Hermes\data\bin\hermes.exe`.
 - `hermes` with no subcommand is the documented fresh interactive-chat launch.
 - `hermes chat` is a CLI subcommand and is not the proven normal Windows launch used for a fresh full interactive session.
