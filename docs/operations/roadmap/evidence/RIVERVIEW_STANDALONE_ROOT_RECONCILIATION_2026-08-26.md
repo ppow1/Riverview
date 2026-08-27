@@ -1,6 +1,6 @@
 # Riverview Standalone Root Reconciliation — 2026-08-26
 
-Status: CANDIDATE VERIFIED; CONTROLLED CUTOVER PENDING
+Status: TECHNICALLY VERIFIED; STEWARD ACCEPTANCE PENDING
 
 ## Selected candidate
 
@@ -8,7 +8,7 @@ Status: CANDIDATE VERIFIED; CONTROLLED CUTOVER PENDING
 - Git remote: `https://github.com/ppow1/Riverview.git`
 - Initial reconciliation baseline: `ec9075bfec7655fe67e7c4455bfd9c644b2d2d52`
 - Candidate branch: `main`
-- Candidate source SHA at final runtime verification: `8bda39ea9f84970bcce012485043bf46f4b87d14`.
+- Candidate source SHA at final runtime verification: `fcc0d43b7c5ec96210078d13ef18cdeb79a04415`.
 - Network `origin/main`: `cb4a203274fd0d543ae5140cc036190a4625828c`; candidate is 13 commits ahead and 1 commit behind by ancestry, with the upstream launch-hints content already represented in the candidate tree.
 - Previous live checkout retained unchanged: `A:\Riverview\repo`
 - No historical checkout was deleted, cleaned, reset, moved, or rewritten.
@@ -126,30 +126,33 @@ After the controlled restart and a settled interval:
 - `A:\\Riverview\\repo` remains preserved as rollback/reference evidence.
 
 The runtime ownership boundary is technically settled, subject to later
-Steward acceptance of the standalone-root transition.
+Steward acceptance of the standalone-root transition. The Supervisor now
+represents CME event replay as explicit bounded recovery (`starting`) while
+the process remains alive and advancing, instead of terminating CME on a
+transient stale heartbeat.
 
-## HOME cognition boundary — 2026-08-26
+## HOME cognition materialization and live proof — 2026-08-27
 
-The accepted `HomeCognitionService` and E1/F1/F2/F3/P1/P2 implementation was
-read and remains unmodified. Its production invocation requires a real
-`AuthoritativeGraceState` containing UUID-backed resident/occupant, office,
-implementation, authority, non-stale `ContextBundle`, authoritative state
-references, and evidence references.
+The Steward-authorized projection was materialized through existing continuity
+APIs using deterministic identities and accepted evidence
+`9d2af4f5-bc47-5b60-a50b-bd3ca5641aa2`:
 
-Read-only PostgreSQL inspection found:
+- Grace occupant: `40f225e2-6f58-55d2-b862-eab7d95700d8`;
+- Operations office: `158973ef-8907-53ed-b0fc-68fb82c30579`;
+- active occupancy: `ea157c2a-4a18-5a37-92d5-7f0622a6aabc`;
+- HOME implementation: `77fb672c-eb12-5628-aeb6-f5ffa7fbae2e`;
+- active HOME binding: `029ac02f-e826-5c16-af73-c7f8e764f2c4`;
+- accepted residency/state references are durable and provenance-backed.
 
-- `grace_identities` contains Grace and her authority rules;
-- `resident_occupants` contains Jessica and test fixtures, but no Grace;
-- no active Grace occupancy exists in `resident_occupancies`;
-- no Grace implementation binding exists;
-- no Grace current assignment/state projection exists from which a non-stale
-  context bundle can be assembled.
+The production `PostgresAuthoritativeGraceStateSource` validates the projection,
+assembles bounded `ENGINEERING_REVIEW` context through the existing assembler,
+and fails closed on missing, stale, or mismatched state. Operator production
+composition now invokes the existing `HomeCognitionService`; no direct Grace
+provider fallback is used when HOME is enabled.
 
-Therefore the Operator cannot yet invoke HOME cognition for Grace without
-inventing UUID-backed institutional state or authority. The correct current
-behavior remains fail-closed; direct provider fallback must not be used to
-mask this absence. The precise remaining decision is to establish the
-authoritative Grace resident/occupant, office assignment, implementation
-binding, and current-assignment/context projection with provenance, or to
-explicitly authorize a canonical identity-mapping design. No such decision is
-assumed by this tranche.
+Live Operator proof at candidate SHA `fcc0d43...` returned HTTP 200 with
+`home_cognition=true`, tier `HOME_COGNITION`, cognition/session/request/
+correlation IDs, Ollama/Qwen provider binding, `local:RTX4090` resource,
+HOME provenance and observation references, `authority_scope=[return:advisory]`,
+and `role_authority_expanded=false`. A second live turn preserved the same
+resident session and advanced bounded history from two to four turns.

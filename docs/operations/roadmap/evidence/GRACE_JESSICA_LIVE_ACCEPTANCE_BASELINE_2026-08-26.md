@@ -7,11 +7,12 @@ Purpose: Durable baseline and acceptance-boundary report for Grace cognition and
 
 # Grace / Jessica live acceptance baseline
 
-Status: BLOCKED_AT_STEWARD_BOUNDARY — NOT READY FOR LIVE ACCEPTANCE
+Status: TECHNICALLY VERIFIED — STEWARD ACCEPTANCE PENDING
 Authority: Steward-controlled Riverview lifecycle and acceptance
-Authoritative checkout: `A:\theestate\Riverview`
+Authoritative checkout: `A:\Riverview\standalone`
 Branch: `main`
-Verified authoritative HEAD and `origin/main`: `ec9075bfec7655fe67e7c4455bfd9c644b2d2d52`
+Verified candidate HEAD: `fcc0d43b7c5ec96210078d13ef18cdeb79a04415`
+Verified GitHub `origin/main`: `cb4a203274fd0d543ae5140cc036190a4625828c`
 
 ## Scope
 
@@ -108,33 +109,35 @@ Steward review was rejected, and no canon was changed.
   environment, and SHA. PostgreSQL read-only access succeeds.
 - Old `A:\\Riverview\\repo` and the preserved artifact subtree remain intact.
 
-## HOME cognition boundary
+## HOME cognition materialization and live acceptance evidence
 
-The accepted `HomeCognitionService` implementation and E1/F1/F2/F3/P1/P2
-seams are present and tested, but the live Grace route still uses the direct
-provider-neutral gateway. Read-only PostgreSQL inspection found `grace_identities`
-but no Grace row in `resident_occupants`, no active Grace occupancy, no Grace
-implementation binding, and no current assignment/context bundle. The required
-`AuthoritativeGraceState` therefore cannot be constructed without inventing
-UUID-backed institutional state or authority. No direct fallback was upgraded
-into HOME cognition.
+Grace is now materialized in the existing resident-continuity authority model
+with deterministic occupant/office/occupancy/implementation/binding IDs and
+Steward evidence. `PostgresAuthoritativeGraceStateSource` produces a
+non-stale `AuthoritativeGraceState` through the existing context assembler.
+
+The live standalone Operator route invokes `HomeCognitionService` and returns
+machine-verifiable `HOME_COGNITION` metadata: cognition/session/request/
+correlation IDs, provider/resource binding, provenance/observation references,
+and advisory-only authority. A real two-turn conversation retained the same
+resident session and bounded continuity; the second response formulated only
+advisory engineering guidance and did not claim execution authority.
 
 ## Supporting verification
 
-- Final bounded candidate regression: `68 passed`.
+- Final targeted resident/HOME/Operator/Jessica regression: `110 passed`.
 - Grace live multi-turn Operator probe: real Ollama/Qwen response, six durable
   messages, role/correlation/provider evidence, and a valid non-binding proposal.
 - Jessica live Operator workflow probe: inspect/discuss/propose/independent
   review succeeded; publish-before-Steward-review failed closed.
-- Candidate runtime settled proof: all managed services `running` after restart.
+- Candidate runtime settled proof: all six managed services `running` after restart;
+  CME replay recovery is represented explicitly rather than terminated on stale
+  heartbeat.
 - `git diff --check`: passed.
 
 ## Notification / stop boundary
 
-No READY_FOR_STEWARD_REVIEW claim is made. Runtime ownership is technically
-settled. Grace HOME cognition is not proven live because authoritative Grace
-state is absent. The remaining Steward action is to establish the authoritative
-Grace resident/occupant, office assignment, implementation binding, and
-current-assignment/context projection with provenance, or explicitly authorize
-a canonical identity-mapping design. After that state exists, wire and live-test
-HOME cognition before issuing a READY notification.
+No `READY_FOR_STEWARD_REVIEW` notification has been issued. Technical proof is
+complete for this tranche; institutional acceptance remains separate. The
+Steward action is to review and accept the standalone-root runtime transition
+and the live Grace HOME cognition evidence, or identify a specific discrepancy.
