@@ -204,7 +204,7 @@ class ResidentConversationGateway:
 
     def open_session(self, resident: str, *, interface_id: str, classification: str = "operational") -> ResidentSession:
         profile = self.resolve(resident)
-        if classification != profile.classification and not (profile.is_grace and classification == "operational"):
+        if classification != profile.classification and not (profile.is_grace and classification in {"operational", "internal"}):
             raise PermissionError("RIV-RES-0002: session classification does not match resident boundary.")
         session = ResidentSession(uuid4(), profile.resident_id, interface_id, classification, character_version=self.character_store.current(profile.resident_id)["version"])
         self._sessions[session.session_id] = session
