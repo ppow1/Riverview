@@ -40,14 +40,22 @@ def compose_resident_speech(
         required_output_schema="resident-speech-v1", evidence_requirements=("speech-composition", "correlation"),
         expires_at=datetime.now(UTC), allowed_authority=("return:advisory",), response_format=_SPEECH_FORMAT,
     )
-    response = provider(model, request)
-    try:
-        value = json.loads(response.summary)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("RIV-RES-0002: resident speech composer returned invalid JSON.") from exc
-    speech = value.get("speech") if isinstance(value, dict) else None
-    if not isinstance(speech, str) or not speech.strip() or any(marker in speech.casefold() for marker in _FORBIDDEN):
-        raise RuntimeError("RIV-RES-0002: resident speech composer returned internal scaffolding.")
+    last_error: RuntimeError | None = None
+    for _attempt in range(2):
+        try:
+            response = provider(model, request)
+            value = json.loads(response.summary)
+            speech = value.get("speech") if isinstance(value, dict) else None
+            if not isinstance(speech, str) or not speech.strip() or any(marker in speech.casefold() for marker in _FORBIDDEN):
+                raise RuntimeError("RIV-RES-0002: resident speech composer returned internal scaffolding.")
+            break
+        except json.JSONDecodeError as exc:
+            last_error = RuntimeError("RIV-RES-0002: resident speech composer returned invalid JSON.")
+            last_error.__cause__ = exc
+        except RuntimeError as exc:
+            last_error = exc
+    else:
+        raise last_error or RuntimeError("RIV-RES-0002: resident speech composer failed.")
     return ReasoningResponse(
         response_id=response.response_id, request_id=request.request_id,
         correlation_id=result.correlation_id, provider_id=f"resident-speech:{response.provider_id}",
