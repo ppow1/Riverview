@@ -8,6 +8,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -34,6 +35,27 @@ class DatabaseConfig:
     database: str
     user: str
     password: str
+
+
+def _connect_with_retry(config: DatabaseConfig) -> psycopg.Connection[Any]:
+    """Bound transient TCP/startup failures without retrying transaction errors."""
+    last_error: psycopg.OperationalError | None = None
+    for attempt in range(3):
+        try:
+            return psycopg.connect(
+                host=config.host,
+                port=config.port,
+                dbname=config.database,
+                user=config.user,
+                password=config.password,
+                connect_timeout=5,
+            )
+        except psycopg.OperationalError as exc:
+            last_error = exc
+            if attempt == 2:
+                raise
+            time.sleep(0.25 * (2**attempt))
+    raise last_error  # pragma: no cover
 
 
 def _unprotect_dpapi(ciphertext_hex: str) -> str:
@@ -82,14 +104,7 @@ def connect(config: DatabaseConfig | None = None) -> Iterator[psycopg.Connection
 
     active = config or load_database_config()
     try:
-        with psycopg.connect(
-            host=active.host,
-            port=active.port,
-            dbname=active.database,
-            user=active.user,
-            password=active.password,
-            connect_timeout=5,
-        ) as connection:
+        with _connect_with_retry(active) as connection:
             yield connection
     except psycopg.Error as exc:
         raise RuntimeError(f"RIV-DB-0004: PostgreSQL connection or transaction failed: {exc}") from exc

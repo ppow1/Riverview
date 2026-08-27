@@ -40,6 +40,7 @@ class ServiceSpec:
     process_match: str = ""
     secret_file: str | None = None
     secret_env: str | None = None
+    secret_key: str | None = None
     environment: dict[str, str] = field(default_factory=dict)
     restart: bool = True
     startup_timeout: float = 8.0
@@ -230,7 +231,7 @@ class RuntimeSupervisor:
             return False
         matches = [
             process
-            for process in self._processes()
+            for process in self._service_processes(state.spec)
             if self._process_matches(state.spec, process)
             and self._process_belongs_to_repository(process)
         ]
@@ -267,19 +268,24 @@ class RuntimeSupervisor:
             raise ValueError("RIV-RUN-0001: unknown managed service.")
         if service_id not in self.states:
             raise ValueError("RIV-RUN-0001: only registered production service recycle is enabled.")
-        matches = [p for p in self._processes() if self._process_matches(state.spec, p) and self._process_belongs_to_repository(p)]
+        matches = [p for p in self._service_processes(state.spec) if self._process_belongs_to_repository(p)]
+        recorded_owner = next((p for p in matches if int(p.get("pid") or 0) == int(state.pid or 0)), None)
+        if recorded_owner is not None:
+            owner = int(recorded_owner["pid"])
+        else:
+            owner = None
         match_pids = {int(process["pid"]) for process in matches}
         roots = [process for process in matches if int(process.get("ppid") or 0) not in match_pids]
-        if len(roots) != 1:
+        if owner is None and len(roots) != 1:
             raise RuntimeError("RIV-RUN-0001: service ownership is ambiguous; refusing recycle.")
-        owner = int(roots[0]["pid"])
+        owner = owner or int(roots[0]["pid"])
         self._terminate_process_tree(int(owner))
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
-            if not [p for p in self._processes() if self._process_matches(state.spec, p)]:
+            if not self._service_processes(state.spec):
                 break
             time.sleep(0.2)
-        if [p for p in self._processes() if self._process_matches(state.spec, p)]:
+        if self._service_processes(state.spec):
             raise RuntimeError("RIV-RUN-0001: service descendants remained after bounded recycle.")
         state.process = None
         state.pid = None
@@ -288,6 +294,27 @@ class RuntimeSupervisor:
         state.last_failure = None
         state.backoff_until = 0.0
         return {"service_id": service_id, "status": "stopped", "old_owner_pid": owner}
+
+    def _service_processes(self, spec: ServiceSpec) -> list[dict[str, Any]]:
+        """Scope matching services to this lock-owning Supervisor tree."""
+        processes = self._processes()
+        by_pid = {int(process["pid"]): process for process in processes if process.get("pid") is not None}
+        supervisor_pid = os.getpid()
+        if supervisor_pid not in by_pid:
+            return [process for process in processes if self._process_matches(spec, process)]
+        scoped: list[dict[str, Any]] = []
+        for process in processes:
+            if not self._process_matches(spec, process):
+                continue
+            pid = int(process["pid"])
+            seen: set[int] = set()
+            while pid in by_pid and pid not in seen:
+                if pid == supervisor_pid:
+                    scoped.append(process)
+                    break
+                seen.add(pid)
+                pid = int(by_pid[pid].get("ppid") or 0)
+        return scoped
 
     def _set_service_enabled(self, service_id: str, enabled: bool) -> dict[str, Any]:
         state = self.states.get(service_id)
@@ -402,12 +429,39 @@ class RuntimeSupervisor:
                 raise RuntimeError(
                     f"RIV-RUN-0003: credential source unavailable for {spec.service_id}."
                 )
-            secret = secret_path.read_text(encoding="utf-8").strip()
+            raw_secret = secret_path.read_text(encoding="utf-8")
+            if spec.secret_key:
+                secret = self._named_secret(raw_secret, spec.secret_key)
+            else:
+                secret = raw_secret.strip()
             if not secret:
                 raise RuntimeError(f"RIV-RUN-0003: credential source empty for {spec.service_id}.")
             environment[spec.secret_env] = secret
         environment.update(spec.environment)
         return environment
+
+    @staticmethod
+    def _named_secret(source: str, key: str) -> str:
+        """Read one scalar from an approved dotenv/YAML-like config source."""
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            raise RuntimeError("RIV-RUN-0003: credential source key is invalid.")
+        for line in source.splitlines():
+            candidate = line.strip()
+            if not candidate or candidate.startswith("#"):
+                continue
+            if candidate.startswith("export "):
+                candidate = candidate[7:].lstrip()
+            if candidate.startswith(f"{key}="):
+                value = candidate[len(key) + 1:].strip()
+            elif candidate.startswith(f"{key}:"):
+                value = candidate[len(key) + 1:].strip()
+            else:
+                continue
+            value = value.strip('"').strip("'")
+            if not value or value.startswith("$"):
+                raise RuntimeError("RIV-RUN-0003: named credential source is empty or unresolved.")
+            return value
+        raise RuntimeError("RIV-RUN-0003: named credential source key is unavailable.")
 
     def _spawn(self, state: ServiceState) -> None:
         spec = state.spec

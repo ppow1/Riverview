@@ -13,11 +13,29 @@ import pytest
 from riverview.autonomy.control import ExecutionResult
 from riverview.relay import ClaimedWork, FenceNotCurrentError
 from riverview.runner import RestrictedRunner
+from riverview.resources.control import DurableResourcePlanner, ResourcePolicyStore, SeatClaimStore
 
 
 def test_runner_repository_is_resolved(tmp_path: Path) -> None:
     runner = RestrictedRunner(tmp_path, "test")
     assert runner.repository == tmp_path.resolve()
+
+
+def test_production_runner_owns_durable_resource_planner_and_claim_store(tmp_path: Path) -> None:
+    runner = RestrictedRunner(tmp_path, "test")
+    assert isinstance(runner.resource_planner, DurableResourcePlanner)
+    assert isinstance(runner.resource_claim_store, SeatClaimStore)
+    assert isinstance(runner.resource_planner.policy_store, ResourcePolicyStore)
+
+
+def test_codex_engineering_routes_to_hermes_without_direct_codex_fallback(monkeypatch, tmp_path: Path) -> None:
+    runner = RestrictedRunner(tmp_path, "test")
+    work = ClaimedWork(uuid4(), "codex.engineering.v1", "1", {}, 900, 1)
+    calls: list[str] = []
+    monkeypatch.setattr(runner, "_execute_hermes", lambda _work: calls.append("hermes") or {"status": "succeeded"})
+    monkeypatch.setattr(runner, "_execute_codex", lambda _work: calls.append("codex") or {"status": "succeeded"})
+    assert runner._execute_action(work) == {"status": "succeeded"}
+    assert calls == ["hermes"]
 
 
 def test_runner_preserves_specific_execution_checkpoint() -> None:

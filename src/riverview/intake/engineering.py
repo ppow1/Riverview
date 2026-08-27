@@ -86,7 +86,7 @@ class EngineeringIntent:
     intent_id: UUID | None = None
 
     def validate(self) -> None:
-        if not self.repository_identity or self.repository_identity != "ppow1/Riverview":
+        if not self.repository_identity or self.repository_identity not in {"ppow1/Riverview", "Riverview standalone"}:
             raise ValueError("RIV-INT-0004: repository identity is not approved.")
         if not self.repository_root.is_absolute() or not (self.repository_root / ".git").is_dir():
             raise ValueError("RIV-INT-0004: repository root is not an approved Git repository.")
@@ -126,7 +126,7 @@ class EngineeringIntentStore:
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
-    def bind(self, intent: EngineeringIntent, *, authority_id: UUID | None = None, explicit_steward_confirmation: bool | None = None) -> dict[str, Any]:
+    def bind(self, intent: EngineeringIntent, *, authority_id: UUID | None = None, explicit_steward_confirmation: bool | None = None, on_bound: Any = None) -> dict[str, Any]:
         """Bind one validated intent to one eligible stage and emit one River fact."""
         # A caller-supplied boolean is deliberately not an authority source.
         # Formation must name the durable grant that covers this exact scope.
@@ -201,7 +201,8 @@ class EngineeringIntentStore:
                 (event_id, intent.objective_id, intent.correlation_id, intent.causation_id,
                  f"engineering.intent.bound:{intent_id}", intent.classification,
                  json.dumps({"intent_id": str(intent_id), "objective_id": str(intent.objective_id), "stage_id": str(intent.stage_id), "action_type": intent.action_type})))
-        return {"intent_id": str(intent_id), "status": "bound", "idempotent": False, "action": action}
+            follow_up = on_bound(cursor, intent_id) if on_bound is not None else None
+        return {"intent_id": str(intent_id), "status": "bound", "idempotent": False, "action": action, **(follow_up or {})}
 
     def bind_from_authority(self, authority_id: UUID) -> dict[str, Any]:
         """Derive only the typed contract stored under a durable grant."""
@@ -212,6 +213,43 @@ class EngineeringIntentStore:
             raise PermissionError("RIV-GRC-0010: authority grant was not found.")
         intent = StewardAuthorityStore.intent_from_contract(authority)
         return self.bind(intent, authority_id=authority_id)
+
+    def form_and_enqueue(self, authority_id: UUID) -> dict[str, Any]:
+        """Form one approved intent and queue its one Relay work order atomically."""
+        from riverview.intake.authority import StewardAuthorityStore
+        from riverview.relay.store import RelayStore
+
+        authority = StewardAuthorityStore().load(authority_id)
+        if authority is None:
+            raise PermissionError("RIV-GRC-0010: authority grant was not found.")
+        intent = StewardAuthorityStore.intent_from_contract(authority)
+        work_key = f"engineering-work-order:authority:{authority_id}"
+
+        def enqueue(cursor: Any, intent_id: UUID) -> dict[str, Any]:
+            work = RelayStore.enqueue_in_transaction(
+                cursor,
+                intent.action_type,
+                {"engineering_intent_id": str(intent_id)},
+                "grace",
+                work_key,
+                intent.correlation_id,
+                intent.causation_id,
+                intent.objective_id,
+                intent.stage_id,
+            )
+            return {"work_order_id": str(work.work_order_id), "work_order_status": work.status}
+
+        result = self.bind(intent, authority_id=authority_id, on_bound=enqueue)
+        if result["status"] == "already_bound":
+            with connect() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT work_order_id,status FROM work_orders WHERE idempotency_key=%s", (work_key,))
+                work = cursor.fetchone()
+            if work is None:
+                raise RuntimeError("RIV-WRK-0001: formed intent has no idempotent work order.")
+            result.update({"work_order_id": str(work[0]), "work_order_status": work[1]})
+        result["authority_id"] = str(authority_id)
+        result["authority_status"] = "consumed"
+        return result
 
     def load(self, intent_id: UUID) -> dict[str, Any] | None:
         with connect() as connection, connection.cursor() as cursor:

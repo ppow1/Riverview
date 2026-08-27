@@ -162,28 +162,71 @@ class RelayStore:
         )
         return cursor.rowcount == 1
 
-    def enqueue(self, action_type: str, parameters: dict[str, Any], requested_by: str, idempotency_key: str, correlation_id: UUID | None = None, causation_id: UUID | None = None) -> WorkOrder:
+    @classmethod
+    def enqueue_in_transaction(cls, cursor: Any, action_type: str, parameters: dict[str, Any], requested_by: str, idempotency_key: str, correlation_id: UUID | None = None, causation_id: UUID | None = None, objective_id: UUID | None = None, stage_id: UUID | None = None) -> WorkOrder:
+        """Create one order on an existing transaction and retain its lineage."""
+        cursor.execute("SELECT action_version, expected_duration_seconds, hard_timeout_seconds, enabled FROM approved_actions WHERE action_type=%s", (action_type,))
+        action = cursor.fetchone()
+        if not action or not action[3]:
+            raise RuntimeError(f"RIV-WRK-0001: Action is unknown or disabled: {action_type}")
+        engineering_intent_id = parameters.get("engineering_intent_id")
+        work_order_kind = "successor" if parameters.get("source_work_order_id") else "initial"
+        if engineering_intent_id and work_order_kind == "initial":
+            cursor.execute("""SELECT action_type,parameters,requested_by,idempotency_key,correlation_id,work_order_id,action_version,expected_duration_seconds,hard_timeout_seconds,status FROM work_orders
+                              WHERE engineering_intent_id=%s AND work_order_kind='initial' AND source_work_order_id IS NULL AND status <> 'cancelled'
+                              ORDER BY created_at LIMIT 1""", (engineering_intent_id,))
+            existing = cursor.fetchone()
+            if existing is not None:
+                return WorkOrder(*existing)
+        order_id = uuid4(); correlation = correlation_id or uuid4()
+        cursor.execute(
+            """INSERT INTO work_orders (work_order_id, action_type, action_version, status, parameters, requested_by, idempotency_key, correlation_id, causation_id, expected_duration_seconds, hard_timeout_seconds, objective_id, stage_id, engineering_intent_id, work_order_kind)
+               VALUES (%s,%s,%s,'queued',%s::jsonb,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               ON CONFLICT (idempotency_key) DO NOTHING
+               RETURNING work_order_id""",
+            (order_id, action_type, action[0], json.dumps(parameters), requested_by, idempotency_key, correlation, causation_id, action[1], action[2], objective_id, stage_id, engineering_intent_id, work_order_kind),
+        )
+        inserted = cursor.fetchone()
+        if not inserted:
+            cursor.execute("SELECT work_order_id FROM work_orders WHERE idempotency_key=%s", (idempotency_key,)); order_id = cursor.fetchone()[0]
+        cursor.execute("SELECT action_type, parameters, requested_by, idempotency_key, correlation_id, work_order_id, action_version, expected_duration_seconds, hard_timeout_seconds, status FROM work_orders WHERE work_order_id=%s", (order_id,))
+        row = cursor.fetchone()
+        cls._append_event(cursor, event_type="work.order.queued", work_order_id=row[5], correlation_id=row[4], payload={"action_type": row[0], "status": row[9]})
+        return WorkOrder(*row)
+
+    def reconcile_duplicate_work_order(self, duplicate_work_order_id: UUID, canonical_work_order_id: UUID, *, reason: str, reconciled_by: str, idempotency_key: str) -> dict[str, Any]:
+        """Durably cancel one unstarted duplicate while preserving both work-order rows."""
+        if duplicate_work_order_id == canonical_work_order_id or not reason.strip() or not reconciled_by.strip() or not idempotency_key.strip():
+            raise ValueError("RIV-WRK-0014: duplicate reconciliation fields are invalid.")
+        with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT duplicate_work_order_id,canonical_work_order_id,engineering_intent_id FROM work_order_duplicate_reconciliations WHERE idempotency_key=%s", (idempotency_key,))
+            replay = cursor.fetchone()
+            if replay:
+                if replay[:2] != (duplicate_work_order_id, canonical_work_order_id):
+                    raise ValueError("RIV-WRK-0014: reconciliation idempotency conflict.")
+                return {"duplicate_work_order_id": str(replay[0]), "canonical_work_order_id": str(replay[1]), "status": "cancelled", "idempotent_replay": True}
+            cursor.execute("SELECT work_order_id,status,engineering_intent_id,objective_id,stage_id,source_work_order_id,idempotency_key FROM work_orders WHERE work_order_id IN (%s,%s) FOR UPDATE", (duplicate_work_order_id, canonical_work_order_id))
+            rows = {row[0]: row for row in cursor.fetchall()}
+            duplicate = rows.get(duplicate_work_order_id)
+            canonical = rows.get(canonical_work_order_id)
+            if duplicate is None or canonical is None:
+                raise RuntimeError("RIV-WRK-0014: both work orders are required.")
+            if duplicate[1] != "queued" or duplicate[2] is None or duplicate[5] is not None:
+                raise RuntimeError("RIV-WRK-0014: duplicate is not an unstarted initial order.")
+            if canonical[1] not in {"queued", "claimed", "running", "succeeded"} or canonical[2] != duplicate[2] or canonical[3] is None or canonical[4] is None or canonical[5] is not None:
+                raise RuntimeError("RIV-WRK-0014: canonical order does not establish stronger initial lineage.")
+            reconciliation_id = uuid4()
+            cursor.execute("""INSERT INTO work_order_duplicate_reconciliations(reconciliation_id,duplicate_work_order_id,canonical_work_order_id,engineering_intent_id,reason,reconciled_by,idempotency_key) VALUES(%s,%s,%s,%s,%s,%s,%s)""", (reconciliation_id, duplicate_work_order_id, canonical_work_order_id, duplicate[2], reason, reconciled_by, idempotency_key))
+            cursor.execute("UPDATE work_orders SET status='cancelled',finished_at=now(),updated_at=now() WHERE work_order_id=%s AND status='queued'", (duplicate_work_order_id,))
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-WRK-0014: duplicate status transition was lost.")
+            self._append_event(cursor, event_type="work.order.duplicate_reconciled", work_order_id=duplicate_work_order_id, correlation_id=duplicate[0], payload={"canonical_work_order_id": str(canonical_work_order_id), "reason": reason, "reconciled_by": reconciled_by}, idempotency_key=f"work.order.duplicate_reconciled:{reconciliation_id}")
+            return {"duplicate_work_order_id": str(duplicate_work_order_id), "canonical_work_order_id": str(canonical_work_order_id), "status": "cancelled", "reconciliation_id": str(reconciliation_id), "idempotent_replay": False}
+
+    def enqueue(self, action_type: str, parameters: dict[str, Any], requested_by: str, idempotency_key: str, correlation_id: UUID | None = None, causation_id: UUID | None = None, objective_id: UUID | None = None, stage_id: UUID | None = None) -> WorkOrder:
         """Create one durable order or return the existing idempotent order."""
         with connect(self._config) as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT action_version, expected_duration_seconds, hard_timeout_seconds, enabled FROM approved_actions WHERE action_type=%s", (action_type,))
-            action = cursor.fetchone()
-            if not action or not action[3]:
-                raise RuntimeError(f"RIV-WRK-0001: Action is unknown or disabled: {action_type}")
-            order_id = uuid4(); correlation = correlation_id or uuid4()
-            cursor.execute(
-                """INSERT INTO work_orders (work_order_id, action_type, action_version, status, parameters, requested_by, idempotency_key, correlation_id, causation_id, expected_duration_seconds, hard_timeout_seconds)
-                   VALUES (%s,%s,%s,'queued',%s::jsonb,%s,%s,%s,%s,%s,%s)
-                   ON CONFLICT (idempotency_key) DO NOTHING
-                   RETURNING work_order_id""",
-                (order_id, action_type, action[0], json.dumps(parameters), requested_by, idempotency_key, correlation, causation_id, action[1], action[2]),
-            )
-            inserted = cursor.fetchone()
-            if not inserted:
-                cursor.execute("SELECT work_order_id FROM work_orders WHERE idempotency_key=%s", (idempotency_key,)); order_id = cursor.fetchone()[0]
-            cursor.execute("SELECT action_type, parameters, requested_by, idempotency_key, correlation_id, work_order_id, action_version, expected_duration_seconds, hard_timeout_seconds, status FROM work_orders WHERE work_order_id=%s", (order_id,))
-            row = cursor.fetchone()
-            self._append_event(cursor, event_type="work.order.queued", work_order_id=row[5], correlation_id=row[4], payload={"action_type": row[0], "status": row[9]})
-            return WorkOrder(*row)
+            return self.enqueue_in_transaction(cursor, action_type, parameters, requested_by, idempotency_key, correlation_id, causation_id, objective_id, stage_id)
 
     def claim_fenced(
         self,
@@ -274,11 +317,13 @@ class RelayStore:
 
     def claim(self, worker_id: str, lease_seconds: int = 30, *,
               worker_instance_id: UUID | None = None, seat_id: str = "C1",
-              role: str = "writer", work_order_id: UUID | None = None) -> ClaimedWork | None:
+              role: str = "writer", work_order_id: UUID | None = None,
+              allow_internal: bool = False) -> ClaimedWork | None:
         """Compatibility claim; it still creates the exact fenced identity."""
         instance = worker_instance_id or uuid4()
         claim = self.claim_fenced(worker_id, instance, seat_id=seat_id, role=role,
-                                  lease_seconds=lease_seconds, work_order_id=work_order_id)
+                                  lease_seconds=lease_seconds, work_order_id=work_order_id,
+                                  allow_internal=allow_internal)
         if claim is None:
             return None
         return ClaimedWork(
@@ -294,6 +339,7 @@ class RelayStore:
             worker_instance_id=claim.identity.worker_instance_id,
             seat_id=claim.seat_id,
             role=claim.role,
+            correlation_id=claim.correlation_id,
         )
 
     @staticmethod

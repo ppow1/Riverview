@@ -219,6 +219,16 @@ class GraceMomentum:
             raise RuntimeError("RIV-GRC-0004: stage is not eligible for automatic action.")
         if not isinstance(action, dict) or not isinstance(action.get("action_type"), str) or not isinstance(action.get("parameters"), dict):
             raise TypeError("RIV-GRC-0004: no declared approved action is present.")
+        intent_id = action["parameters"].get("engineering_intent_id")
+        if intent_id:
+            with connect() as connection, connection.cursor() as cursor:
+                cursor.execute("""SELECT work_order_id,status,action_type FROM work_orders
+                                  WHERE engineering_intent_id=%s AND work_order_kind='initial'
+                                    AND source_work_order_id IS NULL
+                                  ORDER BY created_at LIMIT 1""", (intent_id,))
+                existing = cursor.fetchone()
+            if existing is not None:
+                return {"stage_id": str(stage_id), "work_order_id": str(existing[0]), "correlation_id": str(correlation_id), "action_type": existing[2], "already_enqueued": True}
         order = RelayStore().enqueue(action["action_type"], action["parameters"], requested_by, f"grace:{objective_key}:{stage_key}", correlation_id)
         return {"stage_id": str(stage_id), "work_order_id": str(order.work_order_id), "correlation_id": str(correlation_id), "action_type": order.action_type}
 

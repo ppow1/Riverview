@@ -28,6 +28,12 @@ def test_recoverable_failure_classes_include_old_and_infrastructure_failures() -
     assert not is_recoverable_failure("RIV-GRC-0010")
 
 
+def test_pre_execution_reasoning_adapter_failure_is_recoverable_only_with_evidence() -> None:
+    evidence = {"status": "failed", "reason": "RIV-REASON-0001: request type is unsupported", "execution_started": False}
+    assert is_recoverable_failure("RIV-REASON-0001", evidence)
+    assert not is_recoverable_failure("RIV-REASON-0001", {"status": "failed", "reason": "model rejected work"})
+
+
 def test_original_failure_does_not_control_drift_decision(monkeypatch: pytest.MonkeyPatch) -> None:
     result = analyzer(monkeypatch, "src/riverview/autonomy/control.py\n").assess(Path.cwd(), BASE, (PATH,), proposed_base_sha=HEAD)
     assert result.decision == "material_drift"

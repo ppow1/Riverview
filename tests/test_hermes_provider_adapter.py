@@ -122,6 +122,23 @@ def test_provider_forwards_structured_response_format() -> None:
     assert captured["body"]["response_format"] == {"type": "json_object"}
 
 
+def test_provider_forwards_explicit_codex_seat_as_request_scoped_metadata() -> None:
+    captured: dict[str, object] = {}
+
+    def opener(req, **_kwargs):
+        captured["body"] = json.loads(req.data)
+        return FakeResponse(response())
+
+    provider = HermesReasoningProvider(codex_seat_id="C2", opener=opener)
+    provider.generate(request())
+    assert captured["body"]["model_options"] == {"codex_seat_id": "C2"}
+
+
+def test_provider_rejects_unknown_codex_seat() -> None:
+    with pytest.raises(ValueError, match="C1, C2, or C3"):
+        HermesReasoningProvider(codex_seat_id="C9")
+
+
 def test_provider_restricts_endpoint_and_timeout() -> None:
     with pytest.raises(ValueError, match="loopback"):
         HermesReasoningProvider(endpoint="http://example.com/v1")

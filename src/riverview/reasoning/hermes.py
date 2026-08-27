@@ -24,6 +24,7 @@ from .contracts import ReasoningRequest, ReasoningResponse
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:8642/v1"
 DEFAULT_TIMEOUT_SECONDS = 30.0
+CODEX_SEATS = {"C1", "C2", "C3"}
 MAX_TIMEOUT_SECONDS = 120.0
 CAMPAIGN_TIMEOUT_SECONDS = 1800.0
 MAX_RESPONSE_BYTES = 128_000
@@ -86,6 +87,7 @@ class HermesReasoningProvider:
         execution_class: str = "bounded-advisory",
         max_response_chars: int = MAX_RESPONSE_CHARS,
         opener: Callable[..., Any] = urlopen,
+        codex_seat_id: str | None = None,
     ) -> None:
         _validate_loopback(endpoint)
         if execution_class not in {"bounded-advisory", "campaign-engineering"}:
@@ -110,6 +112,9 @@ class HermesReasoningProvider:
         self.max_response_chars = max_response_chars
         self._api_key = api_key if api_key is not None else _api_key_from_environment()
         self._opener = opener
+        if codex_seat_id is not None and codex_seat_id not in CODEX_SEATS:
+            raise ValueError("codex_seat_id must be C1, C2, or C3")
+        self.codex_seat_id = codex_seat_id
 
     def resource_metadata(self) -> dict[str, str | None]:
         """Return dynamic provider/resource identity for registry binding."""
@@ -121,6 +126,16 @@ class HermesReasoningProvider:
             "classification": "provider-declared",
             "execution_class": self.execution_class,
         }
+
+    def for_seat(self, codex_seat_id: str) -> "HermesReasoningProvider":
+        """Return an equivalent provider bound to the admitted Codex seat."""
+        return HermesReasoningProvider(
+            endpoint=self.endpoint, provider_id=self.provider_id,
+            resource_class_ref=self.resource_class_ref, model_ref=self.model_ref,
+            api_key=self._api_key, timeout_seconds=self.timeout_seconds,
+            execution_class=self.execution_class, max_response_chars=self.max_response_chars,
+            opener=self._opener, codex_seat_id=codex_seat_id,
+        )
 
     def generate(self, request: ReasoningRequest) -> ReasoningResponse:
         """Perform one bounded advisory generation with no action tools."""
@@ -149,6 +164,8 @@ class HermesReasoningProvider:
         }
         if self.model_ref:
             body["model"] = self.model_ref
+        if self.codex_seat_id:
+            body["model_options"] = {"codex_seat_id": self.codex_seat_id}
         if request.response_format is not None:
             body["response_format"] = request.response_format
         payload = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")

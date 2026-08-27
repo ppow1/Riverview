@@ -59,6 +59,11 @@ def is_recoverable_failure(checkpoint: str, failure_evidence: object | None = No
         checkpoint == "RIV-WRK-0004" and evidence.get("status") == "timed_out"
     ) or (
         checkpoint == "RIV-EXE-0007" and "changed path escaped envelope" in reason
+    ) or (
+        checkpoint == "RIV-REASON-0001"
+        and evidence.get("status") == "failed"
+        and evidence.get("execution_started", False) is False
+        and "request type is unsupported" in reason
     )
 
 
@@ -210,7 +215,7 @@ class StaleBaseRecoveryStore:
             if row[22] not in {"active", "consumed"}:
                 raise RuntimeError("RIV-GRC-0010: authority lineage is not available for revalidation.")
             expected_contract = {
-                "repository_identity": row[21], "repository_root": str(row[12]).replace("\\", "/"),
+                "repository_identity": row[21], "repository_root": str(row[12]),
                 "expected_base_sha": row[13], "bounded_instruction": row[17],
                 "allowed_paths": list(row[14]), "acceptance_criteria": list(row[15]),
                 "evidence_requirements": list(row[16]), "capability_name": row[18],
@@ -331,6 +336,42 @@ class StaleBaseRecoveryStore:
         if row is None:
             raise PermissionError("RIV-GRC-0010: refreshed base binding is not approved for this exact work lineage.")
         return str(row[0])
+
+    def requeue_failed_successor(self, revalidation_id: UUID, *, idempotency_key: str) -> dict[str, Any]:
+        """Requeue one failed pre-execution successor without creating another row."""
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT r.successor_work_order_id,w.status,w.error_checkpoint,w.result_report
+                     FROM execution_base_revalidations r JOIN work_orders w ON w.work_order_id=r.successor_work_order_id
+                    WHERE r.revalidation_id=%s AND r.status='approved' FOR UPDATE OF r,w""",
+                (revalidation_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise RuntimeError("RIV-GRC-0007: approved recovery successor was not found.")
+            successor, status, checkpoint, report = row
+            if status == "queued":
+                return {"revalidation_id": str(revalidation_id), "successor_work_order_id": str(successor), "status": "queued", "idempotent_replay": True}
+            evidence = report if isinstance(report, dict) else {}
+            reason = str(evidence.get("reason", ""))
+            if status != "failed" or checkpoint != "RIV-RUN-0001" or "Hermes authentication was rejected" not in reason:
+                raise RuntimeError("RIV-GRC-0007: successor failure is not an eligible pre-execution recovery failure.")
+            cursor.execute(
+                """UPDATE work_orders SET status='queued',error_checkpoint=NULL,result_report=NULL,
+                          active_attempt_id=NULL,lease_owner=NULL,lease_expires_at=NULL,
+                          lease_generation=NULL,fencing_token=NULL,worker_instance_id=NULL,
+                          seat_id=NULL,role=NULL,started_at=NULL,finished_at=NULL,updated_at=now()
+                    WHERE work_order_id=%s AND status='failed'""",
+                (successor,),
+            )
+            cursor.execute(
+                """INSERT INTO river_events(event_id,event_type,aggregate_type,aggregate_id,correlation_id,causation_id,idempotency_key,classification,payload,occurred_at)
+                   SELECT gen_random_uuid(),'work.order.recovery_requeued','work_order',w.work_order_id,w.correlation_id,r.failed_work_order_id,%s,'river',%s::jsonb,now()
+                     FROM work_orders w JOIN work_order_retry_lineage r ON r.successor_work_order_id=w.work_order_id
+                    WHERE w.work_order_id=%s ON CONFLICT(idempotency_key) DO NOTHING""",
+                (idempotency_key, json.dumps({"revalidation_id": str(revalidation_id), "successor_work_order_id": str(successor)}), successor),
+            )
+        return {"revalidation_id": str(revalidation_id), "successor_work_order_id": str(successor), "status": "queued", "idempotent_replay": False}
 
     def refresh_approved_successor_base(self, revalidation_id: UUID, repository: Path) -> str:
         """Refresh a queued successor's verified descendant base before start."""

@@ -56,6 +56,9 @@
       "command": [".venv/Scripts/python.exe", "-m", "riverview.relay.worker"],
       "dependencies": ["cme-supervisor"],
       "process_match": "riverview.relay.worker",
+      "secret_file": "A:/AI/Tools/Hermes/data/.env",
+      "secret_key": "API_SERVER_KEY",
+      "secret_env": "API_SERVER_KEY",
       "restart": true,
       "startup_timeout": 8.0
     }

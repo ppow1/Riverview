@@ -46,3 +46,11 @@ def test_transport_probe_rejects_unbounded_or_sensitive_token(monkeypatch: pytes
     monkeypatch.setattr("riverview.mcp.comms5.connect", fake_connect)
     with pytest.raises(Comms5Error):
         Comms5Service().transport_probe("bad token", "http-test-001")
+
+
+def test_resource_policy_operations_are_governed_and_not_reset_activation(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = Comms5Service()
+    assert service.describe_operation("resource_policy_status")["authorization"] == "READ_ONLY"
+    assert service.describe_operation("set_resource_policy")["authorization"] == "STEWARD-GATED_WRITE"
+    with pytest.raises(Comms5Error, match="authenticated Steward"):
+        service.set_resource_policy({"mode": "DRAIN", "parameters": {"target_seat": "C3"}, "explicit_steward_confirmation": True}, transport_principal=None)

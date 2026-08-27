@@ -26,6 +26,12 @@ _GOVERNED_MUTATION_HINTS = ToolAnnotations(
     idempotentHint=True,
     openWorldHint=False,
 )
+_READ_ONLY_HINTS = ToolAnnotations(
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False,
+)
 
 
 class FormationContractInput(BaseModel):
@@ -82,7 +88,7 @@ def _server_request_id(context: Context) -> str:
     return str(scope.get("riverview_request_id", ""))
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_contract_info(ctx: Context) -> Any:
     """Return the versioned Comms5 contract identity."""
     request_id = _server_request_id(ctx)
@@ -93,25 +99,25 @@ def comms5_contract_info(ctx: Context) -> Any:
     return result
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_help() -> Any:
     """Return machine-readable Comms5 discovery and safe-use guidance."""
     return _safe(service.help())
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_capabilities() -> Any:
     """List Comms5 operations, limits, and authorization classes."""
     return _safe(service.capabilities())
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_describe_operation(operation: str) -> Any:
     """Describe one Comms5 operation."""
     return _safe(service.describe_operation(operation))
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_examples() -> Any:
     """Return bounded examples for public operations."""
     return _safe(service.examples())
@@ -172,25 +178,28 @@ def comms5_store_specification(
     return _invoke(service.store_specification, values)
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Read bounded seed status",
+    annotations=_READ_ONLY_HINTS,
+)
 def comms5_seed_status(seed_id: str) -> Any:
-    """Return bounded seed status metadata."""
+    """Return bounded seed, specification, objective linkage, and promotion status metadata."""
     return _safe(service.seed_status(seed_id))
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_seed_lineage(seed_id: str) -> Any:
     """Return authoritative bounded seed lineage."""
     return _safe(service.seed_lineage(seed_id))
 
 
-@mcp.tool()
+@mcp.tool(title="Read bounded objective status", annotations=_READ_ONLY_HINTS)
 def comms5_objective_status(objective_id: str) -> Any:
-    """Return bounded objective/stage/CME/work state."""
+    """Return bounded objective, stages, authority, intent, and work metadata."""
     return _safe(service.objective_status(objective_id))
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_cme_status(ctx: Context) -> Any:
     """Return the authoritative CME runtime projection."""
     request_id = _server_request_id(ctx)
@@ -201,16 +210,56 @@ def comms5_cme_status(ctx: Context) -> Any:
     return result
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_recent_steward_submissions(limit: int = 20) -> Any:
     """Return bounded recent submission metadata."""
     return _safe(service.recent_steward_submissions(limit))
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READ_ONLY_HINTS)
 def comms5_transport_probe(probe_id: str, ctx: Context) -> Any:
     """Run one read-only end-to-end transport correlation probe."""
     return _safe(service.transport_probe(probe_id, _server_request_id(ctx)))
+
+
+@mcp.tool(annotations=_READ_ONLY_HINTS)
+def comms5_resource_policy_status() -> Any:
+    """Return the durable Codex resource policy and its audit projection."""
+    return _invoke(service.resource_policy_status)
+
+
+@mcp.tool(title="Set resource policy", annotations=_GOVERNED_MUTATION_HINTS)
+def comms5_set_resource_policy(
+    mode: str,
+    parameters: dict[str, Any],
+    explicit_steward_confirmation: bool,
+    ctx: Context,
+    rationale: str = "",
+    expected_revision: int | None = None,
+) -> Any:
+    """Set policy only from authenticated Steward transport attestation."""
+    return _invoke(
+        service.set_resource_policy,
+        {"mode": mode, "parameters": parameters, "explicit_steward_confirmation": explicit_steward_confirmation, "rationale": rationale, "expected_revision": expected_revision, "source_request_id": _server_request_id(ctx)},
+        transport_principal=_transport_principal(ctx),
+    )
+
+
+@mcp.tool(title="Lock resource policy", annotations=_GOVERNED_MUTATION_HINTS)
+def comms5_set_resource_policy_lock(
+    locked: bool,
+    explicit_steward_confirmation: bool,
+    ctx: Context,
+    rationale: str = "",
+) -> Any:
+    """Lock or unlock policy only from authenticated Steward transport attestation."""
+    return _invoke(
+        service.set_resource_policy_lock,
+        locked,
+        transport_principal=_transport_principal(ctx),
+        explicit_steward_confirmation=explicit_steward_confirmation,
+        rationale=rationale,
+    )
 
 
 @mcp.tool(title="Confirm Steward-approved draft", annotations=_GOVERNED_MUTATION_HINTS)
@@ -253,6 +302,40 @@ def comms5_confirm_and_promote_seed(
     }, transport_principal=_transport_principal(ctx))
 
 
+@mcp.tool(title="Form and queue approved work", annotations=_GOVERNED_MUTATION_HINTS)
+def comms5_form_and_queue_work(
+    objective_id: Annotated[str, Field(description="Exact already-promoted objective ID; scope is derived server-side.")],
+    stage_id: Annotated[str, Field(description="Exact ready stage ID bound to the objective.")],
+    authority_id: Annotated[str, Field(description="Exact active Steward authority grant ID bound to the objective and stage.")],
+    idempotency_key: Annotated[str, Field(description="Stable retry key for this one formation and enqueue operation.")],
+    explicit_steward_confirmation: Annotated[bool, Field(description="Explicit Steward approval to form and enqueue this existing approved lineage; must be true.")],
+    client_id: str,
+    client_type: str,
+    client_name: str,
+    ctx: Context,
+    client_version: str = "",
+    protocol_version: str = CONTRACT_VERSION,
+    correlation_id: str = "",
+    classification: str = "river",
+) -> Any:
+    """Form the approved typed intent and enqueue exactly one work order."""
+    return _invoke(service.form_and_queue_work, {
+        "objective_id": objective_id,
+        "stage_id": stage_id,
+        "authority_id": authority_id,
+        "idempotency_key": idempotency_key,
+        "explicit_steward_confirmation": explicit_steward_confirmation,
+        "client_id": client_id,
+        "client_type": client_type,
+        "client_name": client_name,
+        "authenticated_principal": "untrusted-client-provenance",
+        "client_version": client_version,
+        "protocol_version": protocol_version,
+        "correlation_id": correlation_id,
+        "classification": classification,
+    }, transport_principal=_transport_principal(ctx))
+
+
 @mcp.tool(title="Revalidate approved work base", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_revalidate_and_queue_work(
     work_order_id: Annotated[str, Field(description="Exact preserved failed work order with RIV-EXE-0008 stale-base evidence.")],
@@ -266,6 +349,7 @@ def comms5_revalidate_and_queue_work(
     protocol_version: str = CONTRACT_VERSION,
     correlation_id: str = "",
     classification: str = "river",
+    infrastructure_repair_evidence: list[str] = [],
 ) -> Any:
     """Revalidate one stale approved base and queue one bounded successor.
 
@@ -285,6 +369,7 @@ def comms5_revalidate_and_queue_work(
         "protocol_version": protocol_version,
         "correlation_id": correlation_id,
         "classification": classification,
+        "infrastructure_repair_evidence": infrastructure_repair_evidence,
     }, transport_principal=_transport_principal(ctx))
 
 

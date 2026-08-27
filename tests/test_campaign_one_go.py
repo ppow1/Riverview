@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections import deque
 from uuid import uuid4
 
-from riverview.campaign.one_go import CampaignOneGoRunner, WorkerSlot
+import pytest
+
+from riverview.campaign.one_go import CampaignOneGoRunner, OneGoError, WorkerSlot
 from riverview.campaign import DefectInput
 from riverview.relay import AttemptIdentity, ClaimedWork
 from riverview.relay.store import FencedClaimedWork
+from riverview.resources.control import ResourceControlError, SeatClaim
 
 
 def _fenced(role: str) -> FencedClaimedWork:
@@ -164,3 +167,90 @@ def test_one_go_resume_uses_persisted_pending_role_without_replaying_writer():
     assert [item["role"] for item in first.run(max_steps=1)] == ["writer"]
     second = _runner(["validator"], {role: lambda _work: _success(verdict="PASS", basis_hash="basis", findings_summary=(), defects=()) for role in ("writer", "validator", "repair_writer", "revalidator")}, relay, lifecycle)
     assert [item["role"] for item in second.run(max_steps=1)] == ["validator"]
+
+
+class FakeResourceClaims:
+    def __init__(self) -> None:
+        self.seat_claim = SeatClaim(uuid4(), "C3", "reservation", "worker", "claimed", None)
+        self.calls: list[tuple[str, object]] = []
+
+    def claim(self, seat_id, work_id, owner_id):
+        self.calls.append(("claim", (seat_id, work_id, owner_id)))
+        return self.seat_claim
+
+    def attach_work(self, claim_id, work_id):
+        self.calls.append(("attach", (claim_id, work_id)))
+
+    def transition(self, claim_id, state):
+        self.calls.append(("transition", (claim_id, state)))
+
+    def release(self, claim_id, *, reason, failed=False):
+        self.calls.append(("release", (claim_id, reason, failed)))
+
+
+class BusyResourceClaims(FakeResourceClaims):
+    def claim(self, seat_id, work_id, owner_id):
+        raise ResourceControlError("seat is already claimed")
+
+
+class FakeResourcePlanner:
+    def __init__(self, claim):
+        self.claim = claim
+
+    def claim_automatic(self, work_id, owner_id, *, role):
+        return self.claim, f"selected C3 under HIGHEST_CAPACITY for {role}"
+
+
+class SeatRelay(FakeRelay):
+    def claim_fenced(self, worker_id, worker_instance_id, *, seat_id, role, **kwargs):
+        assert seat_id == "C3"
+        item = _fenced(role)
+        return FencedClaimedWork(
+            AttemptIdentity(item.identity.work_order_id, item.identity.attempt_id, item.identity.lease_generation, item.identity.fencing_token, item.identity.worker_instance_id),
+            item.action_type, item.action_version, item.parameters, item.hard_timeout_seconds, item.expected_duration_seconds, item.correlation_id,
+            "C3", role,
+        )
+
+
+def test_resource_claim_wraps_automatic_admission_and_releases_success():
+    resources = FakeResourceClaims()
+    runner = CampaignOneGoRunner(
+        (WorkerSlot("auto-worker", "AUTO", ("writer",), uuid4()),),
+        {"writer": lambda _work: _success(), "validator": lambda _work: _success(), "repair_writer": lambda _work: _success(), "revalidator": lambda _work: _success()},
+        relay=SeatRelay(["writer"]), lifecycle=FakeLifecycle(),
+        resource_planner=FakeResourcePlanner(resources.seat_claim), resource_claim_store=resources,
+    )
+    runner.admit_eligible_stages = lambda: ()
+    outcome = runner.tick()
+    assert outcome["status"] == "succeeded"
+    assert [call[0] for call in resources.calls] == ["attach", "transition", "transition", "release"]
+    assert resources.calls[-1][1][2] is False
+
+
+def test_resource_claim_releases_failed_when_executor_raises():
+    resources = FakeResourceClaims()
+    runner = CampaignOneGoRunner(
+        (WorkerSlot("auto-worker", "AUTO", ("writer",), uuid4()),),
+        {"writer": lambda _work: (_ for _ in ()).throw(RuntimeError("provider failed")), "validator": lambda _work: _success(), "repair_writer": lambda _work: _success(), "revalidator": lambda _work: _success()},
+        relay=SeatRelay(["writer"]), lifecycle=FakeLifecycle(),
+        resource_planner=FakeResourcePlanner(resources.seat_claim), resource_claim_store=resources,
+        attention_delivery=lambda _key: {"status": "delivered"},
+    )
+    runner.admit_eligible_stages = lambda: ()
+    outcome = runner.tick()
+    assert outcome["status"] == "failed"
+    assert resources.calls[-1][0] == "release"
+    assert resources.calls[-1][1][2] is True
+
+
+def test_explicit_resource_claim_failure_does_not_substitute_seat():
+    resources = BusyResourceClaims()
+    runner = CampaignOneGoRunner(
+        (WorkerSlot("fixed-worker", "C2", ("writer",), uuid4()),),
+        {role: lambda _work: _success() for role in ("writer", "validator", "repair_writer", "revalidator")},
+        relay=FakeRelay(["writer"]), lifecycle=FakeLifecycle(),
+        resource_planner=FakeResourcePlanner(resources.seat_claim), resource_claim_store=resources,
+    )
+    runner.admit_eligible_stages = lambda: ()
+    with pytest.raises(OneGoError, match="explicit seat C2"):
+        runner.tick()

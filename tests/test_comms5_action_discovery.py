@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from riverview.mcp.comms5 import Comms5Service
 from riverview.mcp.comms5_server import mcp
 from tools.riverview_comms5_manifest import TOOL_SCHEMAS, TOOLS
 
@@ -28,7 +29,8 @@ def test_comms5_tools_have_chatgpt_discoverable_schemas() -> None:
         "comms5_store_specification", "comms5_seed_status", "comms5_seed_lineage",
         "comms5_objective_status", "comms5_cme_status", "comms5_recent_steward_submissions",
         "comms5_transport_probe",
-        "comms5_confirm_and_promote_seed", "comms5_revalidate_and_queue_work", "comms5_cancel_draft", "comms5_supersede_seed",
+        "comms5_confirm_and_promote_seed", "comms5_form_and_queue_work", "comms5_revalidate_and_queue_work", "comms5_cancel_draft", "comms5_supersede_seed",
+        "comms5_resource_policy_status", "comms5_set_resource_policy", "comms5_set_resource_policy_lock",
     }
     assert {tool.name for tool in tools} == expected
     assert TOOLS == expected
@@ -57,7 +59,8 @@ def test_mutating_comms5_tools_publish_flat_authoritative_schemas() -> None:
         "comms5_submit_steward_seed": {"seed_text", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal", "correlation_id", "client_version", "protocol_version", "classification", "causation_id", "specification_id"},
             "comms5_store_specification": {"content", "summary", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal", "correlation_id", "client_version", "protocol_version", "classification", "formation_contract"},
         "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "client_version", "protocol_version", "correlation_id", "classification"},
-        "comms5_revalidate_and_queue_work": {"work_order_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "client_version", "protocol_version", "correlation_id", "classification"},
+        "comms5_form_and_queue_work": {"objective_id", "stage_id", "authority_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "client_version", "protocol_version", "correlation_id", "classification"},
+        "comms5_revalidate_and_queue_work": {"work_order_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "client_version", "protocol_version", "correlation_id", "classification", "infrastructure_repair_evidence"},
         "comms5_cancel_draft": {"seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal", "client_version", "protocol_version", "correlation_id", "classification"},
         "comms5_supersede_seed": {"seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal", "client_version", "protocol_version", "correlation_id", "classification"},
     }
@@ -65,6 +68,7 @@ def test_mutating_comms5_tools_publish_flat_authoritative_schemas() -> None:
         "comms5_submit_steward_seed": {"seed_text", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal"},
         "comms5_store_specification": {"content", "summary", "idempotency_key", "client_id", "client_type", "client_name", "authenticated_principal"},
         "comms5_confirm_and_promote_seed": {"seed_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name"},
+        "comms5_form_and_queue_work": {"objective_id", "stage_id", "authority_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name"},
         "comms5_revalidate_and_queue_work": {"work_order_id", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name"},
         "comms5_cancel_draft": {"seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal"},
         "comms5_supersede_seed": {"seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client_id", "client_type", "client_name", "authenticated_principal"},
@@ -95,6 +99,42 @@ def test_stale_base_revalidation_publishes_non_destructive_idempotent_safety_hin
     assert tool.annotations.destructiveHint is False
     assert tool.annotations.idempotentHint is True
     assert tool.annotations.openWorldHint is False
+
+
+def test_status_reads_publish_explicit_read_only_safety_hints() -> None:
+    tools = {tool.name: tool for tool in mcp._tool_manager.list_tools()}
+    for name in (
+        "comms5_seed_status",
+        "comms5_seed_lineage",
+        "comms5_objective_status",
+        "comms5_cme_status",
+        "comms5_recent_steward_submissions",
+        "comms5_transport_probe",
+        "comms5_resource_policy_status",
+    ):
+        annotations = tools[name].annotations
+        assert annotations is not None
+        assert annotations.readOnlyHint is True
+        assert annotations.destructiveHint is False
+        assert annotations.idempotentHint is True
+        assert annotations.openWorldHint is False
+
+
+def test_objective_and_seed_status_are_the_bounded_preflight_reads() -> None:
+    objective = Comms5Service().describe_operation("objective_status")
+    seed = Comms5Service().describe_operation("seed_status")
+    assert objective["authorization"] == "READ_ONLY"
+    assert seed["authorization"] == "READ_ONLY"
+    assert objective["required"] == ["objective_id"]
+    assert seed["required"] == ["seed_id"]
+    assert "objective, stages, authority, intent, and work" in objective["description"]
+    assert seed["description"] == "Return bounded seed, specification, objective linkage, and promotion status metadata."
+
+
+def test_seed_status_has_explicit_bounded_read_title_and_description() -> None:
+    tool = next(tool for tool in mcp._tool_manager.list_tools() if tool.name == "comms5_seed_status")
+    assert tool.title == "Read bounded seed status"
+    assert tool.description == "Return bounded seed, specification, objective linkage, and promotion status metadata."
 
 
 def test_public_discovery_describes_typed_formation_and_durable_authority() -> None:

@@ -44,13 +44,21 @@ class HermesCampaignRoleExecutor:
             raise HermesCampaignExecutionError(
                 "RIV-CAM-HERMES-0002: canonical Campaign Runner correlation is missing."
             )
+        provider = self.provider
+        if work.seat_id and hasattr(provider, "for_seat"):
+            provider = provider.for_seat(work.seat_id)
+        configured_seat = getattr(provider, "codex_seat_id", None)
+        if configured_seat is not None and configured_seat != work.seat_id:
+            raise HermesCampaignExecutionError(
+                "RIV-CAM-HERMES-0018: Hermes provider seat differs from claimed work seat."
+            )
         request = self._request(work)
-        response = self.provider.generate(request)
+        response = provider.generate(request)
         if response.request_id != request.request_id or response.correlation_id != request.correlation_id:
             raise HermesCampaignExecutionError(
                 "RIV-CAM-HERMES-0003: Hermes response correspondence failed."
             )
-        if response.provider_id != self.provider.provider_id:
+        if response.provider_id != provider.provider_id:
             raise HermesCampaignExecutionError(
                 "RIV-CAM-HERMES-0004: Hermes provider identity changed in response."
             )
@@ -65,7 +73,7 @@ class HermesCampaignRoleExecutor:
             "worker_instance_id": str(work.worker_instance_id) if work.worker_instance_id else None,
             "role": work.role,
             "provider_id": response.provider_id,
-            "resource_class_ref": self.provider.resource_class_ref,
+            "resource_class_ref": provider.resource_class_ref,
             "response_id": str(response.response_id),
             "evidence_refs": list(response.evidence_refs),
             "summary": response.summary[:8_000],
@@ -94,7 +102,7 @@ class HermesCampaignRoleExecutor:
                 revalidation_parameters = dict(work.parameters["revalidation_parameters"])
                 revalidation_parameters.setdefault("expected_evidence_refs", result["evidence_refs"])
                 result["revalidation_parameters"] = revalidation_parameters
-        else:
+        elif work.role != "engineering":
             result["validator_action_type"] = self._validator_action(work)
             if "validator_parameters" in work.parameters:
                 validator_parameters = dict(work.parameters["validator_parameters"])

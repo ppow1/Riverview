@@ -12,6 +12,8 @@ import shutil
 import subprocess
 import threading
 from dataclasses import dataclass
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import monotonic
 from typing import Any
@@ -24,9 +26,14 @@ from riverview.autonomy.control import (
     ResultReconciler,
 )
 from riverview.autonomy.stale_base import StaleBaseRecoveryStore
+from riverview.campaign.hermes_executor import HermesCampaignRoleExecutor
 from riverview.database import connect
 from riverview.intake import EngineeringIntentStore
 from riverview.relay import AttemptIdentity, ClaimedWork, FenceNotCurrentError, RelayStore
+from riverview.resources.control import DurableResourcePlanner, ResourceControlError, ResourcePolicyStore, SeatClaim, SeatClaimStore
+from riverview.resources.registry import ResourceRegistry
+from riverview.reasoning.contracts import ReasoningRequest
+from riverview.reasoning.hermes import HermesReasoningProvider
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,28 +48,101 @@ class ActionDefinition:
 class RestrictedRunner:
     """Execute only explicitly implemented actions whose source hash matches policy."""
 
-    def __init__(self, repository: Path, worker_id: str, heartbeat_seconds: float = 0.5) -> None:
+    def __init__(self, repository: Path, worker_id: str, heartbeat_seconds: float = 0.5,
+                 *, resource_planner: DurableResourcePlanner | None = None,
+                 resource_claim_store: SeatClaimStore | None = None) -> None:
         self.repository = repository.resolve()
         self.worker_id = worker_id
         self.worker_instance_id = uuid4()
         self.heartbeat_seconds = heartbeat_seconds
         self.store = RelayStore()
+        if (resource_planner is None) != (resource_claim_store is None):
+            raise ValueError("resource planner and claim store must be supplied together")
+        self.resource_claim_store = resource_claim_store or SeatClaimStore()
+        self.resource_lease_seconds = 300
+        self.resource_renewal_seconds = 100
+        self.resource_planner = resource_planner or DurableResourcePlanner(
+            ResourceRegistry.from_codex_telemetry(), ResourcePolicyStore(), self.resource_claim_store,
+        )
 
-    def run_once(self) -> dict[str, Any] | None:
-        work = self.store.claim(self.worker_id, 10, worker_instance_id=self.worker_instance_id,
-                                seat_id="C1", role="writer")
+    def run_once(self, *, target_work_order_id: UUID | None = None) -> dict[str, Any] | None:
+        """Run one order, optionally restricting admission to an exact ID."""
+        reservation_id = f"relay-reservation:{uuid4()}"
+        resource_claim: SeatClaim | None = None
+        renewal_stop = threading.Event()
+        renewal_errors: list[str] = []
+        renewal_thread: threading.Thread | None = None
+        try:
+            resource_claim, _reason = self.resource_planner.claim_automatic(
+                reservation_id, self.worker_id, role="writer",
+            )
+            work = self.store.claim(self.worker_id, 10, worker_instance_id=self.worker_instance_id,
+                                    seat_id=resource_claim.seat_id, role="writer",
+                                    work_order_id=target_work_order_id,
+                                    allow_internal=target_work_order_id is not None)
+            if work is None:
+                self.resource_claim_store.release(resource_claim.claim_id, reason="no work admitted")
+                return None
+            self.resource_claim_store.attach_work(resource_claim.claim_id, str(work.work_order_id))
+            if resource_claim.decision_id is not None:
+                self.resource_planner.decision_store.bind_execution(
+                    resource_claim.decision_id,
+                    work_id=str(work.work_order_id),
+                    execution_correlation_id=str(work.correlation_id),
+                )
+            self.resource_claim_store.transition(resource_claim.claim_id, "starting")
+            self.resource_claim_store.transition(resource_claim.claim_id, "running")
+            renewal_thread = threading.Thread(
+                target=self._renew_resource_claim,
+                args=(resource_claim.claim_id, renewal_stop, renewal_errors),
+                name=f"riverview-resource-renewal-{self.worker_id}", daemon=True,
+            )
+            renewal_thread.start()
+        except ResourceControlError:
+            if resource_claim is not None:
+                self.resource_claim_store.release(resource_claim.claim_id, reason="production admission failed", failed=True)
+            return None
+        except Exception:
+            if resource_claim is not None:
+                self.resource_claim_store.release(resource_claim.claim_id, reason="production admission failed", failed=True)
+            raise
         if work is None:
             return None
         try:
             definition = self._definition(work)
             if work.action_type == "codex.engineering.v1":
-                return self._execute_codex(work)
+                result = self._execute_action(work)
+                if renewal_errors:
+                    raise RuntimeError(f"RIV-RSRC-0004: resource claim renewal failed: {renewal_errors[-1]}")
+                return result
             command = self._command(work, definition)
-            return self._execute(work, command)
+            result = self._execute(work, command)
+            if renewal_errors:
+                raise RuntimeError(f"RIV-RSRC-0004: resource claim renewal failed: {renewal_errors[-1]}")
+            return result
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             checkpoint = self._checkpoint_from_error(str(exc))
             self._fail(work, checkpoint, str(exc), timed_out=checkpoint == "RIV-EXE-0003")
             return {"status": "failed", "checkpoint_id": checkpoint}
+        finally:
+            renewal_stop.set()
+            if renewal_thread is not None:
+                renewal_thread.join(timeout=2)
+            if resource_claim is not None:
+                self.resource_claim_store.release(
+                    resource_claim.claim_id,
+                    reason="execution completed" if not renewal_errors else "resource lease renewal failed",
+                    failed=bool(renewal_errors),
+                )
+
+    def _renew_resource_claim(self, claim_id: UUID, stop: threading.Event, errors: list[str]) -> None:
+        """Renew one active resource lease until its owning execution ends."""
+        while not stop.wait(self.resource_renewal_seconds):
+            try:
+                self.resource_claim_store.renew(claim_id, lease_seconds=self.resource_lease_seconds)
+            except (ResourceControlError, OSError, RuntimeError) as exc:
+                errors.append(str(exc))
+                return
 
     @staticmethod
     def _checkpoint_from_error(reason: object) -> str:
@@ -72,6 +152,50 @@ class RestrictedRunner:
             reason = "" if reason is None else str(reason)
         match = re.search(r"\b(RIV-[A-Z0-9]+-\d{4})\b", reason)
         return match.group(1) if match else "RIV-RUN-0001"
+
+    def _execute_action(self, work: ClaimedWork) -> dict[str, Any]:
+        """Route each action class to its authoritative executor."""
+        if work.action_type == "codex.engineering.v1":
+            return self._execute_hermes(work)
+        raise RuntimeError(f"RIV-RUN-0004: unsupported action executor: {work.action_type}")
+
+    def _execute_hermes(self, work: ClaimedWork) -> dict[str, Any]:
+        """Run governed engineering reasoning through the claimed seat."""
+        if work.correlation_id is None or work.seat_id not in {"C1", "C2", "C3"}:
+            raise RuntimeError("RIV-CAM-HERMES-0019: claimed work lacks canonical seat/correlation.")
+        intent_id = UUID(str(work.parameters.get("engineering_intent_id", "")))
+        record = EngineeringIntentStore().load(intent_id)
+        if record is None:
+            raise RuntimeError("RIV-EXE-0002: engineering intent is missing.")
+        if not record["authority_id"] or record["approved_by"] != "steward":
+            raise PermissionError("RIV-GRC-0004: execution requires a durable Steward authority grant.")
+        request = ReasoningRequest(
+            request_id=uuid4(), correlation_id=work.correlation_id,
+            request_type="analysis", instruction=record["bounded_instruction"],
+            context_refs=(f"work-order:{work.work_order_id}",),
+            classification=record["classification"], required_output_schema="bounded",
+            evidence_requirements=tuple(record["evidence_requirements"]),
+            expires_at=datetime.now(UTC) + timedelta(seconds=min(work.hard_timeout_seconds, 1800)),
+            allowed_authority=("return:advisory",), objective_id=record["objective_id"],
+            stage_id=record["stage_id"], causation_id=record["causation_id"],
+        )
+        provider = HermesReasoningProvider(
+            provider_id="hermes:codex.engineering.v1", resource_class_ref=f"codex:{work.seat_id}",
+            execution_class="campaign-engineering", timeout_seconds=min(work.hard_timeout_seconds, 1800),
+            codex_seat_id=work.seat_id,
+        )
+        routed = replace(work, role="engineering", parameters={**work.parameters, "hermes_request": {
+            "request_id": str(request.request_id), "request_type": request.request_type,
+            "instruction": request.instruction, "context_refs": list(request.context_refs),
+            "classification": request.classification, "required_output_schema": request.required_output_schema,
+            "evidence_requirements": list(request.evidence_requirements), "expires_at": request.expires_at.isoformat(),
+            "allowed_authority": list(request.allowed_authority), "objective_id": str(request.objective_id),
+            "stage_id": str(request.stage_id), "causation_id": str(request.causation_id) if request.causation_id else None,
+        }})
+        result = HermesCampaignRoleExecutor(provider).execute(routed)
+        result.update({"execution_class": "codex.engineering.v1", "execution_mode": "hermes-http", "codex_seat_id": work.seat_id})
+        self.store.complete_fenced(self._identity(work), result)
+        return result
 
     def _execute_codex(self, work: ClaimedWork) -> dict[str, Any]:
         intent_id = UUID(str(work.parameters.get("engineering_intent_id", "")))
@@ -262,6 +386,9 @@ class RestrictedRunner:
         state = "timed_out" if timed_out else "failed"
         identity = self._identity(work)
         with connect() as connection, connection.cursor() as cursor:
+            report = {"status": state, "reason": reason}
+            if checkpoint == "RIV-REASON-0001" and "request type is unsupported" in reason:
+                report["execution_started"] = False
             cursor.execute("""UPDATE work_orders SET status=%s,error_checkpoint=%s,result_report=%s::jsonb,
                               finished_at=now(),lease_expires_at=NULL,active_attempt_id=NULL,
                               lease_generation=NULL,fencing_token=NULL,worker_instance_id=NULL,
@@ -269,7 +396,7 @@ class RestrictedRunner:
                            WHERE work_order_id=%s AND status IN('claimed','running')
                              AND active_attempt_id=%s AND lease_generation=%s
                              AND fencing_token=%s AND worker_instance_id=%s""",
-                           (state,checkpoint,json.dumps({"status":state,"reason":reason}),
+                           (state,checkpoint,json.dumps(report),
                             identity.work_order_id, identity.attempt_id, identity.lease_generation,
                             identity.fencing_token, identity.worker_instance_id))
             if cursor.rowcount != 1:

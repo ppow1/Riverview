@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 from pathlib import Path
 
 import pytest
@@ -81,6 +82,24 @@ def test_runtime_command_expands_windows_environment_syntax(tmp_path: Path, monk
     ) == "C:/Users/example/.ssh/id_ed25519"
 
 
+def test_runtime_secret_projection_reads_named_config_scalar_only(tmp_path: Path) -> None:
+    secret_source = tmp_path / "hermes-config.yaml"
+    secret_source.write_text("API_SERVER_KEY: protected-value\nother: visible\n")
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
+    spec = supervisor.registry.specs["relay-worker"]
+    projected = spec.__class__(
+        service_id=spec.service_id,
+        command=spec.command,
+        dependencies=spec.dependencies,
+        secret_file=str(secret_source),
+        secret_key="API_SERVER_KEY",
+        secret_env="API_SERVER_KEY",
+    )
+    environment = supervisor._environment(projected)
+    assert environment["API_SERVER_KEY"] == "protected-value"
+    assert "other" not in environment
+
+
 def test_runtime_status_identifies_top_level_owner(tmp_path: Path):
     supervisor = RuntimeSupervisor(
         ROOT,
@@ -101,6 +120,68 @@ def test_process_adoption_does_not_match_diagnostic_command_text() -> None:
     assert RuntimeSupervisor._process_matches(spec, actual) is True
 
 
+def test_service_process_scope_ignores_workers_owned_by_other_supervisors(monkeypatch: pytest.MonkeyPatch) -> None:
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
+    monkeypatch.setattr("os.getpid", lambda: 10)
+    processes = [
+        {"pid": 10, "ppid": 1, "cmdline": "python -m riverview.runtime.supervisor"},
+        {"pid": 20, "ppid": 10, "cmdline": "python -m riverview.relay.worker"},
+        {"pid": 30, "ppid": 99, "cmdline": "python -m riverview.relay.worker"},
+    ]
+    monkeypatch.setattr(supervisor, "_processes", lambda: processes)
+    scoped = supervisor._service_processes(supervisor.registry.specs["relay-worker"])
+    assert [process["pid"] for process in scoped] == [20]
+
+
+def test_stop_all_terminates_managed_process_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
+    state = supervisor.states["operator"]
+    process = Mock()
+    process.poll.return_value = None
+    process.pid = 4242
+    state.process = process
+    terminated = []
+    monkeypatch.setattr(supervisor, "_terminate_process_tree", terminated.append)
+    supervisor.stop_all()
+    assert terminated == [4242]
+
+
+def test_supervisor_status_projects_loop_failure(tmp_path: Path) -> None:
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json", status_path=tmp_path / "status.json")
+    supervisor.supervisor_last_failure = "RuntimeError: bounded loop failure"
+    supervisor.supervisor_failure_count = 2
+    supervisor.write_status()
+    status = json.loads((tmp_path / "status.json").read_text())
+    assert status["supervisor_last_failure"] == "RuntimeError: bounded loop failure"
+    assert status["supervisor_failure_count"] == 2
+
+
+def test_supervisor_recovers_from_reconcile_exception(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json", status_path=tmp_path / "status.json", poll_seconds=0.01)
+    calls = []
+
+    def reconcile_once() -> None:
+        calls.append(True)
+        if len(calls) == 1:
+            raise RuntimeError("recoverable test fault")
+        supervisor.stop_requested = True
+
+    monkeypatch.setattr(supervisor, "reconcile_once", reconcile_once)
+    monkeypatch.setattr(supervisor, "_acquire_process_lock", lambda _path: ("test", None))
+    monkeypatch.setattr(supervisor, "_release_process_lock", lambda _lock: None)
+    monkeypatch.setattr(supervisor, "stop_all", lambda: None)
+    monkeypatch.setattr("time.sleep", lambda _seconds: None)
+    supervisor.run()
+    assert len(calls) == 2
+    assert supervisor.supervisor_last_failure is None
+    assert supervisor.supervisor_failure_count == 0
+
+
+def test_runtime_installer_disables_idle_termination() -> None:
+    installer = (ROOT / "tools/powershell/runtime/Install-RiverviewRuntimeSupervisor.ps1").read_text()
+    assert "-DontStopOnIdleEnd" in installer
+
+
 def test_relay_service_recycle_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
     supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
     active = [{"pid": 123, "ppid": 1, "cmdline": "relay", "executable": "python"}]
@@ -109,6 +190,21 @@ def test_relay_service_recycle_is_allowed(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(supervisor, "_terminate_process_tree", lambda _pid: active.clear())
     result = supervisor._recycle_service("relay-worker")
     assert result["service_id"] == "relay-worker"
+
+
+def test_recycle_uses_recorded_owner_for_windows_launcher_child_topology(monkeypatch: pytest.MonkeyPatch) -> None:
+    supervisor = RuntimeSupervisor(ROOT, ROOT / "config/runtime/riverview-runtime-services.json")
+    state = supervisor.states["relay-worker"]
+    state.pid = 123
+    active = [
+        {"pid": 123, "ppid": 0, "cmdline": "relay", "executable": "python"},
+        {"pid": 456, "ppid": 0, "cmdline": "relay", "executable": "python"},
+    ]
+    monkeypatch.setattr(supervisor, "_processes", lambda: list(active))
+    monkeypatch.setattr(supervisor, "_process_matches", lambda _spec, _process: True)
+    monkeypatch.setattr(supervisor, "_terminate_process_tree", lambda _pid: active.clear())
+    result = supervisor._recycle_service("relay-worker")
+    assert result["old_owner_pid"] == 123
 
 
 def test_comms5_http_service_recycle_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:

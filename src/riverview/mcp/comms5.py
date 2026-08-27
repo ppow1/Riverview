@@ -12,7 +12,8 @@ import hashlib
 import json
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -22,7 +23,14 @@ from riverview.database import connect
 from riverview.grace.objectives import ObjectiveStore
 from riverview.grace.seeds import MAX_SEED_BYTES, SeedLifecycleError, StewardSeedStore
 from riverview.intake.authority import StewardAuthorityError, StewardAuthorityStore
+from riverview.intake.engineering import EngineeringIntentStore
 from riverview.mcp.transport_diagnostics import record
+from riverview.resources.control import (
+    ResourceControlError,
+    ResourceDecisionStore,
+    ResourcePolicyStore,
+)
+from riverview.resources.registry import ResourceRegistry
 from riverview.river.events import Classification, RiverEvent
 from riverview.river.store import EventStore
 
@@ -121,16 +129,20 @@ OPERATIONS: dict[str, dict[str, Any]] = {
     "examples": {"authorization": "READ_ONLY", "required": [], "description": "Return one bounded example for every public operation."},
     "submit_steward_seed": {"authorization": "DRAFT_WRITE", "required": ["seed_text", "idempotency_key", "client context"], "description": "Create a bounded draft only; no objective or work is created."},
     "store_specification": {"authorization": "DRAFT_WRITE", "required": ["content", "summary", "idempotency_key", "client context"], "optional": ["formation_contract"], "description": "Store a bounded authoritative specification reference; an optional typed formation_contract enables later Steward-approved Grace formation. read_only is inspection-only; bounded_write permits only the contract's explicitly bounded engineering write."},
-    "seed_status": {"authorization": "READ_ONLY", "required": ["seed_id"], "description": "Return bounded authoritative seed metadata."},
+    "seed_status": {"authorization": "READ_ONLY", "required": ["seed_id"], "description": "Return bounded seed, specification, objective linkage, and promotion status metadata."},
     "seed_lineage": {"authorization": "READ_ONLY", "required": ["seed_id"], "description": "Return bounded seed-to-result lineage across existing stores."},
-    "objective_status": {"authorization": "READ_ONLY", "required": ["objective_id"], "description": "Return bounded objective, stages, CME, work, and checkpoint state."},
+    "objective_status": {"authorization": "READ_ONLY", "required": ["objective_id"], "description": "Return bounded objective, stages, authority, intent, and work metadata."},
     "cme_status": {"authorization": "READ_ONLY", "required": [], "description": "Return the authoritative CME runtime projection."},
     "recent_steward_submissions": {"authorization": "READ_ONLY", "required": [], "description": "Rediscover recent bounded governed submissions."},
     "transport_probe": {"authorization": "READ_ONLY", "required": ["probe_id"], "description": "Run one bounded read-only transport correlation probe and return its opaque probe ID and server request ID."},
     "confirm_and_promote_seed": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "explicit_steward_confirmation", "idempotency_key", "client context"], "description": "Record Pat's explicit approval from the authenticated Steward-controlled Comms5 connector for one eligible exact specification-backed draft, bind durable bounded Steward authority to its exact specification version/hash, and create the canonical objective. Grace and downstream stages consume this state without repeated human approval; this operation does not execute work or bypass downstream gates. Client identity and body-supplied principal are not authority."},
+    "form_and_queue_work": {"authorization": "STEWARD-GATED_WRITE", "required": ["objective_id", "stage_id", "authority_id", "explicit_steward_confirmation", "idempotency_key", "client context"], "description": "Consume one exact active Steward authority grant to form its stored typed engineering intent and enqueue exactly one idempotent codex.engineering.v1 work order. Scope, capability, repository, instruction, policy, and correlation are derived from the approved specification; this operation does not accept replacement scope or execute Codex."},
     "revalidate_and_queue_work": {"authorization": "STEWARD-GATED_WRITE", "required": ["work_order_id", "explicit_steward_confirmation", "idempotency_key", "client context"], "description": "Revalidate one preserved RIV-EXE-0008 stale-base failure and queue one successor attempt against the current verified descendant base. It preserves the original scope, authority, failed attempt, and exact work lineage; material drift remains blocked and requires renewed specification approval. This operation does not execute Codex."},
     "cancel_draft": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client context"], "description": "Append-only cancellation of a draft; it never cancels an objective or work order."},
     "supersede_seed": {"authorization": "STEWARD-GATED_WRITE", "required": ["seed_id", "replacement_seed_id", "reason", "idempotency_key", "explicit_steward_confirmation", "client context"], "description": "Append an old-draft-to-new-draft replacement relation; active objectives cannot be superseded."},
+    "resource_policy_status": {"authorization": "READ_ONLY", "required": [], "description": "Return the authoritative durable Codex resource policy and audit metadata."},
+    "set_resource_policy": {"authorization": "STEWARD-GATED_WRITE", "required": ["mode", "authenticated Steward transport"], "description": "Change the durable Codex resource policy; client identity is not authority."},
+    "set_resource_policy_lock": {"authorization": "STEWARD-GATED_WRITE", "required": ["locked", "authenticated Steward transport"], "description": "Lock or unlock durable resource policy against lower-authority changes."},
 }
 
 
@@ -157,6 +169,56 @@ class Comms5Service:
 
     def help(self) -> dict[str, Any]:
         return {"contract": self.contract_info(), "capabilities": self.capabilities(), "operations": {name: self.describe_operation(name) for name in OPERATIONS}, "examples": self.examples(), "errors": ["RIV-COMMS5-0001", "RIV-COMMS5-0002", "RIV-COMMS5-0003", "RIV-COMMS5-0004", "RIV-COMMS5-0005", "RIV-COMMS5-0006", "RIV-COMMS5-0007", "RIV-COMMS5-0009", "RIV-COMMS5-0014", "RIV-COMMS5-0015", "RIV-EXE-0008", "RIV-SEC-0001"], "do_not": ["directly mutate PostgreSQL", "bypass Steward confirmation", "treat client identity as authority", "invent objective/work state", "retry mutations with a new idempotency key blindly", "expose protected payloads", "treat provider completion as global completion", "cancel objectives or work through draft lifecycle operations", "modify Comms/MCP authorization through ordinary ingress"]}
+
+    def resource_policy_status(self) -> dict[str, Any]:
+        store = ResourcePolicyStore()
+        policy = store.get()
+        claims: list[dict[str, Any]] = []
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT claim_id,seat_id,work_id,owner_id,state,claimed_at,started_at,last_heartbeat_at,lease_expires_at,released_at,release_reason,safe_fingerprint FROM resource_seat_claims ORDER BY claimed_at DESC LIMIT %s", (MAX_PAGE_SIZE,))
+            claims = _rows(cursor)
+        claim_by_seat = {item["seat_id"]: item for item in claims if item["state"] in {"claimed", "starting", "running"}}
+        try:
+            registry = ResourceRegistry.from_codex_telemetry()
+            now = datetime.now(UTC)
+            resources = []
+            for resource in registry.resources:
+                claim = claim_by_seat.get(resource.seat_id)
+                stale = resource.observed_at is None or now - resource.observed_at > timedelta(minutes=30)
+                reset_times = [window.get("resets_at") or window.get("reset_at") for window in resource.quota_windows]
+                reset_times = [str(value) for value in reset_times if value]
+                resources.append({
+                    "seat_id": resource.seat_id, "safe_fingerprint": resource.identity_fingerprint,
+                    "availability": resource.available, "health": resource.health,
+                    "freshness": "stale" if stale else "fresh", "observed_capacity": resource.observed_capacity,
+                    "quota_windows": list(resource.quota_windows), "reset_at": resource.reset_at,
+                    "time_to_reset_seconds": max(0, (resource.reset_at - now).total_seconds()) if resource.reset_at else None,
+                    "observed_refill": resource.reset_refill_observed,
+                    "reset_credits_remaining": resource.usage_resets_remaining,
+                    "claim": _json(claim), "selectable": bool(resource.available and resource.health == "healthy" and not stale and claim is None),
+                    "reason_not_selectable": ("active claim" if claim else "stale or unhealthy telemetry" if stale or resource.health != "healthy" else "unavailable" if not resource.available else None),
+                })
+        except (OSError, RuntimeError, ValueError):
+            resources = []
+        return {"policy": _json(asdict(policy) if policy else None), "audit": _json(store.audit()), "claims": _json(claims), "resources": _json(resources), "latest_decision": _json(ResourceDecisionStore().latest()), "reset_activation": "not exposed"}
+
+    def set_resource_policy(self, request: dict[str, Any], *, transport_principal: str | None) -> dict[str, Any]:
+        if transport_principal != "steward" or request.get("explicit_steward_confirmation") is not True:
+            raise Comms5Error("RIV-COMMS5-0009", "authenticated Steward transport and explicit confirmation are required", "set_resource_policy", retry_safe=False, steward_action_required=True)
+        try:
+            policy = ResourcePolicyStore().set(str(request.get("mode", "")), request.get("parameters") or {}, actor="steward", authority="steward", rationale=str(request.get("rationale") or ""), source_request_id=str(request.get("source_request_id") or ""), expected_revision=request.get("expected_revision"))
+        except ResourceControlError as exc:
+            raise Comms5Error("RIV-GRC-0010", str(exc), "set_resource_policy", retry_safe=False, steward_action_required=True) from exc
+        return {"policy": _json(asdict(policy)), "reset_activation": "not exposed"}
+
+    def set_resource_policy_lock(self, locked: bool, *, transport_principal: str | None, explicit_steward_confirmation: bool, rationale: str = "") -> dict[str, Any]:
+        if transport_principal != "steward" or explicit_steward_confirmation is not True:
+            raise Comms5Error("RIV-COMMS5-0009", "authenticated Steward transport and explicit confirmation are required", "set_resource_policy_lock", retry_safe=False, steward_action_required=True)
+        try:
+            policy = ResourcePolicyStore().set_lock(bool(locked), actor="steward", authority="steward", rationale=rationale)
+        except ResourceControlError as exc:
+            raise Comms5Error("RIV-GRC-0010", str(exc), "set_resource_policy_lock", retry_safe=False, steward_action_required=True) from exc
+        return {"policy": _json(asdict(policy))}
 
     def transport_probe(self, probe_id: str, server_request_id: str) -> dict[str, Any]:
         """Run a bounded read-only probe across Comms5 and PostgreSQL."""
@@ -385,6 +447,28 @@ class Comms5Service:
             raise Comms5Error(exc.code, exc.reason + detail, "confirm_and_promote_seed", retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0014") from exc
         return {"seed_id": str(seed_id), "objective_id": str(objective_id), "status": "promoted", "canonical_store": "StewardSeedStore.confirm_and_promote", "correlation_id": str(context.correlation_id), "client_id": context.client_id, "authority_source": "authenticated_comms5_connector"}
 
+    def form_and_queue_work(self, request: dict[str, Any], *, transport_principal: str | None = None) -> dict[str, Any]:
+        operation = "form_and_queue_work"
+        context = ClientContext.from_request(request)
+        if transport_principal != "steward" or request.get("explicit_steward_confirmation") is not True:
+            raise Comms5Error("RIV-GRC-0010", "explicit narrow Steward confirmation and authenticated transport attestation are required", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-GRC-0010")
+        try:
+            objective_id = UUID(str(request["objective_id"]))
+            stage_id = UUID(str(request["stage_id"]))
+            authority_id = UUID(str(request["authority_id"]))
+        except (KeyError, ValueError) as exc:
+            raise Comms5Error("RIV-COMMS5-0006", "objective_id, stage_id, or authority_id is invalid", operation, retry_safe=False, checkpoint="RIV-GRC-0010") from exc
+        if not str(request.get("idempotency_key", "")).strip():
+            raise Comms5Error("RIV-COMMS5-0003", "idempotency_key is required for formation retry safety", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-GRC-0010")
+        try:
+            authority = StewardAuthorityStore().load(authority_id)
+            if authority is None or authority["objective_id"] != objective_id or authority["stage_id"] != stage_id:
+                raise ValueError("RIV-GRC-0010: objective, stage, and authority do not match")
+            result = EngineeringIntentStore().form_and_enqueue(authority_id)
+        except (PermissionError, RuntimeError, ValueError, StewardAuthorityError) as exc:
+            raise Comms5Error("RIV-GRC-0010", str(exc), operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-GRC-0010") from exc
+        return {**result, "objective_id": str(objective_id), "stage_id": str(stage_id), "correlation_id": str(authority["correlation_id"]), "client_id": context.client_id, "codex_executed": False}
+
     def revalidate_and_queue_work(self, request: dict[str, Any], *, transport_principal: str | None = None) -> dict[str, Any]:
         operation = "revalidate_and_queue_work"
         context = ClientContext.from_request(request)
@@ -398,7 +482,15 @@ class Comms5Service:
         if not key:
             raise Comms5Error("RIV-COMMS5-0003", "idempotency_key is required for stale-base retry safety", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-EXE-0008")
         try:
-            prepared = StaleBaseRecoveryStore().prepare(work_order_id, idempotency_key=f"{operation}:{key}")
+            prepared = StaleBaseRecoveryStore().prepare(
+                work_order_id,
+                idempotency_key=f"{operation}:{key}",
+                infrastructure_repair_evidence=(
+                    {key: True for key in request.get("infrastructure_repair_evidence", ())}
+                    if isinstance(request.get("infrastructure_repair_evidence"), (list, tuple))
+                    else request.get("infrastructure_repair_evidence")
+                ),
+            )
             result = StaleBaseRecoveryStore().approve_and_queue(UUID(str(prepared["revalidation_id"])), explicit_steward_confirmation=True, transport_principal=transport_principal)
         except (PermissionError, RuntimeError, ValueError) as exc:
             raise Comms5Error("RIV-EXE-0008", str(exc), operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-EXE-0008") from exc
