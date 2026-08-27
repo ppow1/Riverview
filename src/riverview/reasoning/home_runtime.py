@@ -38,7 +38,7 @@ def build_grace_home_cognition(provider: Callable[[str, ReasoningRequest], Reaso
     configuration = BindingConfigurationLoader.from_mapping({
         CognitionTier.HOME_COGNITION.value: {
             "capability_name": "HOME_COGNITION",
-            "policy_ref": "grace-home-cognition-policy:v1",
+            "policy_ref": "grace-escalation-policy-p1-v1",
             "configuration_ref": "riverview:home-cognition:ollama",
             "resource_class_ref": "local:RTX4090",
         }
@@ -65,12 +65,12 @@ def invocation_for_message(*, instruction: str, correlation_id: UUID, classifica
         request_class="operator-grace-conversation",
         objective="Provide bounded operational judgment for the current Riverview conversation.",
         question=instruction,
-        consequence=ConsequenceClass.MEDIUM,
+        consequence=ConsequenceClass.DIFFICULT,
         classification=classification,
         expires_at=__import__("datetime").datetime.now(__import__("datetime").UTC).replace(microsecond=0) + __import__("datetime").timedelta(minutes=5),
-        authorization_ref=GRACE_AUTHORITY_REF,
-        home_belief=True,
-        home_belief_reason="Grace's bounded Director of Operations conversation is assigned to HOME cognition.",
+        authorization_ref="resident-implementation-policy:v1",
+        home_belief=False,
+        home_belief_reason="The bounded Director of Operations conversation is admitted to HOME cognition without requesting a stronger tier.",
         constraints=("advisory only", "no execution", "no authority expansion", "preserve evidence/assumption distinction"),
         relevant_prior_decisions=prior_history,
     )
