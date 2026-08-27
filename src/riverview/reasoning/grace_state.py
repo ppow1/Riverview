@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from riverview.autonomy.runtime import CMEStatusStore
-from riverview.residents.context import AssignmentContext, BudgetSpec, PostgresContextSource, ResidentContextAssembler
+from riverview.residents.context import AssignmentContext, BudgetSpec, ContextItem, PostgresContextSource, ResidentContextAssembler
 from riverview.residents.persistence import ResidentContinuityStore, stable_id
 
 from .home_cognition import AuthoritativeGraceState, AuthoritativeGraceStateSource, HomeCognitionExecutionError
@@ -77,6 +78,14 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
                 budget=BudgetSpec(),
                 assignment=assignment,
             )
+            institutional = next((item for item in projection.get("state_records", []) if item.get("value_ref") == "riverview:bounded-institutional-context:v1"), None)
+            if institutional:
+                bundle = replace(bundle, items=(*bundle.items, ContextItem(
+                    "state:grace:bounded-institutional-context:v1", "professional_doctrine",
+                    {"state_class": "professional_doctrine", "value_ref": institutional["value_ref"], "metadata": institutional["bounded_metadata"], "status": institutional["status"]},
+                    None, "high", institutional["classification"], "1", institutional["provenance_id"],
+                    "bounded institutional registry, subsystem, and capability projection", 2, False, "structured_projection", 1,
+                )))
         except Exception as exc:
             raise HomeCognitionExecutionError("authoritative-state-unavailable", "Grace context assembly failed closed.") from exc
         observed = datetime.now(UTC)

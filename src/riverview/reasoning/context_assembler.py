@@ -232,7 +232,7 @@ class ResidentReasoningPacketAssembler:
             "context_material": tuple(
                 json.dumps({"layer": item.layer, "source_ref": item.source_ref, "value": dict(item.value)}, sort_keys=True, default=str, separators=(",", ":"))
                 for item in sorted(bundle.items, key=lambda item: (item.priority_tier, item.layer, item.item_id))
-                if item.source_ref.startswith(("riverview:", "resident_continuity:", "grace:", "RV-014.1"))
+                if item.source_ref.startswith(("riverview:", "resident_continuity:", "grace:", "RV-014.1")) or str(item.value.get("value_ref", "")).startswith("riverview:")
             ),
             "home_assessment": request.home_assessment,
             "requested_output_schema": request.requested_output_schema,
