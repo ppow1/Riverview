@@ -92,6 +92,7 @@ class ReasoningAssemblyRequest:
     unresolved_ambiguity: tuple[str, ...] = ()
     relevant_prior_decisions: tuple[str, ...] = ()
     known_deterministic_results: tuple[str, ...] = ()
+    conversation_context: tuple[str, ...] = ()
     causation_id: UUID | None = None
 
 
@@ -111,6 +112,7 @@ def _context_total(packet: dict[str, Any]) -> int:
         packet["relevant_prior_decisions"],
         packet["known_deterministic_results"],
         packet["context_material"],
+        packet["conversation_context"],
         packet["home_assessment"],
         packet["requested_output_schema"],
         packet["egress_policy"],
@@ -136,6 +138,7 @@ def _bounded_packet_preflight(packet: dict[str, Any]) -> None:
         "unresolved_ambiguity": MAX_CONTEXT_REFS,
         "known_deterministic_results": MAX_CONTEXT_REFS,
         "context_material": MAX_CONTEXT_REFS,
+        "conversation_context": MAX_CONTEXT_REFS,
         "constraints": 32,
     }
     for name, limit in collection_limits.items():
@@ -143,6 +146,8 @@ def _bounded_packet_preflight(packet: dict[str, Any]) -> None:
         if not isinstance(values, tuple) or len(values) > limit:
             raise ReasoningContextAssemblyError("packet-bound-exceeded", f"{name} exceeds its collection bound.")
         value_limit = 4_000 if name in {"constraints", "unresolved_ambiguity", "known_deterministic_results", "context_material"} else 500
+        if name == "conversation_context":
+            value_limit = 2_000
         if not all(isinstance(value, str) and value.strip() and len(value) <= value_limit for value in values):
             raise ReasoningContextAssemblyError("packet-field-invalid", f"{name} contains an invalid value.")
     if _context_total(packet) > MAX_CONTEXT_CHARS:
@@ -229,6 +234,7 @@ class ResidentReasoningPacketAssembler:
             "unresolved_ambiguity": _unique(ambiguity),
             "relevant_prior_decisions": _unique(prior_decisions),
             "known_deterministic_results": _unique(list(request.known_deterministic_results)),
+            "conversation_context": _unique(list(request.conversation_context)),
             "context_material": tuple(
                 json.dumps({"layer": item.layer, "source_ref": item.source_ref, "value": dict(item.value)}, sort_keys=True, default=str, separators=(",", ":"))
                 for item in sorted(bundle.items, key=lambda item: (item.priority_tier, item.layer, item.item_id))
@@ -296,6 +302,7 @@ class ResidentReasoningPacketAssembler:
                 source_context_id=bundle.bundle_id,
                 causation_id=request.causation_id,
                 context_material=packet["context_material"],
+                conversation_context=packet["conversation_context"],
                 contract_version=COGNITION_CONTRACT_VERSION,
             )
         except (TypeError, ValueError) as exc:

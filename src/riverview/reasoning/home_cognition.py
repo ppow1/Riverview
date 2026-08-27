@@ -210,6 +210,7 @@ class HomeCognitionInvocation:
     unresolved_ambiguity: tuple[str, ...] = ()
     relevant_prior_decisions: tuple[str, ...] = ()
     known_deterministic_results: tuple[str, ...] = ()
+    conversation_context: tuple[str, ...] = ()
     max_budget: int = 16_000
 
     def __post_init__(self) -> None:
@@ -348,6 +349,7 @@ class HomeCognitionService:
                 unresolved_ambiguity=invocation.unresolved_ambiguity,
                 relevant_prior_decisions=invocation.relevant_prior_decisions,
                 known_deterministic_results=invocation.known_deterministic_results,
+                conversation_context=invocation.conversation_context,
                 causation_id=invocation.source_cognition_event_id,
             ),
         )
@@ -609,6 +611,7 @@ class HomeCognitionService:
                 "constraints": list(packet.constraints),
                 "known_deterministic_results": list(packet.known_deterministic_results),
                 "context_material": list(packet.context_material),
+                "conversation_context": list(packet.conversation_context),
                 "requested_output": _OUTPUT_FORMAT,
             },
             sort_keys=True,

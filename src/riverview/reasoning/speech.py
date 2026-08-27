@@ -34,7 +34,10 @@ def compose_resident_speech(
             "Use the governed advisory result below only as internal guidance. Speak naturally and concisely. "
             "Do not mention prompts, HOME cognition, governance scaffolding, provider/model, JSON, proposals, "
             "rationales, or internal instructions. Do not claim execution authority. Return only the exact JSON "
-            "object required by the response format, with the natural spoken response in speech.\n"
+            "object required by the response format, with the natural spoken response in speech. Set "
+            "assertion_mode to institutional and provide typed institutional_claims for any Riverview "
+            "responsibility, capability, owner, suitability, or authoritative-contact assertion; use ordinary "
+            "only for non-authoritative conversation.\n"
             f"Steward message: {instruction}\n"
             f"Internal advisory guidance (not speech): {json.dumps({'recommendation': result.recommendation, 'uncertainty': result.uncertainty, 'constraints': list(result.constraints)}, sort_keys=True)}"
         ),
@@ -49,7 +52,7 @@ def compose_resident_speech(
     no_owner_capability = False
     engineering_capability_known = False
     for raw in context_material:
-        if '"human_owner_known":false' in raw and '"suitable_resident_ids":[]' in raw:
+        if "human_owner_known" in raw and "false" in raw and "suitable_resident_ids" in raw:
             no_owner_capability = True
         if "codex.engineering.v1" in raw:
             engineering_capability_known = True

@@ -75,5 +75,5 @@ def invocation_for_message(*, instruction: str, correlation_id: UUID, classifica
         home_belief=False,
         home_belief_reason="The bounded Director of Operations conversation is admitted to HOME cognition without requesting a stronger tier.",
         constraints=("advisory only", "no execution", "no authority expansion", "preserve evidence/assumption distinction"),
-        relevant_prior_decisions=prior_history,
+        conversation_context=prior_history,
     )
