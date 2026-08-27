@@ -151,7 +151,6 @@ class ResidentConversationGateway:
             )
             for row in payload["records"]
         ]
-        profiles.append(ResidentProfile("grace", "Grace", "Director of Operations", "riverview://grace", "riverview://grace", classification="internal", is_grace=True))
         # Reconcile already-accepted durable residents into the Operator
         # discovery surface.  This reads existing authority; it does not
         # create, rename, or promote resident records.
@@ -166,11 +165,20 @@ class ResidentConversationGateway:
                                     AND b.status='active'
                                   WHERE o.lifecycle_status='active' AND o.retired_at IS NULL
                                     AND COALESCE(o.classification,'') <> 'test_fixture'""")
+                authoritative_grace = False
                 for occupant_id, name, role, anchor, classification in cursor.fetchall():
+                    if str(name).casefold() == "grace":
+                        authoritative_grace = True
+                        role = "Director of Operations"
+                        anchor = "grace_identities:grace"
+                        classification = classification or "operational"
+                        profiles = [profile for profile in profiles if profile.name.casefold() != "grace"]
                     resident_id = str(occupant_id)
                     if resident_id in {profile.resident_id for profile in profiles}:
                         continue
-                    profiles.append(ResidentProfile(resident_id, name, role or "Riverview resident", f"riverview://occupant/{resident_id}", str(anchor or "durable resident state"), classification or "operational", certainty="verified"))
+                    profiles.append(ResidentProfile(resident_id, name, role or "Riverview resident", f"riverview://occupant/{resident_id}", str(anchor or "durable resident state"), classification or "operational", certainty="verified", is_grace=authoritative_grace))
+                if not authoritative_grace:
+                    profiles.append(ResidentProfile("grace", "Grace", "Director of Operations", "riverview://grace", "riverview://grace", classification="internal", is_grace=True))
         except (RuntimeError, OSError, TypeError, ValueError):
             pass
         character_path = Path(__file__).resolve().parents[3] / "runtime" / "operator" / "character_store.json"
@@ -236,17 +244,8 @@ class ResidentConversationGateway:
             if outcome.result is None:
                 raise RuntimeError("RIV-COG-E1-0001: HOME cognition did not return an advisory result.")
             result = outcome.result
-            response = ReasoningResponse(
-                response_id=result.result_id,
-                request_id=result.request_id,
-                correlation_id=result.correlation_id,
-                provider_id=f"home-cognition:{result.provider_ref or 'authorized-local'}",
-                response_type="advice",
-                summary=result.recommendation + "\n\nRationale: " + (result.rationale or "") + ("\n\nUncertainty: " + result.uncertainty if result.uncertainty else ""),
-                evidence_refs=tuple(result.provenance_refs),
-                classification=result.classification,
-                created_at=result.created_at,
-            )
+            from riverview.reasoning.speech import compose_resident_speech
+            response = compose_resident_speech(self.home_cognition.speech_provider, self.home_cognition.speech_model, instruction, result)
             session.history.append({"role": "user", "text": instruction})
             session.history.append({"role": "resident", "text": response.summary})
             self.continuity_store.record_session(profile.resident_id, str(session.session_id), session.history)

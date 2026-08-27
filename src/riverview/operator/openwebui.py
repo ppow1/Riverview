@@ -197,12 +197,13 @@ class RiverviewOpenWebUIService:
         def room_projection(room_id: UUID) -> dict[str, object]:
             """Reconcile derived gateway state from durable room membership."""
             membership = service.room_administration.snapshot(room_id)
-            canonical = tuple(str(item) for item in membership.get("participants", ()))
+            displayed_participants = tuple(str(item) for item in membership.get("participants", ()))
+            canonical = tuple(str(service.resident_gateway.resolve(item).resident_id) for item in displayed_participants)
             errors: list[str] = []
             if not membership.get("membership_projection_consistent", True):
                 errors.append("duplicate_active_membership")
             profiles: list[dict[str, str]] = []
-            for resident_id in canonical:
+            for resident_id in displayed_participants:
                 try:
                     profile = service.resident_gateway.resolve(resident_id)
                 except LookupError:
@@ -231,7 +232,7 @@ class RiverviewOpenWebUIService:
             return {
                 "room_id": str(room_id),
                 "membership_state": membership,
-                "participants": list(canonical),
+                "participants": list(displayed_participants),
                 "participant_profiles": profiles,
                 "participant_count": len(canonical),
                 "gateway_participant_ids": list(gateway_participants),

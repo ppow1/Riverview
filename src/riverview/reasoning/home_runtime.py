@@ -48,13 +48,16 @@ def build_grace_home_cognition(provider: Callable[[str, ReasoningRequest], Reaso
         authorization_ref="resident-implementation-policy:v1",
         generate=lambda request: provider(model, request),
     )
-    return HomeCognitionService(
+    service = HomeCognitionService(
         grace_resident_id=GRACE_OCCUPANT_ID,
         state_source=PostgresAuthoritativeGraceStateSource(),
         event_store=EventStore(),
         binding_adapter=CognitionBindingAdapter(_MeasuredLocalCatalog(provider_id, model), configuration),
         provider=authorized,
     )
+    service.speech_provider = provider
+    service.speech_model = model
+    return service
 
 
 def invocation_for_message(*, instruction: str, correlation_id: UUID, classification: str, prior_history: tuple[str, ...] = ()) -> HomeCognitionInvocation:

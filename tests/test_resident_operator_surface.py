@@ -5,6 +5,15 @@ from uuid import UUID, uuid4
 
 from riverview.operator.openwebui import OpenWebUIConfig, RiverviewOpenWebUIService
 from riverview.reasoning import ReasoningResponse
+from riverview.residents.gateway import ResidentConversationGateway
+
+
+def test_resident_discovery_exposes_one_authoritative_grace() -> None:
+    gateway = ResidentConversationGateway.from_evidence()
+    grace = [resident for resident in gateway.residents() if resident["name"] == "Grace"]
+    assert len(grace) == 1
+    assert grace[0]["resident_id"] == "40f225e2-6f58-55d2-b862-eab7d95700d8"
+    assert grace[0]["role"] == "Director of Operations"
 
 
 def test_browser_operator_exposes_authoritative_residents_and_bound_session() -> None:
