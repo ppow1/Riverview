@@ -83,17 +83,29 @@ Modules reduce code coupling; they do not replace source-control integration dis
 ## Hermes engineering Steward-attention boundary
 
 When this repository is the working root for a bounded Hermes engineering lane,
-enable the project plugin and expose `riverview_steward_attention`. Use that
-single tool only when the lane genuinely stops at a terminal human-attention
-boundary: `READY_FOR_STEWARD_REVIEW`, `BLOCKED_REQUIRES_STEWARD`, or
-`STEWARD_DECISION_REQUIRED`. Do not call it for progress, intermediate tests,
-ordinary failures that will be retried, or a report from which the lane can
-continue.
+launch through `tools/hermes/Start-RiverviewHermes.ps1`. The wrapper verifies
+the project plugin, sets the Riverview-only activation flag, and idempotently
+enables the plugin through Hermes' supported CLI. The plugin registers a
+`transform_llm_output` boundary: the model declares one structured
+`RIVERVIEW_TERMINAL_OUTCOME` envelope in its normal final report, and the
+infrastructure automatically routes only genuine terminal attention states:
+`READY_FOR_STEWARD_REVIEW`, `BLOCKED_REQUIRES_STEWARD`, or
+`STEWARD_DECISION_REQUIRED`. The model does not need a second notifier-tool
+call. `CONTINUE`, `COMPLETED_NO_ATTENTION`, ordinary turns, intermediate tests,
+and retryable failures remain silent.
 
-The call must carry the lane, `RIV-*` checkpoint, durable evidence reference,
-Hermes session ID, and stable terminal transition ID. Reuse the same transition
-ID on a legitimate retry. Riverview owns durable notification state and
-idempotency; its existing Estate `WindowsPresenter` adapter owns delivery.
+The manual `riverview_steward_attention` operation remains available for
+bounded diagnostic or explicit recovery use, but is not the normal correctness
+dependency. The envelope must carry the lane, `RIV-*` checkpoint, durable
+evidence reference, and stable terminal transition ID; the active Hermes
+session ID is supplied by the hook and an optional envelope session ID must
+match it.
+
+The automatic envelope carries the lane, `RIV-*` checkpoint, durable evidence
+reference, and stable terminal transition ID. The hook supplies the active
+Hermes session ID and rejects a mismatched envelope identity. Reuse the same
+transition ID on a legitimate retry. Riverview owns durable notification state
+and idempotency; its existing Estate `WindowsPresenter` adapter owns delivery.
 Delivery is not acknowledgement, and acknowledgement is not institutional
 acceptance. The spoken summary is short; the full report remains in the Hermes
 session/evidence location.

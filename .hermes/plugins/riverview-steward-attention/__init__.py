@@ -6,6 +6,7 @@ Version: 0.1.0
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,15 @@ def _handle_attention(args: dict[str, Any], **_: Any) -> str:
     return json.dumps(result, ensure_ascii=False, sort_keys=True)
 
 
+def _transform_riverview_outcome(response_text: str, session_id: str = "", **_: Any) -> str:
+    """Automatically route a semantic outcome in a normal final report."""
+    if os.environ.get("RIVERVIEW_HERMES_ENGINEERING") != "1":
+        return response_text
+    from riverview.hermes_terminal_outcome import process_terminal_outcome
+
+    return process_terminal_outcome(response_text, session_id=session_id or "")
+
+
 def register(ctx) -> None:
     ctx.register_tool(
         name="riverview_steward_attention",
@@ -89,3 +99,4 @@ def register(ctx) -> None:
         handler=_handle_attention,
         description="Riverview terminal-boundary Steward attention bridge.",
     )
+    ctx.register_hook("transform_llm_output", _transform_riverview_outcome)

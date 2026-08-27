@@ -109,20 +109,26 @@ Important Windows distinction:
 - `hermes profile` manages profiles described by the installed CLI as "multiple isolated Hermes instances"; inspect `hermes profile --help` before relying on profiles for concurrent credential/resource isolation.
 
 For a Riverview engineering lane, the canonical Hermes working root is
-`A:\Riverview\standalone`. Launch from that root with project plugins explicitly
-enabled so the shared `riverview_steward_attention` terminal-boundary tool is
-available. This is infrastructure, not a per-handoff reminder:
+`A:\Riverview\standalone`. Launch through the repository-owned wrapper so
+project-plugin activation and the automatic semantic terminal-outcome bridge
+cannot be omitted by forgetting an environment variable:
 
 ```powershell
 Set-Location 'A:\Riverview\standalone'
-$env:HERMES_ENABLE_PROJECT_PLUGINS = '1'
-hermes plugins enable riverview-steward-attention
-hermes
+& '.\tools\hermes\Start-RiverviewHermes.ps1'
 ```
 
-The tool is used only for a genuine terminal `READY_FOR_STEWARD_REVIEW`,
-`BLOCKED_REQUIRES_STEWARD`, or `STEWARD_DECISION_REQUIRED` boundary. Ordinary
-progress, intermediate test results, and retryable failures remain silent.
+The wrapper verifies the repository plugin, sets the Riverview-only activation
+flag, and idempotently enables the project plugin through Hermes' supported CLI.
+The project plugin automatically processes one structured
+`RIVERVIEW_TERMINAL_OUTCOME` envelope in the normal final engineering report.
+`READY_FOR_STEWARD_REVIEW`, `BLOCKED_REQUIRES_STEWARD`, and
+`STEWARD_DECISION_REQUIRED` submit through the existing durable notification and
+Estate presenter path; `CONTINUE`, `COMPLETED_NO_ATTENTION`, ordinary turns,
+intermediate test results, and retryable failures remain silent. The model
+declares the semantic outcome as part of its report and does not make a second
+notification-tool call. The manual `riverview_steward_attention` operation
+remains available for bounded diagnostic/recovery use only.
 
 Useful launch diagnostics:
 
