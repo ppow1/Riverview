@@ -142,6 +142,6 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
         }
         projection = dict(projection)
         states = list(projection.get("state_records") or [])
-        states.append({"state_id": str(stable_id("state:grace:bounded-institutional-context:v1")), "state_class": "professional_doctrine", "value_kind": "structured_projection", "value_ref": "riverview:bounded-institutional-context:v1", "bounded_metadata": material, "classification": "operational", "retrieval_policy_ref": "grace-home-cognition-policy:v1", "status": "active", "effective_from": datetime.now(UTC).isoformat(), "provenance_id": "RV-014.1;RIV-COG-E1-0001"})
+        states.append({"state_id": str(stable_id("state:grace:bounded-institutional-context:v1")), "state_class": "professional_doctrine", "value_kind": "structured_projection", "value_ref": "riverview:bounded-institutional-context:v1", "bounded_metadata": material, "classification": "operational", "retrieval_policy_ref": "grace-home-cognition-policy:v1", "status": "active", "effective_from": datetime.now(UTC).isoformat(), "provenance_id": "RV-014.1;RIV-COG-E1-0001;riverview://capability/codex.engineering.v1"})
         projection["state_records"] = states[-32:]
         return projection
