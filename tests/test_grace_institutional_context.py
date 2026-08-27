@@ -24,6 +24,9 @@ def test_institutional_projection_is_bounded_read_only_and_authoritative(monkeyp
     engineering = next(item for item in material["capabilities"] if item["capability"] == "codex.engineering.v1")
     assert engineering["mode"] == "advisory proposal only"
     assert engineering["execution"].startswith("requires separate Steward")
+    assert engineering["human_owner_known"] is False
+    assert engineering["suitable_resident_ids"] == []
+    assert material["capability_assignment_policy"].startswith("Assign a resident only")
     assert material["authority_boundary"] == "Reading institutional context does not grant mutation or execution authority."
 
 

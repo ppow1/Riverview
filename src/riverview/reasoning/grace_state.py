@@ -125,9 +125,10 @@ class PostgresAuthoritativeGraceStateSource(AuthoritativeGraceStateSource):
             "registry": registry,
             "subsystems": [cme_facts, {"subsystem": "River", "meaning": "authoritative event stream", "source": "riverview://river"}, {"subsystem": "Relay", "meaning": "bounded work-order execution relay", "source": "riverview://relay"}],
             "capabilities": [
-                {"capability": "codex.engineering.v1", "purpose": "bounded engineering proposal/work formation", "mode": "advisory proposal only", "execution": "requires separate Steward-authorized formation and lifecycle gate", "source": "riverview://capability/codex.engineering.v1"},
+                {"capability": "codex.engineering.v1", "purpose": "bounded engineering proposal/work formation", "mode": "advisory proposal only", "execution": "requires separate Steward-authorized formation and lifecycle gate", "human_owner_known": False, "suitable_resident_ids": [], "source": "riverview://capability/codex.engineering.v1"},
                 {"capability": "resident-continuity.read", "purpose": "read bounded resident identity, office, and role projections", "mode": "read-only", "execution": "none", "source": "riverview://capability/resident-continuity.read"},
             ],
+            "capability_assignment_policy": "Assign a resident only when authoritative capability or responsibility evidence supports the assignment; role presence alone is insufficient.",
             "authority_boundary": "Reading institutional context does not grant mutation or execution authority.",
         }
         projection = dict(projection)
