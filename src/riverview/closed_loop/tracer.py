@@ -68,10 +68,10 @@ class TracerStore:
     def _event(self, root_id: str, correlation_id: str, event_type: str, payload: dict[str, Any]) -> None:
         item = {"event_type": event_type, "root_task_id": root_id, "correlation_id": correlation_id, "payload": payload}
         if self._memory:
-            if not any(x["event_type"] == event_type and x["root_task_id"] == root_id for x in self._events):
-                self._events.append(item)
+            self._events.append(item)
             return
-        EventStore().append(RiverEvent(event_type=event_type, aggregate_type="autonomous_root_task", aggregate_id=UUID(root_id), correlation_id=UUID(correlation_id), idempotency_key=f"loop:{root_id}:{event_type}", classification=Classification.INTERNAL, payload=payload))
+        identity = payload.get("request_id") or payload.get("result_id") or payload.get("source_result_id") or event_type
+        EventStore().append(RiverEvent(event_type=event_type, aggregate_type="autonomous_root_task", aggregate_id=UUID(root_id), correlation_id=UUID(correlation_id), idempotency_key=f"loop:{root_id}:{event_type}:{identity}", classification=Classification.INTERNAL, payload=payload))
 
     def create(self, objective: str, resident: str = "grace") -> dict[str, Any]:
         root_id, correlation = uuid4(), uuid4()
@@ -109,18 +109,62 @@ class TracerStore:
     def read_projection(self, root_id: str) -> dict[str, Any]:
         """Return the bounded authoritative result projection for Grace."""
         if self._memory:
-            result = next((item for item in self._results.values() if item["root_task_id"] == root_id), None)
+            result = next((item for item in reversed(list(self._results.values())) if item["root_task_id"] == root_id), None)
             if result is None:
                 raise RuntimeError("RIV-LOOP-0003: result projection is unavailable")
             request_id = result["request_id"]
             request = next(item for item in self._requests.values() if item.request_id == request_id)
             return {"root_task_id": root_id, "correlation_id": result["correlation_id"], "request_id": request_id, "result_id": result["result_id"], "run_id": result["run_id"], "current_checkpoint_id": "result-consumed", "semantic_outcome": result["semantic_outcome"], "summary": result["summary"], "evidence": result["evidence"], "adapter_id": result["adapter_id"]}
         with connect() as conn, conn.cursor() as cur:
-            cur.execute("SELECT r.root_task_id,r.correlation_id,r.request_id,r.result_id,x.run_id,t.current_checkpoint_id,x.semantic_outcome,x.summary,x.evidence,x.result_digest FROM autonomous_tracer_results x JOIN autonomous_tracer_requests r ON r.request_id=x.request_id JOIN autonomous_root_tasks t ON t.root_task_id=x.root_task_id WHERE x.root_task_id=%s", (UUID(root_id),))
+            cur.execute("SELECT r.root_task_id,r.correlation_id,r.request_id,r.result_id,x.run_id,t.current_checkpoint_id,x.semantic_outcome,x.summary,x.evidence,x.result_digest FROM autonomous_tracer_results x JOIN autonomous_tracer_requests r ON r.request_id=x.request_id JOIN autonomous_root_tasks t ON t.root_task_id=x.root_task_id WHERE x.root_task_id=%s ORDER BY x.created_at DESC LIMIT 1", (UUID(root_id),))
             row = cur.fetchone()
             if not row:
                 raise RuntimeError("RIV-LOOP-0003: result projection is unavailable")
             return {"root_task_id": str(row[0]), "correlation_id": str(row[1]), "request_id": str(row[2]), "result_id": str(row[3]), "run_id": str(row[4]), "current_checkpoint_id": row[5], "semantic_outcome": row[6], "summary": row[7], "evidence": row[8], "result_digest": row[9], "adapter_id": "hermes.tracer.no_mutation.v1"}
+
+    def continue_from_result(self, root_id: str, result_id: str, *, objective: str) -> dict[str, Any]:
+        """Create and execute one same-root successor request."""
+        if self._memory:
+            prior = self._results.get(result_id)
+            if prior is None or prior["root_task_id"] != root_id:
+                raise RuntimeError("RIV-LOOP-0004: continuation source is not the same root")
+            correlation = prior["correlation_id"]
+        else:
+            with connect() as conn, conn.cursor() as cur:
+                cur.execute("SELECT correlation_id FROM autonomous_tracer_results WHERE result_id=%s AND root_task_id=%s", (UUID(result_id), UUID(root_id)))
+                row = cur.fetchone()
+                if not row: raise RuntimeError("RIV-LOOP-0004: continuation source is not the same root")
+                correlation = str(row[0])
+        self._event(root_id, correlation, "continuation.requested", {"source_result_id": result_id, "objective": objective})
+        request_id, run_id, new_result_id = str(uuid4()), str(uuid4()), str(uuid4())
+        request = {"schema_version": SCHEMA_VERSION, "request_id": request_id, "root_task_id": root_id, "correlation_id": correlation, "checkpoint_id": "hermes-execution-2", "originating_resident": "grace", "objective": objective, "instruction": "Return one bounded evidence summary; do not mutate files."}
+        request_digest = _atomic_json(self.artifact_root / "requests" / root_id / f"{request_id}.json", request)
+        _atomic_text(self.artifact_root / "requests" / root_id / f"{request_id}.md", f"# {objective}\n\nBounded Hermes continuation request.\n")
+        if self._memory:
+            self._requests[request_id] = _MemRequest(request_id, root_id, correlation)
+        else:
+            with connect() as conn, conn.cursor() as cur:
+                cur.execute("INSERT INTO autonomous_tracer_requests(request_id,root_task_id,correlation_id,checkpoint_id,originating_resident,objective,state,request_digest,run_id) VALUES(%s,%s,%s,%s,%s,%s,'queued',%s,%s)", (UUID(request_id), UUID(root_id), UUID(correlation), "hermes-execution-2", "grace", objective, request_digest, UUID(run_id)))
+        self._event(root_id, correlation, "request.formed", {"request_id": request_id, "request_digest": request_digest})
+        self._event(root_id, correlation, "request.queued", {"request_id": request_id})
+        claimed = self.claim(request_id, "hermes-tracer")
+        self._event(root_id, correlation, "hermes.claimed", claimed)
+        self._event(root_id, correlation, "hermes.started", {"run_id": claimed["run_id"], "request_id": request_id})
+        execution = HermesTracerExecutor().execute(request, run_id=claimed["run_id"])
+        outcome = {"schema_version": SCHEMA_VERSION, "result_id": new_result_id, "request_id": request_id, "root_task_id": root_id, "correlation_id": correlation, "run_id": claimed["run_id"], "semantic_outcome": execution["semantic_outcome"], "summary": execution["summary"], "evidence": execution["evidence"], "adapter_id": execution["adapter_id"], "resulting_sha": None}
+        result_digest = _atomic_json(self.artifact_root / "results" / root_id / f"{new_result_id}.json", outcome)
+        _atomic_text(self.artifact_root / "results" / root_id / f"{new_result_id}.md", f"# {execution['summary']}\n\nEvidence: {', '.join(execution['evidence'])}\n")
+        if self._memory:
+            self._results[new_result_id] = outcome
+            self._requests[request_id].run_id = claimed["run_id"]; self._requests[request_id].result_id = new_result_id; self._requests[request_id].state = "consumed"
+        else:
+            with connect() as conn, conn.cursor() as cur:
+                cur.execute("INSERT INTO autonomous_tracer_results(result_id,request_id,root_task_id,correlation_id,run_id,semantic_outcome,summary,evidence,result_digest) VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)", (UUID(new_result_id), UUID(request_id), UUID(root_id), UUID(correlation), UUID(claimed["run_id"]), execution["semantic_outcome"], execution["summary"], json.dumps(execution["evidence"]), result_digest))
+                cur.execute("UPDATE autonomous_tracer_requests SET state='consumed',result_id=%s,updated_at=now() WHERE request_id=%s", (UUID(new_result_id), UUID(request_id)))
+        for event in ("hermes.result.persisted", "grace.result.available", "grace.result.consumed"):
+            self._event(root_id, correlation, event, {"result_id": new_result_id, "request_id": request_id})
+        projection = self.read_projection(root_id)
+        return {"state": "consumed", **projection, "projection": projection, "request_id": request_id, "result_id": new_result_id, "request_digest": request_digest, "result_digest": result_digest, "events": [x["event_type"] for x in self.events_for(root_id)]}
 
 
 class HermesTracerExecutor:
@@ -154,7 +198,7 @@ def run_tracer(store: TracerStore, *, objective: str, executor: HermesTracerExec
     store._event(root_id, correlation, "request.queued", {"request_id": request_id})
     claimed = store.claim(request_id, "hermes-tracer")
     store._event(root_id, correlation, "hermes.claimed", claimed)
-    store._event(root_id, correlation, "hermes.started", {"run_id": claimed["run_id"]})
+    store._event(root_id, correlation, "hermes.started", {"run_id": claimed["run_id"], "request_id": request_id})
     execution = (executor or HermesTracerExecutor()).execute(request, run_id=claimed["run_id"])
     result_id = str(uuid4())
     outcome = {"schema_version": SCHEMA_VERSION, "result_id": result_id, "request_id": request_id, "root_task_id": root_id, "correlation_id": correlation, "run_id": claimed["run_id"], "semantic_outcome": execution["semantic_outcome"], "summary": execution["summary"], "evidence": execution["evidence"], "adapter_id": execution["adapter_id"], "resulting_sha": None}

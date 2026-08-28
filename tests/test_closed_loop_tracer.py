@@ -53,3 +53,23 @@ def test_artifacts_are_atomic_and_digest_bound():
         assert request.with_suffix(request.suffix + ".tmp").exists() is False
         assert result["request_digest"]
         assert result["result_digest"]
+
+
+def test_same_root_continuation_creates_one_second_request_and_result():
+    with TemporaryDirectory() as temporary:
+        store = TracerStore.memory(artifact_root=Path(temporary))
+        first = run_tracer(store, objective="Continuation proof")
+        second = store.continue_from_result(first["root_task_id"], first["result_id"], objective="Continue the bounded tracer")
+
+        assert second["root_task_id"] == first["root_task_id"]
+        assert second["correlation_id"] == first["correlation_id"]
+        assert second["request_id"] != first["request_id"]
+        assert second["result_id"] != first["result_id"]
+        assert second["projection"]["result_id"] == second["result_id"]
+        assert [x["event_type"] for x in store.events_for(first["root_task_id"])] == [
+            "root_task.created", "roadmap.created", "request.formed", "request.queued",
+            "hermes.claimed", "hermes.started", "hermes.result.persisted",
+            "grace.result.available", "grace.result.consumed", "continuation.requested",
+            "request.formed", "request.queued", "hermes.claimed", "hermes.started",
+            "hermes.result.persisted", "grace.result.available", "grace.result.consumed",
+        ]
