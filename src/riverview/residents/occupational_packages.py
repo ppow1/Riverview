@@ -117,6 +117,11 @@ def _grace_diagnostics(request: ResidentCapabilityRequest) -> dict[str, Any]:
     return {"items": ReadOnlyRelay().diagnostics(_limit(request)), "evidence_refs": ["postgresql:diagnostic_events", "riverview://diagnostics"]}
 
 
+def _grace_host_resources(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    from riverview.host_resource_health import collect_host_resource_health
+    return {"host": collect_host_resource_health(), "evidence_refs": ["windows:memory-manager", "windows:resource-exhaustion-detector", "windows:process-snapshot"]}
+
+
 def _grace_attention(request: ResidentCapabilityRequest) -> dict[str, Any]:
     from riverview.database import connect
     with connect() as connection, connection.cursor() as cursor:
@@ -214,6 +219,7 @@ def build_grace_operations_package(profile: ResidentProfile, office_id: UUID, im
         _descriptor("operations.cookbook.lookup", "Cookbook", "Lookup bounded troubleshooting and recovery knowledge.", _grace_cookbook, classification=profile.classification, input_schema={"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer"}}}, evidence=("postgresql:cookbook_entries",)),
         _descriptor("operations.responsibility.read", "Responsibilities", "Read resident and office responsibility metadata.", lambda request: _grace_responsibility(request, profiles), classification=profile.classification, evidence=("riverview://resident-registry",)),
         _descriptor("operations.diagnostics.lookup", "Diagnostics", "Read bounded current diagnostic evidence and related recovery references.", _grace_diagnostics, classification=profile.classification, evidence=("riverview://diagnostics",)),
+        _descriptor("operations.host-resources.read", "Host resource health", "Read authoritative bounded Windows physical-memory, commit, pagefile, process, and low-virtual-memory event evidence; this is diagnostic observation only and cannot change host state.", _grace_host_resources, classification=profile.classification, evidence=("windows:memory-manager", "windows:resource-exhaustion-detector")),
         _descriptor("operations.attention.read", "Steward attention", "Read pending and acknowledged Steward attention without acceptance authority.", _grace_attention, classification=profile.classification, evidence=("riverview://steward-attention",)),
         _descriptor("operations.roadmap.read", "Roadmap", "Read the current authoritative roadmap position and revision.", _grace_roadmap, classification=profile.classification, evidence=("riverview://roadmap",)),
         _descriptor("operations.engineering-request.prepare", "Engineering request preparation", "Prepare a typed governed engineering request for Steward review without execution.", _grace_prepare, classification=profile.classification, authority="PROPOSE", input_schema={"type": "object", "properties": {"proposal": {"type": "object", "properties": {"content": {"type": "string"}, "summary": {"type": "string"}, "formation_contract": _ENGINEERING_FORMATION_CONTRACT_SCHEMA}, "required": ["content", "summary", "formation_contract"], "additionalProperties": False}}, "required": ["proposal"], "additionalProperties": False}, evidence=("riverview://engineering-formation",)),
