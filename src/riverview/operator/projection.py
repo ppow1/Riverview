@@ -18,7 +18,18 @@ class OperatorProjection:
         except (RuntimeError, OSError, ValueError):
             self.available = False
 
+    def _recover_if_available(self) -> None:
+        if self.available:
+            return
+        try:
+            with connect() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            self.available = True
+        except (RuntimeError, OSError, ValueError):
+            return
+
     def list(self, *, include_archived: bool = False) -> list[dict[str, Any]]:
+        self._recover_if_available()
         if not self.available:
             return list(self.memory.values())
         with connect() as connection, connection.cursor() as cursor:
@@ -29,6 +40,7 @@ class OperatorProjection:
 
     def list_summaries(self, *, include_archived: bool = False, limit: int = 24, offset: int = 0) -> dict[str, Any]:
         """Return a bounded conversation window without hydrating message bodies."""
+        self._recover_if_available()
         bounded_limit = max(1, min(int(limit), 50))
         bounded_offset = max(0, int(offset))
         if not self.available:
@@ -56,6 +68,7 @@ class OperatorProjection:
 
     def search(self, query: str, *, limit: int = 25, include_archived: bool = True) -> list[dict[str, Any]]:
         """Search durable conversation/message bodies without loading history into the browser."""
+        self._recover_if_available()
         term = query.strip()
         if not term:
             return []
@@ -84,6 +97,7 @@ class OperatorProjection:
         return {"id": str(conversation_id), "resident_id": resident_id or "", "resident_name": "", "room_id": str(room_id) if room_id else "", "kind": kind, "title": title, "classification": classification, "messages": messages, "preview": messages[-1]["text"][:180] if messages else "", "unread": False, "archived": bool(archived_at), "source_conversation_id": str(source_id) if source_id else "", "inherited_context_window": context_window or "", "inherited_message_count": inherited_count or 0, "participants_added": participants_added or []}
 
     def create(self, *, resident_id: str, title: str, kind: str = "conversation", room_id: UUID | None = None, classification: str = "operational", source_conversation_id: UUID | None = None, inherited_context_window: str = "", inherited_message_count: int = 0, participants_added: list[str] | None = None) -> dict[str, Any]:
+        self._recover_if_available()
         conversation_id = uuid4()
         value = {"id": str(conversation_id), "resident_id": resident_id, "resident_name": "", "room_id": str(room_id) if room_id else "", "kind": kind, "title": title[:160], "classification": classification, "messages": [], "preview": "", "unread": False, "source_conversation_id": str(source_conversation_id) if source_conversation_id else "", "inherited_context_window": inherited_context_window, "inherited_message_count": inherited_message_count, "participants_added": participants_added or []}
         if not self.available:
@@ -95,6 +109,7 @@ class OperatorProjection:
         return value
 
     def append(self, conversation_id: UUID, *, role: str, text: str, speaker_id: str | None, speaker: str, details: dict[str, Any]) -> None:
+        self._recover_if_available()
         if not self.available:
             item = self.memory[conversation_id]
             item["messages"].append({"role": role, "speaker_id": speaker_id, "speaker": speaker, "text": text, "details": details})
@@ -108,6 +123,7 @@ class OperatorProjection:
             cursor.execute("UPDATE operator_conversations SET updated_at=now() WHERE conversation_id=%s", (conversation_id,))
 
     def refresh(self, conversation_id: UUID, *, include_archived: bool = False) -> dict[str, Any] | None:
+        self._recover_if_available()
         if not self.available:
             return self.memory.get(conversation_id)
         with connect() as connection, connection.cursor() as cursor:
@@ -116,6 +132,7 @@ class OperatorProjection:
             return self._conversation(cursor, row) if row else None
 
     def set_archived(self, conversation_id: UUID, archived: bool) -> dict[str, Any] | None:
+        self._recover_if_available()
         if not self.available:
             item = self.memory.get(conversation_id)
             if item is not None:
@@ -133,6 +150,7 @@ class OperatorProjection:
 
     def assign_resident(self, conversation_id: UUID, resident_id: str, title: str) -> dict[str, Any] | None:
         """Assign the initial resident exactly once on a neutral conversation."""
+        self._recover_if_available()
         if not resident_id.strip():
             return self.refresh(conversation_id)
         if not self.available:

@@ -9,6 +9,7 @@ from riverview.operator.vnext import ConversationTransition
 from riverview.operator.vnext_projection import build_resource_topology, build_vnext_projection
 from riverview.reasoning import ReasoningResponse
 from riverview.reasoning.epistemic import EpistemicSpan, ProvenanceRecord, VERIFIED, build_epistemic_metadata
+from riverview.operator.projection import OperatorProjection
 
 
 def test_transition_keeps_active_until_success_and_fails_closed() -> None:
@@ -22,6 +23,24 @@ def test_transition_keeps_active_until_success_and_fails_closed() -> None:
     assert state.active_id == "B"
     assert state.can_send("B") is True
     assert state.payload("B", "hello")["conversation_id"] == "B"
+
+
+def test_operator_projection_reprobes_after_database_recovery(monkeypatch) -> None:
+    projection = OperatorProjection.__new__(OperatorProjection)
+    projection.available = False
+    projection.memory = {}
+    class Cursor:
+        def execute(self, sql, args=()): return None
+        def fetchall(self): return []
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+    class Connection:
+        def cursor(self): return Cursor()
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+    monkeypatch.setattr("riverview.operator.projection.connect", lambda: Connection())
+    assert projection.list_summaries()["conversations"] == []
+    assert projection.available is True
 
 
 def test_transition_ignores_stale_success_and_failure() -> None:
