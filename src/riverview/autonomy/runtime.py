@@ -20,10 +20,52 @@ from riverview.database import connect
 from riverview.database.connection import load_database_config
 from riverview.diagnostics import DiagnosticEvent, DiagnosticStore, RecoveryState, Severity
 from riverview.grace.objectives import ObjectiveStore
+from riverview.river import Classification, EventStore, RiverEvent
 
 HEARTBEAT_FRESHNESS_SECONDS = 5.0
 HEARTBEAT_INTERVAL_SECONDS = 1.0
 CONSUMER_ID = "cme.primary"
+
+
+class CMEV1ContinuationPolicy:
+    """Root-scoped V1 continuation policy over an existing enqueue seam."""
+
+    PARKED_OUTCOMES = {"STEWARD_DECISION_REQUIRED", "BLOCKED_REQUIRES_STEWARD", "READY_FOR_STEWARD_REVIEW", "COMPLETED_NO_ATTENTION"}
+
+    def __init__(self, *, enqueue: Any, event_sink: Any | None = None, event_store: EventStore | None = None, max_no_progress: int = 3) -> None:
+        if not callable(enqueue) or max_no_progress < 1:
+            raise ValueError("RIV-GRC-0009: CME continuation policy bounds are invalid.")
+        self.enqueue, self.event_sink, self.event_store, self.max_no_progress = enqueue, event_sink, event_store, max_no_progress
+        self._last_progress: dict[str, str] = {}
+        self._no_progress: dict[str, int] = {}
+
+    def _event(self, event_type: str, result: dict[str, Any]) -> None:
+        if self.event_sink is not None:
+            self.event_sink(event_type, result)
+        if self.event_store is not None:
+            self.event_store.append(RiverEvent(event_type=event_type, aggregate_type="autonomous_root_task", aggregate_id=UUID(str(result["root_task_id"])), correlation_id=UUID(str(result["correlation_id"])), idempotency_key=f"cme:{event_type}:{result['root_task_id']}:{result.get('result_id', result.get('source_result_id', 'none'))}", classification=Classification.INTERNAL, payload={key: value for key, value in result.items() if key != "summary"}))
+
+    def observe(self, result: dict[str, Any]) -> dict[str, Any]:
+        required = ("root_task_id", "correlation_id", "request_id", "result_id", "semantic_outcome")
+        if any(not result.get(key) for key in required):
+            raise ValueError("RIV-GRC-0010: CME result correspondence is incomplete.")
+        root = str(result["root_task_id"]); outcome = str(result["semantic_outcome"])
+        progress = str(result.get("result_digest") or result.get("resulting_sha") or result["result_id"])
+        if outcome == "CONTINUE":
+            if self._last_progress.get(root) == progress:
+                self._no_progress[root] = self._no_progress.get(root, 0) + 1
+            else:
+                self._last_progress[root] = progress; self._no_progress[root] = 0
+            if self._no_progress[root] >= self.max_no_progress:
+                self._event("momentum.anomaly", result)
+                return {"state": "MOMENTUM_ANOMALY", "root_task_id": root, "correlation_id": str(result["correlation_id"]), "reason": "CONTINUE produced no observable progress within the bounded V1 limit."}
+            continuation = {"root_task_id": root, "correlation_id": str(result["correlation_id"]), "source_result_id": str(result["result_id"]), "source_request_id": str(result["request_id"])}
+            self.enqueue(continuation); self._event("continuation.selected", continuation); self._event("continuation.queued", continuation)
+            return {"state": "CONTINUATION_QUEUED", **continuation}
+        if outcome not in self.PARKED_OUTCOMES:
+            raise ValueError(f"RIV-GRC-0011: unsupported CME semantic outcome {outcome}.")
+        self._event("root.parked", result)
+        return {"state": "PARKED", "root_task_id": root, "correlation_id": str(result["correlation_id"]), "semantic_outcome": outcome}
 
 
 def _iso(value: Any) -> str | None:

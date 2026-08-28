@@ -10,11 +10,11 @@ from .control import (
     LaneRegistry,
     ResultReconciler,
 )
-from .runtime import CMEStatusStore, ContinuousMomentumRuntime
+from .runtime import CMEStatusStore, CMEV1ContinuationPolicy, ContinuousMomentumRuntime
 from .supervisor import CMESupervisor
 
 __all__ = [
-    "CMEStatusStore",
+    "CMEStatusStore", "CMEV1ContinuationPolicy",
     "CMESupervisor",
     "CapabilityRegistry",
     "CodexCliAdapter",
