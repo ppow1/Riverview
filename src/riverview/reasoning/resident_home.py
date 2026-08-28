@@ -8,7 +8,7 @@ selection remains entirely with the model callback.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable, Mapping, TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -162,6 +162,7 @@ class ResidentHomeCognitionService:
     def execute(self, profile: ResidentProfile, question: str, *, correlation_id: UUID, conversation_context: tuple[str, ...] = ()) -> ResidentHomeTurn:
         state = self.state_resolver.resolve(profile)
         package = self._package(profile, state)
+        package = replace(package, provenance_refs=tuple(dict.fromkeys((*state.evidence_refs, *state.state_refs, *package.provenance_refs))))
         bound_model = str(state.implementation.get("model_ref") or self.model_ref)
         provider_ref = str(state.implementation.get("provider_ref") or "ollama")
         provider_id = f"{provider_ref}:{bound_model}"
