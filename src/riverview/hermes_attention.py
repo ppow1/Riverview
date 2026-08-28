@@ -37,6 +37,13 @@ def _display_name(*values: Any) -> str:
     return "Riverview Hermes"
 
 
+def _display_title(task_title: Any, roadmap_title: Any, window_description: Any, lane: str) -> str:
+    for value in (task_title, roadmap_title):
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:_MAX_FIELD]
+    return _display_name(window_description, lane)
+
+
 def _required_text(value: Any, field: str, *, max_length: int = _MAX_FIELD) -> str:
     if not isinstance(value, str) or not value.strip() or len(value.strip()) > max_length:
         raise ValueError(f"RIV-HERMES-ATTN-0001: {field} is missing or unbounded.")
@@ -159,7 +166,7 @@ def submit_hermes_run_boundary(
     evidence_value = _required_text(evidence_ref, "evidence_ref", max_length=512)
     session_value = _required_text(session_id, "session_id")
     transition_value = _required_text(transition_id, "transition_id")
-    title = _display_name(task_title, roadmap_title, window_description, lane_value)
+    title = _display_title(task_title, roadmap_title, window_description, lane_value)
     suffix = "continuation remains." if outcome_value == "CONTINUE" else "completed."
     summary = f"{title} iteration complete; {suffix}"
     key = f"hermes.run_boundary:{session_value}:{transition_value}"
@@ -171,14 +178,15 @@ def submit_hermes_run_boundary(
         summary=summary, evidence_refs=tuple(refs),
     )
     event_id = UUID(notification_id.hex[:8] + "-" + notification_id.hex[8:12] + "-4" + notification_id.hex[13:16] + "-8" + notification_id.hex[17:20] + "-" + notification_id.hex[20:32])
+    delivery = deliver(notification_id)
+    delivery_status = "delivered" if delivery.get("delivered") is True or delivery.get("state") == "delivered" else str(delivery.get("state") or "unknown")
     event = (event_store or EventStore()).append(RiverEvent(
         event_type="hermes.run_boundary.completed", aggregate_type="hermes_run", aggregate_id=notification_id,
         correlation_id=UUID(correlation_id) if correlation_id else UUID(int=0),
         idempotency_key=key, classification=Classification.INTERNAL,
-        payload={"task_title": title, "outcome": outcome_value, "notification_id": str(notification_id), "notification_class": "informational", "run_started_at": run_started_at, "run_completed_at": run_completed_at, "resulting_sha": resulting_sha, "delivery_status": "pending"},
+        payload={"task_title": title, "outcome": outcome_value, "notification_id": str(notification_id), "notification_class": "informational", "run_started_at": run_started_at, "run_completed_at": run_completed_at, "resulting_sha": resulting_sha, "delivery_status": delivery_status},
         event_id=event_id,
     ))
-    delivery = deliver(notification_id)
     return {"schema_version": VERSION, "notification_id": str(notification_id), "idempotency_key": key, "notification_type": "important_completion", "task_title": title, "summary": summary, "event_id": str(event.event_id), "delivery": delivery, "action_required": False, "acknowledged": bool(delivery.get("acknowledged", False)), "institutionally_accepted": False}
 
 
