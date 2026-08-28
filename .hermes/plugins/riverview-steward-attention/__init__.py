@@ -92,11 +92,48 @@ def _transform_riverview_outcome(response_text: str, *, session_id: str, **kwarg
         response_text,
         session_id=session_id,
         window_description=kwargs.get("window_description") or kwargs.get("task_title"),
+        notify=False,
+    )
+
+
+def _post_response_rendered(response_text: str, *, session_id: str, **kwargs: Any) -> None:
+    """Render the waiting banner, flush it, then notify at the idle boundary."""
+    if os.environ.get("RIVERVIEW_HERMES_ENGINEERING") != "1":
+        return
+    from riverview.hermes_terminal_outcome import _parse_marker, _text
+    from riverview.hermes_attention import submit_hermes_run_boundary
+
+    _, envelope = _parse_marker(response_text)
+    if envelope is None:
+        return
+    outcome = _text(envelope.get("outcome"), "outcome").upper()
+    if outcome not in {"CONTINUE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"}:
+        return
+    title = envelope.get("task_title") or kwargs.get("task_title") or envelope.get("lane") or "Riverview Hermes"
+    labels = {
+        "CONTINUE": ("HERMES ITERATION COMPLETE", "CONTINUATION REMAINS · WAITING"),
+        "COMPLETED_NO_ATTENTION": ("TASK COMPLETE", "NO STEWARD ACTION REQUIRED"),
+        "READY_FOR_STEWARD_REVIEW": ("HERMES WAITING", "READY FOR STEWARD REVIEW"),
+        "BLOCKED_REQUIRES_STEWARD": ("HERMES WAITING", "BLOCKED · STEWARD INPUT REQUIRED"),
+        "STEWARD_DECISION_REQUIRED": ("HERMES WAITING", "STEWARD DECISION REQUIRED"),
+    }
+    heading, state = labels[outcome]
+    print(f"\n\n{'═' * 72}\n  {heading}\n  {title}\n  {state}\n{'═' * 72}")
+    sys.stdout.flush()
+    submit_hermes_run_boundary(
+        lane=_text(envelope.get("lane"), "lane"), outcome=outcome,
+        checkpoint_id=_text(envelope.get("checkpoint_id"), "checkpoint_id"),
+        evidence_ref=_text(envelope.get("evidence_ref"), "evidence_ref", limit=2000),
+        session_id=session_id, transition_id=_text(envelope.get("terminal_transition_id"), "terminal_transition_id"),
+        task_title=envelope.get("task_title") or kwargs.get("task_title"),
+        roadmap_title=envelope.get("roadmap_title"), window_description=kwargs.get("window_description"),
+        correlation_id=envelope.get("correlation_id"), resulting_sha=envelope.get("resulting_sha"),
     )
 
 
 def register(ctx) -> None:
     ctx.register_hook("transform_llm_output", _transform_riverview_outcome)
+    ctx.register_hook("post_response_rendered", _post_response_rendered)
     ctx.register_tool(
         name="riverview_steward_attention",
         toolset="riverview",

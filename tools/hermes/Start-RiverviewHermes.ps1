@@ -29,11 +29,17 @@ try {
     # Project plugins are discovered only when opted in, and the generic
     # plugins enable command intentionally does not install project plugins.
     # Extend the existing supported config list without replacing its entries.
-    $configured = @(& hermes config get plugins.enabled 2>$null | ForEach-Object {
-        if ($_ -match '^\s*-\s+(.+)$') {
-            $Matches[1].Trim()
-        }
-    })
+    $configured = @()
+    try {
+        $configured = @(& hermes config get plugins.enabled 2>&1 | ForEach-Object {
+            if ($_ -match '^\s*-\s+(.+)$') {
+                $Matches[1].Trim()
+            }
+        })
+    }
+    catch {
+        $configured = @()
+    }
     if ($configured -notcontains $PluginName) {
         $configured += $PluginName
         $encoded = $configured | ConvertTo-Json -Compress

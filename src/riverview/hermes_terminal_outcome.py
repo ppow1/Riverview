@@ -102,6 +102,7 @@ def process_terminal_outcome(
     window_description: str | None = None,
     submit: Callable[..., Mapping[str, Any]] = submit_hermes_attention,
     run_boundary_submit: Callable[..., Mapping[str, Any]] = submit_hermes_run_boundary,
+    notify: bool = True,
 ) -> str:
     """Process one normal Hermes final response and return report text.
 
@@ -122,6 +123,8 @@ def process_terminal_outcome(
 
     try:
         outcome = _text(envelope.get("outcome"), "outcome").upper()
+        if outcome in NON_ATTENTION_OUTCOMES and not notify:
+            return clean
         if outcome in NON_ATTENTION_OUTCOMES:
             boundary = run_boundary_submit(
                 lane=_text(envelope.get("lane"), "lane"), outcome=outcome,
