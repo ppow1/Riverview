@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import psycopg
 
@@ -78,11 +78,32 @@ class RelayWorker:
         else:
             self.statistics.failed += 1
 
+    def _next_closed_loop_work_order(self) -> UUID | None:
+        """Select only an exact executable root-bound order for internal actions."""
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("""SELECT w.work_order_id
+                               FROM work_orders w
+                               JOIN autonomous_governance_bindings b
+                                 ON b.work_order_id=w.work_order_id
+                                AND b.root_task_id=(w.parameters->>'root_task_id')::uuid
+                                AND b.correlation_id=w.correlation_id
+                                AND b.objective_id=w.objective_id
+                                AND b.stage_id=w.stage_id
+                              WHERE w.status='queued' AND w.active_attempt_id IS NULL
+                                AND w.parameters ? 'root_task_id'
+                                AND w.parameters->>'root_task_id' ~ '^[0-9a-fA-F-]{36}$'
+                                AND b.state='EXECUTABLE'
+                              ORDER BY w.created_at
+                              LIMIT 1""")
+            row = cursor.fetchone()
+        return UUID(str(row[0])) if row else None
+
     def drain(self, limit: int = 25) -> int:
         processed = 0
         while processed < limit:
             self._record("running")
-            result = self.runner.run_once()
+            target = self._next_closed_loop_work_order()
+            result = self.runner.run_once(target_work_order_id=target) if target is not None else self.runner.run_once()
             if result is None:
                 self._record("idle")
                 break

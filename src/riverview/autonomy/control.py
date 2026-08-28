@@ -202,19 +202,19 @@ class GraceMomentum:
                 decisions.append({"stage_key": stage_key, "decision": decision, "steward_checkpoint": steward_checkpoint, "declared_action": declared_action})
             return decisions
 
-    def enqueue_declared_action(self, objective_key: str, stage_key: str, *, requested_by: str = "grace") -> dict[str, Any]:
+    def enqueue_declared_action(self, objective_key: str, stage_key: str, *, requested_by: str = "grace", root_task_id: UUID | None = None) -> dict[str, Any]:
         from riverview.relay import RelayStore
 
         with connect() as connection, connection.cursor() as cursor:
             cursor.execute(
-                """SELECT s.stage_id,s.status,s.readiness,s.steward_checkpoint,s.declared_action,o.correlation_id
+                """SELECT s.stage_id,s.status,s.readiness,s.steward_checkpoint,s.declared_action,o.correlation_id,o.objective_id
                    FROM objective_stages s JOIN objectives o ON o.objective_id=s.objective_id
                    WHERE o.objective_key=%s AND s.stage_key=%s""", (objective_key, stage_key)
             )
             row = cursor.fetchone()
         if row is None:
             raise RuntimeError("RIV-GRC-0004: declared objective stage is missing.")
-        stage_id, status, readiness, steward_checkpoint, action, correlation_id = row
+        stage_id, status, readiness, steward_checkpoint, action, correlation_id, objective_id = row
         if status == "completed" or readiness != "ready" or steward_checkpoint:
             raise RuntimeError("RIV-GRC-0004: stage is not eligible for automatic action.")
         if not isinstance(action, dict) or not isinstance(action.get("action_type"), str) or not isinstance(action.get("parameters"), dict):
@@ -229,7 +229,8 @@ class GraceMomentum:
                 existing = cursor.fetchone()
             if existing is not None:
                 return {"stage_id": str(stage_id), "work_order_id": str(existing[0]), "correlation_id": str(correlation_id), "action_type": existing[2], "already_enqueued": True}
-        order = RelayStore().enqueue(action["action_type"], action["parameters"], requested_by, f"grace:{objective_key}:{stage_key}", correlation_id)
+        parameters = {**action["parameters"], **({"root_task_id": str(root_task_id)} if root_task_id is not None else {})}
+        order = RelayStore().enqueue(action["action_type"], parameters, requested_by, f"grace:{objective_key}:{stage_key}", correlation_id, objective_id=objective_id, stage_id=stage_id)
         return {"stage_id": str(stage_id), "work_order_id": str(order.work_order_id), "correlation_id": str(correlation_id), "action_type": order.action_type}
 
     def form_authorized_intent(self, objective_id: UUID, stage_id: UUID) -> dict[str, Any]:
@@ -309,9 +310,9 @@ class GraceMomentum:
 class ContinuousMomentumEngine:
     """Run one bounded, event-driven Grace cycle across independent objectives."""
 
-    def enqueue_declared_action(self, objective_key: str, stage_key: str, *, requested_by: str = "grace") -> dict[str, Any]:
+    def enqueue_declared_action(self, objective_key: str, stage_key: str, *, requested_by: str = "grace", root_task_id: UUID | None = None) -> dict[str, Any]:
         """Delegate approved work formation to Grace's authority boundary."""
-        return GraceMomentum().enqueue_declared_action(objective_key, stage_key, requested_by=requested_by)
+        return GraceMomentum().enqueue_declared_action(objective_key, stage_key, requested_by=requested_by, root_task_id=root_task_id)
 
     def frontier(
         self,

@@ -214,7 +214,7 @@ class EngineeringIntentStore:
         intent = StewardAuthorityStore.intent_from_contract(authority)
         return self.bind(intent, authority_id=authority_id)
 
-    def form_and_enqueue(self, authority_id: UUID) -> dict[str, Any]:
+    def form_and_enqueue(self, authority_id: UUID, *, root_task_id: UUID | None = None, root_correlation_id: UUID | None = None) -> dict[str, Any]:
         """Form one approved intent and queue its one Relay work order atomically."""
         from riverview.intake.authority import StewardAuthorityStore
         from riverview.relay.store import RelayStore
@@ -222,6 +222,8 @@ class EngineeringIntentStore:
         authority = StewardAuthorityStore().load(authority_id)
         if authority is None:
             raise PermissionError("RIV-GRC-0010: authority grant was not found.")
+        if root_correlation_id is not None and UUID(str(authority["correlation_id"])) != root_correlation_id:
+            raise ValueError("RIV-LOOP-BIND-0011: root correlation does not match authorized formation.")
         intent = StewardAuthorityStore.intent_from_contract(authority)
         work_key = f"engineering-work-order:authority:{authority_id}"
 
@@ -229,7 +231,7 @@ class EngineeringIntentStore:
             work = RelayStore.enqueue_in_transaction(
                 cursor,
                 intent.action_type,
-                {"engineering_intent_id": str(intent_id)},
+                {"engineering_intent_id": str(intent_id), **({"root_task_id": str(root_task_id)} if root_task_id is not None else {})},
                 "grace",
                 work_key,
                 intent.correlation_id,
