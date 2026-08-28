@@ -406,7 +406,7 @@ class RiverviewOpenWebUIService:
                     except (OSError, TypeError, ValueError, json.JSONDecodeError):
                         pass
                     try:
-                        conversations = service.projection.list_summaries(limit=8).get("conversations", [])
+                        conversations = service.projection.list_summaries(limit=24).get("conversations", [])
                     except (RuntimeError, OSError, TypeError, ValueError):
                         conversations = []
                     try:
