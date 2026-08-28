@@ -33,3 +33,16 @@ def test_binding_states_are_root_scoped():
     store.save(GovernanceBinding(b, uuid4(), state=BindingState.EXECUTABLE, objective_id=uuid4(), stage_id=uuid4(), authority_id=uuid4(), work_order_id=uuid4()))
     assert store.read(a).state is BindingState.AWAITING_AUTHORITY
     assert store.read(b).state is BindingState.EXECUTABLE
+
+
+def test_joined_projection_preserves_binding_state_and_unknown_root_fails_closed():
+    store = GovernanceBindingStore.memory()
+    root = uuid4()
+    binding = GovernanceBinding(root, uuid4(), specification_id=uuid4(), state=BindingState.PREPARED)
+    store.save(binding)
+    projection = store.joined_projection(root)
+    assert projection["root_task_id"] == str(root)
+    assert projection["binding_state"] == "PREPARED"
+    assert projection["execution_eligible"] is False
+    with pytest.raises(LookupError):
+        store.joined_projection(uuid4())

@@ -53,6 +53,7 @@ class GovernanceBindingStore:
         self._memory = memory
         self._items: dict[UUID, GovernanceBinding] = {}
 
+
     @classmethod
     def memory(cls) -> "GovernanceBindingStore":
         return cls(memory=True)
@@ -61,6 +62,7 @@ class GovernanceBindingStore:
         binding.validate()
         if self._memory:
             self._items[binding.root_task_id] = binding
+
             return binding
         with connect() as conn, conn.cursor() as cur:
             cur.execute("""INSERT INTO autonomous_governance_bindings(root_task_id,correlation_id,specification_id,engineering_intent_id,objective_id,stage_id,authority_id,work_order_id,attempt_id,lease_generation,fencing_token,worker_id,resource_claim_id,state) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(root_task_id) DO UPDATE SET correlation_id=EXCLUDED.correlation_id,specification_id=EXCLUDED.specification_id,engineering_intent_id=EXCLUDED.engineering_intent_id,objective_id=EXCLUDED.objective_id,stage_id=EXCLUDED.stage_id,authority_id=EXCLUDED.authority_id,work_order_id=EXCLUDED.work_order_id,attempt_id=EXCLUDED.attempt_id,lease_generation=EXCLUDED.lease_generation,fencing_token=EXCLUDED.fencing_token,worker_id=EXCLUDED.worker_id,resource_claim_id=EXCLUDED.resource_claim_id,state=EXCLUDED.state,updated_at=now()""", tuple(getattr(binding, key) for key in ("root_task_id","correlation_id","specification_id","engineering_intent_id","objective_id","stage_id","authority_id","work_order_id","attempt_id","lease_generation","fencing_token","worker_id","resource_claim_id","state")))
@@ -93,3 +95,25 @@ class GovernanceBindingStore:
             raise PermissionError(f"RIV-LOOP-BIND-0006: root is not executable ({binding.state}).")
         binding.validate()
         return binding
+
+    def joined_projection(self, root_task_id: UUID) -> dict[str, Any]:
+        binding = self.read(root_task_id)
+        if binding.correlation_id == UUID(int=0) and root_task_id not in self._items:
+            raise LookupError(f"RIV-LOOP-BIND-0007: unknown root {root_task_id}")
+        return {
+            "root_task_id": str(binding.root_task_id),
+            "correlation_id": str(binding.correlation_id),
+            "binding_state": binding.state.value,
+            "execution_eligible": binding.state is BindingState.EXECUTABLE,
+            "specification_id": str(binding.specification_id) if binding.specification_id else None,
+            "engineering_intent_id": str(binding.engineering_intent_id) if binding.engineering_intent_id else None,
+            "objective_id": str(binding.objective_id) if binding.objective_id else None,
+            "stage_id": str(binding.stage_id) if binding.stage_id else None,
+            "authority_id": str(binding.authority_id) if binding.authority_id else None,
+            "work_order_id": str(binding.work_order_id) if binding.work_order_id else None,
+            "attempt_id": str(binding.attempt_id) if binding.attempt_id else None,
+            "lease_generation": binding.lease_generation,
+            "fencing_token": str(binding.fencing_token) if binding.fencing_token else None,
+            "worker_id": binding.worker_id,
+            "resource_claim_id": str(binding.resource_claim_id) if binding.resource_claim_id else None,
+        }
