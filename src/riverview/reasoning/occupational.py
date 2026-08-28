@@ -221,7 +221,8 @@ class ResidentCapabilityBroker:
         except TimeoutError:
             return ResidentCapabilityResult(**base, status=CapabilityResultStatus.TIMEOUT, value=None, reason="authoritative capability timed out", evidence_refs=descriptor.evidence_requirements)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
-            return ResidentCapabilityResult(**base, status=CapabilityResultStatus.BACKEND_FAILURE, value=None, reason=f"authoritative capability failed: {type(exc).__name__}", evidence_refs=descriptor.evidence_requirements)
+            reason = str(exc).replace("\r", " ").replace("\n", " ").strip()[:240] or type(exc).__name__
+            return ResidentCapabilityResult(**base, status=CapabilityResultStatus.BACKEND_FAILURE, value=None, reason=f"authoritative capability failed: {type(exc).__name__}: {reason}", evidence_refs=descriptor.evidence_requirements)
         if not isinstance(value, Mapping):
             return ResidentCapabilityResult(**base, status=CapabilityResultStatus.MALFORMED, value=None, reason="authoritative handler returned a non-object result", evidence_refs=descriptor.evidence_requirements)
         if len(json.dumps(value, default=str).encode()) > descriptor.max_result_bytes:
