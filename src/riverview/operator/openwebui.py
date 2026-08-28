@@ -441,6 +441,14 @@ class RiverviewOpenWebUIService:
                     self._send(HTTPStatus.OK, build_vnext_projection(cme=cme, runtime=runtime, conversations=conversations, residents=residents, context=context, activity=activity))
                 elif urlsplit(self.path).path == "/api/vnext/projection":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                elif urlsplit(self.path).path == "/api/now" and self._auth():
+                    try:
+                        from riverview.closed_loop.now_projection import read_now_roots
+                        self._send(HTTPStatus.OK, read_now_roots())
+                    except (RuntimeError, OSError, TypeError, ValueError, LookupError):
+                        self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "now_projection_unavailable", "checkpoint": "RIV-LOOP-0012"})
+                elif urlsplit(self.path).path == "/api/now":
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif urlsplit(self.path).path == "/api/events" and self._auth():
                     try:
                         query = parse_qs(urlsplit(self.path).query)
