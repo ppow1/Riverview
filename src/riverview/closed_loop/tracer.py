@@ -157,13 +157,13 @@ class TracerStore:
             request = next(item for item in self._requests.values() if item.request_id == request_id)
             return {"root_task_id": root_id, "correlation_id": result["correlation_id"], "request_id": request_id, "result_id": result["result_id"], "run_id": result["run_id"], "current_checkpoint_id": "result-consumed", "semantic_outcome": result["semantic_outcome"], "summary": result["summary"], "evidence": result["evidence"], "adapter_id": result["adapter_id"]}
         with connect() as conn, conn.cursor() as cur:
-            cur.execute("SELECT r.root_task_id,r.correlation_id,r.request_id,r.result_id,x.run_id,t.current_checkpoint_id,x.semantic_outcome,x.summary,x.evidence,x.result_digest FROM autonomous_tracer_results x JOIN autonomous_tracer_requests r ON r.request_id=x.request_id JOIN autonomous_root_tasks t ON t.root_task_id=x.root_task_id WHERE x.root_task_id=%s ORDER BY x.created_at DESC LIMIT 1", (UUID(root_id),))
+            cur.execute("SELECT r.root_task_id,r.correlation_id,r.request_id,r.result_id,x.run_id,t.current_checkpoint_id,x.semantic_outcome,x.summary,x.evidence,x.result_digest,x.provider_id,x.resource_class_ref,x.response_id,x.adapter_id FROM autonomous_tracer_results x JOIN autonomous_tracer_requests r ON r.request_id=x.request_id JOIN autonomous_root_tasks t ON t.root_task_id=x.root_task_id WHERE x.root_task_id=%s ORDER BY x.created_at DESC LIMIT 1", (UUID(root_id),))
             row = cur.fetchone()
             if not row:
                 cur.execute("SELECT root_task_id,correlation_id,current_checkpoint_id,state FROM autonomous_root_tasks WHERE root_task_id=%s", (UUID(root_id),)); root = cur.fetchone()
                 if not root: raise LookupError(f"RIV-LOOP-0003: unknown root {root_id}")
                 return {"root_task_id": str(root[0]), "correlation_id": str(root[1]), "request_id": None, "result_id": None, "run_id": None, "current_checkpoint_id": root[2], "semantic_outcome": None, "summary": None, "evidence": [], "state": root[3]}
-            return {"root_task_id": str(row[0]), "correlation_id": str(row[1]), "request_id": str(row[2]), "result_id": str(row[3]), "run_id": str(row[4]), "current_checkpoint_id": row[5], "semantic_outcome": row[6], "summary": row[7], "evidence": row[8], "result_digest": row[9], "adapter_id": "hermes.tracer.no_mutation.v1"}
+            return {"root_task_id": str(row[0]), "correlation_id": str(row[1]), "request_id": str(row[2]), "result_id": str(row[3]), "run_id": str(row[4]), "current_checkpoint_id": row[5], "semantic_outcome": row[6], "summary": row[7], "evidence": row[8], "result_digest": row[9], "provider_id": row[10], "resource_class_ref": row[11], "response_id": str(row[12]) if row[12] else None, "adapter_id": row[13] or "hermes.tracer.no_mutation.v1"}
 
     def record_external_result(self, result: dict[str, Any]) -> dict[str, Any]:
         """Persist one governed result only when request/root correspondence matches."""
@@ -197,7 +197,7 @@ class TracerStore:
                 if root_row is None: raise ValueError("RIV-LOOP-0014: external result root was not found.")
                 cur.execute("INSERT INTO autonomous_tracer_requests(request_id,root_task_id,correlation_id,checkpoint_id,originating_resident,objective,state,request_digest,run_id) VALUES(%s,%s,%s,'hermes-execution',%s,%s,'consumed',%s,%s)", (UUID(request_id), UUID(root_id), UUID(correlation), root_row[1], root_row[0], _digest(result), UUID(str(result["run_id"]))))
             digest = _digest(result)
-            cur.execute("INSERT INTO autonomous_tracer_results(result_id,request_id,root_task_id,correlation_id,run_id,semantic_outcome,summary,evidence,result_digest) VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)", (UUID(result_id), UUID(request_id), UUID(root_id), UUID(correlation), UUID(str(result["run_id"])), result["semantic_outcome"], str(result["summary"])[:8000], json.dumps(result["evidence"]), digest))
+            cur.execute("INSERT INTO autonomous_tracer_results(result_id,request_id,root_task_id,correlation_id,run_id,semantic_outcome,summary,evidence,result_digest,provider_id,resource_class_ref,response_id,adapter_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s)", (UUID(result_id), UUID(request_id), UUID(root_id), UUID(correlation), UUID(str(result["run_id"])), result["semantic_outcome"], str(result["summary"])[:8000], json.dumps(result["evidence"]), digest, result.get("provider_id"), result.get("resource_class_ref"), UUID(str(result["response_id"])) if result.get("response_id") else None, result.get("adapter_id")))
             cur.execute("UPDATE autonomous_tracer_requests SET state='consumed',result_id=%s,updated_at=now() WHERE request_id=%s", (UUID(result_id), UUID(request_id)))
             cur.execute("UPDATE autonomous_root_tasks SET state='result_available',current_checkpoint_id='result-returned',updated_at=now() WHERE root_task_id=%s", (UUID(root_id),))
         self._event(root_id, correlation, "result.available", {"request_id": request_id, "result_id": result_id, "work_order_id": result["work_order_id"], "attempt_id": result["attempt_id"]})
@@ -217,6 +217,24 @@ class TracerStore:
             if row is None:
                 raise ValueError("RIV-LOOP-0016: result projection correspondence failed.")
             cur.execute("UPDATE autonomous_root_tasks SET state='result_available',current_checkpoint_id='result-returned',updated_at=now() WHERE root_task_id=%s", (UUID(root_id),))
+        return self.read_projection(root_id)
+
+    def backfill_result_provenance(self, root_id: str, result_id: str, work_order_id: str) -> dict[str, Any]:
+        """Copy observed executor provenance from the exact succeeded order."""
+        with connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT result_id FROM autonomous_tracer_results WHERE result_id=%s AND root_task_id=%s", (UUID(result_id), UUID(root_id)))
+            if cur.fetchone() is None:
+                raise ValueError("RIV-LOOP-0017: result/root correspondence failed.")
+            cur.execute("SELECT result_report FROM work_orders WHERE work_order_id=%s AND status='succeeded'", (UUID(work_order_id),))
+            row = cur.fetchone()
+            if row is None or not isinstance(row[0], dict):
+                raise ValueError("RIV-LOOP-0017: succeeded work-order provenance is unavailable.")
+            report = row[0]
+            cur.execute("SELECT run_id FROM work_order_attempts WHERE attempt_id=%s AND work_order_id=%s", (UUID(str(report["attempt_id"])), UUID(work_order_id)))
+            attempt = cur.fetchone()
+            if attempt is None:
+                raise ValueError("RIV-LOOP-0017: canonical attempt run identity is unavailable.")
+            cur.execute("UPDATE autonomous_tracer_results SET run_id=%s,provider_id=%s,resource_class_ref=%s,response_id=%s,adapter_id=%s WHERE result_id=%s AND root_task_id=%s", (attempt[0], report.get("provider_id"), report.get("resource_class_ref"), UUID(str(report["response_id"])) if report.get("response_id") else None, "hermes.campaign_runner.v1", UUID(result_id), UUID(root_id)))
         return self.read_projection(root_id)
 
     def continue_from_result(self, root_id: str, result_id: str, *, objective: str) -> dict[str, Any]:
