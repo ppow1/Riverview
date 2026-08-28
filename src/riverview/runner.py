@@ -178,6 +178,7 @@ class RestrictedRunner:
             expires_at=datetime.now(UTC) + timedelta(seconds=min(work.hard_timeout_seconds, 1800)),
             allowed_authority=("return:advisory",), objective_id=record["objective_id"],
             stage_id=record["stage_id"], causation_id=record["causation_id"],
+            response_format={"type": "json_object"},
         )
         provider = HermesReasoningProvider(
             provider_id="hermes:codex.engineering.v1", resource_class_ref=f"codex:{work.seat_id}",
@@ -191,8 +192,11 @@ class RestrictedRunner:
             "evidence_requirements": list(request.evidence_requirements), "expires_at": request.expires_at.isoformat(),
             "allowed_authority": list(request.allowed_authority), "objective_id": str(request.objective_id),
             "stage_id": str(request.stage_id), "causation_id": str(request.causation_id) if request.causation_id else None,
+            "response_format": request.response_format,
         }})
         result = HermesCampaignRoleExecutor(provider).execute(routed)
+        if result.get("semantic_outcome") is None:
+            raise RuntimeError("RIV-CAM-HERMES-0020: engineering result omitted structured semantic_outcome.")
         result.update({"execution_class": "codex.engineering.v1", "execution_mode": "hermes-http", "codex_seat_id": work.seat_id})
         self.store.complete_fenced(self._identity(work), result)
         return result

@@ -13,7 +13,7 @@ def main() -> None:
     token = os.environ.get("RIVERVIEW_OPENWEBUI_TOKEN", "")
     if not token:
         raise RuntimeError("RIV-UI-0009: service token must be supplied through the process environment.")
-    adapter = OllamaReasoningAdapter()
+    adapter = OllamaReasoningAdapter(timeout_seconds=300)
     service = RiverviewOpenWebUIService(
         OpenWebUIConfig(port=18082, service_identity="riverview-openwebui", bearer_token=token, home_cognition_enabled=True),
         lambda model, request: adapter.complete(model, request),
