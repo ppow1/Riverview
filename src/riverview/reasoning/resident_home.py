@@ -32,6 +32,7 @@ _DECISION_FORMAT = {
         "arguments": {"type": "object"},
         "assertion_mode": {"type": "string", "enum": ["general", "institutional"]},
         "claims": {"type": "array", "maxItems": 8, "items": {"type": "object"}},
+        "epistemic_spans": {"type": "array", "maxItems": 32, "items": {"type": "object"}},
     },
     "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "claims"],
     "additionalProperties": False,
@@ -102,6 +103,7 @@ class ResidentHomeTurn:
             "second_pass": "completed" if self.run.model_passes == 2 else None,
             "authority_scope": ["return:advisory"],
             "role_authority_expanded": False,
+            "epistemic": self.run.epistemic,
         }
 
 

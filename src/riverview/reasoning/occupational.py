@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Callable, Mapping
 from uuid import UUID, uuid4
+from .epistemic import EpistemicSpan, ProvenanceRecord, build_epistemic_metadata
 
 MAX_ARGUMENT_BYTES = 16_000
 MAX_RESULT_BYTES = 32_000
@@ -240,6 +241,26 @@ class ResidentOccupationalRun:
     tool_result: ResidentCapabilityResult | None
     final_answer: str
     model_passes: int
+    epistemic: dict[str, Any] | None = None
+
+
+def _epistemic(value: Mapping[str, Any], answer: str) -> dict[str, Any] | None:
+    raw = value.get("epistemic_spans")
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        raise ValueError("RIV-OCC-0005: epistemic spans must be an array.")
+    spans = []
+    for item in raw:
+        if not isinstance(item, Mapping):
+            raise ValueError("RIV-OCC-0005: epistemic span must be an object.")
+        provenance = []
+        for record in item.get("provenance", ()):
+            if not isinstance(record, Mapping):
+                raise ValueError("RIV-OCC-0005: epistemic provenance must be an object.")
+            provenance.append(ProvenanceRecord(source_class=str(record.get("source_class", "")), evidence_ref=str(record.get("evidence_ref", "")), freshness=record.get("freshness"), capability=record.get("capability"), source_refs=tuple(str(x) for x in record.get("source_refs", ()))))
+        spans.append(EpistemicSpan(span_id=str(item.get("span_id", "")), start=int(item.get("start", -1)), end=int(item.get("end", -1)), mask=int(item.get("mask", -1)), provenance=tuple(provenance)))
+    return build_epistemic_metadata(spans, response_text=answer)
 
 
 class ResidentOccupationalReasoner:
@@ -283,9 +304,11 @@ class ResidentOccupationalReasoner:
                 if review.get("decision") == "capability" and isinstance(reviewed_id, str) and reviewed_id.strip():
                     first, capability_id, decision, extra_passes = review, reviewed_id, "capability", 1
                 else:
-                    return ResidentOccupationalRun(correlation_id, review, None, self._answer(review), 2)
+                    answer = self._answer(review)
+                    return ResidentOccupationalRun(correlation_id, review, None, answer, 2, _epistemic(review, answer))
             else:
-                return ResidentOccupationalRun(correlation_id, first, None, self._answer(first), 1)
+                answer = self._answer(first)
+                return ResidentOccupationalRun(correlation_id, first, None, answer, 1, _epistemic(first, answer))
         if decision != "capability":
             raise ValueError("RIV-OCC-0005: model decision must be answer or capability.")
         arguments = first.get("arguments", {})
@@ -330,7 +353,8 @@ class ResidentOccupationalReasoner:
         })
         if second.get("decision") not in {"answer", "synthesis"}:
             raise ValueError("RIV-OCC-0005: second model pass must synthesize an answer.")
-        return ResidentOccupationalRun(correlation_id, first, tool_result, self._answer(second), 2 + extra_passes)
+        answer = self._answer(second)
+        return ResidentOccupationalRun(correlation_id, first, tool_result, answer, 2 + extra_passes, _epistemic(second, answer))
 
     def _model(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         value = self.model(payload)

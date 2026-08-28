@@ -252,6 +252,7 @@ class ResidentConversationGateway:
                 provider_id=turn.provider_id, response_type="advice", summary=turn.run.final_answer,
                 evidence_refs=tuple(dict.fromkeys((*turn.state.evidence_refs, *tool_evidence, *turn.package.provenance_refs))),
                 classification=turn.state.classification, created_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+                epistemic=turn.run.epistemic,
             )
             session.history.append({"role": "user", "text": instruction})
             session.history.append({"role": "resident", "text": response.summary})

@@ -12,6 +12,7 @@ from riverview.reasoning.occupational import (
     ResidentOfficeCapabilityPackage,
     ResidentOccupationalReasoner,
 )
+from riverview.reasoning.epistemic import REASONED, VERIFIED
 
 
 RESIDENT = uuid4()
@@ -167,13 +168,14 @@ def test_model_selects_capability_and_receives_result_on_second_pass():
             return {"decision": "capability", "capability_id": descriptor.capability_id, "arguments": {}}
         assert payload["tool_result"]["status"] == "SUCCESS"
         assert payload["tool_result"]["value"]["items"][0]["state"] == "active"
-        return {"decision": "answer", "answer": "Alpha is active."}
+        return {"decision": "answer", "answer": "Alpha is active.", "epistemic_spans": [{"span_id": "alpha", "start": 0, "end": 5, "mask": VERIFIED | REASONED, "provenance": [{"source_class": "live_telemetry", "evidence_ref": "work://alpha", "freshness": "current"}]}]}
 
     run = ResidentOccupationalReasoner(pkg, model).run("What is currently moving?", correlation_id=uuid4())
     assert phases == ["first", "second"]
     assert run.tool_result is not None
     assert run.tool_result.status is CapabilityResultStatus.SUCCESS
     assert run.final_answer == "Alpha is active."
+    assert run.epistemic["summary_mask"] == VERIFIED | REASONED
 
 
 def test_model_can_answer_without_selecting_a_tool():
