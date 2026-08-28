@@ -261,7 +261,7 @@ def _epistemic(value: Mapping[str, Any], answer: str, *, allowed_evidence: tuple
             provenance.append(ProvenanceRecord(source_class=str(record.get("source_class", "")), evidence_ref=str(record.get("evidence_ref", "")), freshness=record.get("freshness"), capability=record.get("capability"), source_refs=tuple(str(x) for x in record.get("source_refs", ()))))
         mask = int(item.get("mask", -1))
         if mask & VERIFIED and (not provenance or any(record.evidence_ref not in allowed_evidence for record in provenance)):
-            raise ValueError("RIV-OCC-0005: VERIFIED epistemic span lacks matching authoritative evidence.")
+            raise ValueError(f"RIV-OCC-0005: VERIFIED epistemic span lacks matching authoritative evidence (declared={[record.evidence_ref for record in provenance]!r}, allowed={list(allowed_evidence)!r}).")
         if mask & CANON and (not provenance or any(record.source_class not in {"canon", "institutional", "postgresql", "repository"} or record.evidence_ref not in allowed_evidence for record in provenance)):
             raise ValueError("RIV-OCC-0005: CANON epistemic span lacks matching canonical evidence.")
         spans.append(EpistemicSpan(span_id=str(item.get("span_id", "")), start=int(item.get("start", -1)), end=int(item.get("end", -1)), mask=mask, provenance=tuple(provenance)))
