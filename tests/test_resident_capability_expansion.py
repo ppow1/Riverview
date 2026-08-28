@@ -83,3 +83,18 @@ def test_typed_capability_request_wins_over_contradictory_prose_decision():
     assert run.tool_result.status is CapabilityResultStatus.SUCCESS
     assert run.model_passes == 2
     assert len(calls) == 2
+
+
+def test_engineering_prepare_catalog_exposes_authoritative_contract_shape():
+    from riverview.residents.occupational_packages import build_grace_operations_package
+
+    class Profile:
+        resident_id = str(uuid4())
+        name = "Grace"
+        role = "Director of Operations"
+        classification = "operational"
+
+    package = build_grace_operations_package(Profile(), uuid4(), uuid4(), (Profile(),))
+    descriptor = next(item for item in package.catalog() if item["capability_id"] == "operations.engineering-request.prepare")
+    contract = descriptor["input_schema"]["properties"]["proposal"]["properties"]["formation_contract"]
+    assert set(contract["required"]) == {"repository_identity", "repository_root", "expected_base_sha", "bounded_instruction", "allowed_paths", "acceptance_criteria", "evidence_requirements", "capability_name", "action_type", "timeout_seconds", "write_policy"}

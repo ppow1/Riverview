@@ -18,6 +18,26 @@ if TYPE_CHECKING:
 from riverview.reasoning.occupational import ResidentCapabilityDescriptor, ResidentCapabilityRequest, ResidentOfficeCapabilityPackage
 
 
+_ENGINEERING_FORMATION_CONTRACT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "repository_identity": {"type": "string"},
+        "repository_root": {"type": "string"},
+        "expected_base_sha": {"type": "string"},
+        "bounded_instruction": {"type": "string"},
+        "allowed_paths": {"type": "array", "items": {"type": "string"}},
+        "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+        "evidence_requirements": {"type": "array", "items": {"type": "string"}},
+        "capability_name": {"type": "string"},
+        "action_type": {"type": "string"},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+        "write_policy": {"type": "string"},
+    },
+    "required": ["repository_identity", "repository_root", "expected_base_sha", "bounded_instruction", "allowed_paths", "acceptance_criteria", "evidence_requirements", "capability_name", "action_type", "timeout_seconds", "write_policy"],
+    "additionalProperties": False,
+}
+
+
 def _limit(request: ResidentCapabilityRequest, default: int = 12) -> int:
     value = request.arguments.get("limit", default)
     return max(1, min(int(value), 50)) if isinstance(value, (int, float)) and not isinstance(value, bool) else default
@@ -167,7 +187,7 @@ def build_grace_operations_package(profile: ResidentProfile, office_id: UUID, im
         _descriptor("operations.diagnostics.lookup", "Diagnostics", "Read bounded current diagnostic evidence and related recovery references.", _grace_diagnostics, classification=profile.classification, evidence=("riverview://diagnostics",)),
         _descriptor("operations.attention.read", "Steward attention", "Read pending and acknowledged Steward attention without acceptance authority.", _grace_attention, classification=profile.classification, evidence=("riverview://steward-attention",)),
         _descriptor("operations.roadmap.read", "Roadmap", "Read the current authoritative roadmap position and revision.", _grace_roadmap, classification=profile.classification, evidence=("riverview://roadmap",)),
-        _descriptor("operations.engineering-request.prepare", "Engineering request preparation", "Prepare a typed governed engineering request for Steward review without execution.", _grace_prepare, classification=profile.classification, authority="PROPOSE", input_schema={"type": "object", "properties": {"proposal": {"type": "object", "properties": {"content": {"type": "string"}, "summary": {"type": "string"}, "formation_contract": {"type": "object"}}, "required": ["content", "summary", "formation_contract"], "additionalProperties": False}}, "required": ["proposal"], "additionalProperties": False}, evidence=("riverview://engineering-formation",)),
+        _descriptor("operations.engineering-request.prepare", "Engineering request preparation", "Prepare a typed governed engineering request for Steward review without execution.", _grace_prepare, classification=profile.classification, authority="PROPOSE", input_schema={"type": "object", "properties": {"proposal": {"type": "object", "properties": {"content": {"type": "string"}, "summary": {"type": "string"}, "formation_contract": _ENGINEERING_FORMATION_CONTRACT_SCHEMA}, "required": ["content", "summary", "formation_contract"], "additionalProperties": False}}, "required": ["proposal"], "additionalProperties": False}, evidence=("riverview://engineering-formation",)),
     )
     return ResidentOfficeCapabilityPackage("grace-operations-v1", "1.0.0", UUID(profile.resident_id), UUID(profile.resident_id), UUID(str(office_id)), UUID(str(implementation_id)), profile.name, profile.role, "Coordinate bounded Riverview operations and progression.", ("observe operational state", "advise on progression", "prepare governed proposals"), ("riverview://office/operations",), ("riverview://cme-runtime-status", "riverview://capability/codex.engineering.v1"), capabilities, ("read:bounded", "return:advisory"), ("cookbook://operations",), profile.classification, 300, "institutional evidence outranks generic priors", "bounded operational metadata only", ("grace-authority:v1", "resident-continuity:operations"))
 
