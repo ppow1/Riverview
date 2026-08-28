@@ -1026,7 +1026,7 @@ class RiverviewOpenWebUIService:
                     provider_failure = "RIV-REASON-0002" in str(exc)
                     checkpoint = "RIV-RES-0002" if resident_id else "RIV-UI-0009"
                     diagnostic(checkpoint, "resident_chat" if resident_id else "operator_chat", "resident_provider_failure" if resident_id else "bounded_request_failure", f"Bounded operator request failed: {type(exc).__name__}: {str(exc)[:240]}")
-                    self._send(HTTPStatus.BAD_REQUEST, {"error": "bounded_request_rejected", "checkpoint": checkpoint, "cause_checkpoint": "RIV-REASON-0002" if provider_failure else "unavailable"})
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": "bounded_request_rejected", "checkpoint": checkpoint, "cause_checkpoint": "RIV-REASON-0002" if provider_failure else "unavailable", "reason": str(exc)[:240]})
 
             def do_PATCH(self) -> None:
                 if self._auth() and self.path.startswith("/api/rooms/"):
