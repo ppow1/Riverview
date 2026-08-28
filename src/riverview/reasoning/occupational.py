@@ -275,7 +275,7 @@ class ResidentOccupationalReasoner:
             "phase": "second", "question": question.strip(), "conversation_context": list(conversation_context),
             "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},
             "tool_result": tool_result.as_payload(),
-            "instructions": "Reason over the authoritative capability result. Distinguish empty, unavailable, denied, stale, timeout, malformed, and backend failure. Return a natural resident-facing answer only.",
+            "instructions": "This is the mandatory final continuation pass. Do not request another capability. Reason over the authoritative capability result, distinguish canon from unknown/proposal, and return decision=answer with a natural resident-facing answer only.",
         })
         if second.get("decision") not in {"answer", "synthesis"}:
             raise ValueError("RIV-OCC-0005: second model pass must synthesize an answer.")
