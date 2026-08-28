@@ -198,7 +198,14 @@ class ResidentHomeCognitionService:
             try:
                 value = json.loads(response.summary)
             except (json.JSONDecodeError, TypeError) as exc:
-                raise RuntimeError("RIV-HOME-0002: Qwen returned malformed structured HOME decision") from exc
+                if phase == "structured_repair":
+                    raise RuntimeError("RIV-HOME-0002: Qwen structured-output repair remained malformed") from exc
+                repair_request = replace(request, request_id=uuid4(), instruction=json.dumps({"phase": "structured_repair", "schema": _DECISION_FORMAT, "parse_error": str(exc)[:240], "malformed_output": response.summary[:8000], "instructions": "Return ONLY one complete JSON object conforming to the supplied schema. Repair syntax only; preserve the substantive answer and epistemic metadata. Do not add commentary, markdown fences, or invented evidence references."}, default=str, separators=(",", ":")))
+                repaired = self.provider(bound_model, repair_request)
+                try:
+                    value = json.loads(repaired.summary)
+                except (json.JSONDecodeError, TypeError) as repair_error:
+                    raise RuntimeError("RIV-HOME-0002: Qwen structured-output repair remained malformed") from repair_error
             if not isinstance(value, dict):
                 raise RuntimeError("RIV-HOME-0002: Qwen HOME decision is not an object")
             if phase == "first" and ("assertion_mode" not in value or "claims" not in value):
