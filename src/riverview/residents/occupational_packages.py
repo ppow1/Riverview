@@ -23,10 +23,10 @@ _ENGINEERING_FORMATION_CONTRACT_SCHEMA = {
     "type": "object",
     "properties": {
         "repository_identity": {"type": "string", "enum": ["ppow1/Riverview", "Riverview standalone"]},
-        "repository_root": {"type": "string", "description": "Approved repository root; do not invent a different checkout."},
-        "expected_base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "repository_root": {"type": "string", "description": "Approved repository root; use the active Riverview checkout and do not invent a different workspace.", "examples": ["A:/Riverview/standalone"]},
+        "expected_base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$", "description": "The exact active repository HEAD, not a placeholder."},
         "bounded_instruction": {"type": "string", "description": "One bounded non-shell instruction; proposal preparation does not execute it."},
-        "allowed_paths": {"type": "array", "description": "Non-empty repository-relative paths only; never absolute paths, parent traversal, or .git paths. Use a narrow existing path when read_only is appropriate.", "items": {"type": "string", "pattern": "^(?!/)(?!\\\\)(?!.*\\.\\.)((?!\\.git(?:/|$)).)+$"}},
+        "allowed_paths": {"type": "array", "description": "Non-empty paths relative to repository_root only; never absolute paths, invented external workspaces, parent traversal, or .git paths. For read_only proposal preparation, use a narrow existing documentation path such as docs/operations/GRACE_ENGINEERING_TASK_SUBMISSION_TEMPLATE.md.", "examples": [["docs/operations/GRACE_ENGINEERING_TASK_SUBMISSION_TEMPLATE.md"]], "items": {"type": "string", "pattern": "^(?!/)(?!\\\\)(?!.*\\.\\.)((?!\\.git(?:/|$)).)+$"}},
         "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
         "evidence_requirements": {"type": "array", "items": {"type": "string"}},
         "capability_name": {"const": ENGINEERING_CAPABILITY},
