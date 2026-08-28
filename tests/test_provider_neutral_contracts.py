@@ -1,6 +1,7 @@
 import json
 from datetime import UTC, datetime
 from uuid import uuid4
+from urllib.error import HTTPError
 
 import pytest
 
@@ -72,6 +73,23 @@ def test_ollama_adapter_forwards_bounded_response_format(monkeypatch: pytest.Mon
     assert captured["body"]["format"] == {"type": "object"}
     assert captured["body"]["options"] == {"temperature": 0, "seed": 7, "num_predict": 2048}
     assert response.summary == "bounded"
+
+
+def test_ollama_cuda_allocation_failure_is_typed_provider_resource_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_urlopen(request, timeout):
+        raise HTTPError(request.full_url, 500, "provider failure", {}, _Body())
+
+    class _Body:
+        def read(self, _limit: int) -> bytes:
+            return b'{"error":"llama-server reported out-of-memory during startup: cudaMalloc failed"}'
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr("riverview.reasoning.ollama.urlopen", fail_urlopen)
+    request = ReasoningRequest(uuid4(), uuid4(), "advice", "hello", (), "operational", "advice-v1", (), datetime.now(UTC), ("read:bounded",))
+    with pytest.raises(RuntimeError, match="RIV-REASON-0003.*provider resource unavailable"):
+        OllamaReasoningAdapter().complete("qwen3-coder:30b-qwencode-20k", request)
 
 
 def test_gpu_adapter_identity_is_closed() -> None:
