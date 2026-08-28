@@ -284,6 +284,26 @@ class ResidentOccupationalReasoner:
             call_index=1, call_budget=self.call_budget,
         )
         tool_result = self.broker.execute(request)
+        if tool_result.status is CapabilityResultStatus.BACKEND_FAILURE and self.call_budget >= 2:
+            repair = self._model({
+                "phase": "repair", "question": question.strip(), "conversation_context": list(conversation_context),
+                "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},
+                "capability_catalog": self.package.catalog(), "previous_capability_request": {"capability_id": capability_id, "arguments": dict(arguments)},
+                "tool_result": tool_result.as_payload(),
+                "instructions": "Repair the same named capability request using the authoritative failure reason and exact active input schema. Return decision=capability with complete typed arguments, or decision=answer only when the capability cannot be repaired without missing legitimate domain information. Do not substitute another capability.",
+            })
+            repaired_id = repair.get("capability_id")
+            repaired_args = repair.get("arguments", {})
+            if isinstance(repaired_id, str) and repaired_id.strip() and isinstance(repaired_args, Mapping) and repaired_id == capability_id:
+                repaired_request = ResidentCapabilityRequest(
+                    request_id=uuid4(), correlation_id=correlation_id, resident_id=self.package.resident_id,
+                    occupant_id=self.package.occupant_id, office_id=self.package.office_id,
+                    implementation_id=self.package.implementation_id, package_id=self.package.package_id,
+                    package_version=self.package.package_version, capability_id=repaired_id,
+                    arguments=dict(repaired_args), classification=self.package.classification, authority=authority,
+                    call_index=2, call_budget=self.call_budget,
+                )
+                tool_result = self.broker.execute(repaired_request)
         second = self._model({
             "phase": "second", "question": question.strip(), "conversation_context": list(conversation_context),
             "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},

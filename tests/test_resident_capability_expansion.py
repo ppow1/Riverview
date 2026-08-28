@@ -120,3 +120,28 @@ def test_engineering_prepare_maps_operational_resident_classification_to_interna
     request = replace(request, classification="operational")
     _grace_prepare(request)
     assert seen["classification"] == "internal"
+
+
+def test_bounded_contract_failure_gets_one_model_repair_before_synthesis():
+    attempts = 0
+
+    def handler(request: ResidentCapabilityRequest) -> dict[str, Any]:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("RIV-INT-0004: formation contract lists are bounded string lists")
+        return {"items": [{"repaired": True}]}
+
+    package = _package(handler)
+    phases = []
+
+    def model(payload: dict[str, Any]) -> dict[str, Any]:
+        phases.append(payload["phase"])
+        if payload["phase"] in {"first", "repair"}:
+            return {"decision": "capability", "answer": None, "capability_id": "office.read", "arguments": {}}
+        return {"decision": "answer", "answer": "The repaired authoritative result is available.", "capability_id": None, "arguments": {}}
+
+    run = ResidentOccupationalReasoner(package, model).run("Proceed.", correlation_id=uuid4())
+    assert run.tool_result is not None
+    assert run.tool_result.status is CapabilityResultStatus.SUCCESS
+    assert phases == ["first", "repair", "second"]

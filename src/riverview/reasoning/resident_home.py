@@ -166,7 +166,7 @@ class ResidentHomeCognitionService:
             raise RuntimeError("RIV-HOME-0002: resident implementation provider is not Ollama")
         def model(payload: Mapping[str, Any]) -> Mapping[str, Any]:
             phase = str(payload["phase"])
-            catalog = payload.get("capability_catalog", package.catalog()) if phase == "first" else []
+            catalog = payload.get("capability_catalog", package.catalog()) if phase in {"first", "repair"} else []
             tool_result = payload.get("tool_result")
             if tool_result is not None:
                 tool_result = json.loads(json.dumps(tool_result, default=str))
