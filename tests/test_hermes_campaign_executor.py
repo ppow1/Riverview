@@ -18,8 +18,9 @@ class FakeHermes:
     provider_id = "hermes:test"
     resource_class_ref = "hermes:local-test"
 
-    def __init__(self, summary: str):
+    def __init__(self, summary: str, semantic_outcome: str | None = None):
         self.summary = summary
+        self.semantic_outcome = semantic_outcome
         self.requests = []
 
     def generate(self, request):
@@ -28,6 +29,7 @@ class FakeHermes:
             uuid4(), request.request_id, request.correlation_id, self.provider_id,
             "analysis", self.summary, ("hermes:test:evidence",), request.classification,
             datetime.now(UTC),
+            semantic_outcome=self.semantic_outcome,
         )
 
 
@@ -84,6 +86,21 @@ def test_campaign_executor_preserves_work_correlation_and_returns_evidence():
     assert result["result_version_hash"] == "sha256:candidate"
     assert result["implementation_ref"] == "candidate://bounded"
     assert hermes.requests[0].correlation_id == work.correlation_id
+
+
+def test_campaign_executor_propagates_provider_semantic_outcome_structurally():
+    hermes = FakeHermes('{"summary":"continue with the next bounded inspection"}', "CONTINUE")
+    result = HermesCampaignRoleExecutor(hermes).execute(_claimed(fenced()))
+    assert result["semantic_outcome"] == "CONTINUE"
+
+
+def test_campaign_executor_preserves_canonical_run_identity_separately_from_response():
+    canonical_run_id = uuid4()
+    source = fenced()
+    source = FencedClaimedWork(source.identity, source.action_type, source.action_version, source.parameters, source.hard_timeout_seconds, source.expected_duration_seconds, source.correlation_id, source.seat_id, source.role, canonical_run_id)
+    result = HermesCampaignRoleExecutor(FakeHermes("bounded inspection complete")).execute(_claimed(source))
+    assert result["run_id"] == str(canonical_run_id)
+    assert result["response_id"] != result["run_id"]
 
 
 def test_campaign_validator_output_stays_a_validation_result_not_acceptance():

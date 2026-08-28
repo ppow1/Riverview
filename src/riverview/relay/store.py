@@ -45,6 +45,7 @@ class ClaimedWork:
     seat_id: str | None = None
     role: str | None = None
     correlation_id: UUID | None = None
+    run_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +115,7 @@ class FencedClaimedWork:
     correlation_id: UUID
     seat_id: str
     role: str
+    run_id: UUID | None = None
 
 
 class RelayStore:
@@ -279,6 +281,7 @@ class RelayStore:
         if not role.strip():
             raise ValueError("RIV-WRK-0010: role must not be empty.")
         attempt_id = uuid4()
+        run_id = uuid4()
         fencing_token = uuid4()
         with connect(self._config) as connection, connection.cursor() as cursor:
             claim_sql = """SELECT w.work_order_id, w.action_type, w.action_version, w.parameters,
@@ -318,10 +321,10 @@ class RelayStore:
                 """INSERT INTO work_order_attempts(
                     attempt_id, work_order_id, attempt, worker_id, lease_generation,
                     fencing_token, worker_instance_id, seat_id, role,
-                    last_heartbeat_at
-                ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,now())""",
+                    last_heartbeat_at, run_id
+                ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,now(),%s)""",
                 (attempt_id, row[0], attempt, worker_id, attempt, fencing_token,
-                 worker_instance_id, seat_id, role),
+                 worker_instance_id, seat_id, role, run_id),
             )
             cursor.execute(
                 """UPDATE work_orders
@@ -342,13 +345,13 @@ class RelayStore:
                 correlation_id=self._correlation(cursor, row[0]),
                 payload={"attempt_id": str(attempt_id), "lease_generation": attempt,
                          "fencing_token": str(fencing_token),
-                         "worker_instance_id": str(worker_instance_id),
+                         "worker_instance_id": str(worker_instance_id), "run_id": str(run_id),
                          "seat_id": seat_id, "role": role},
                 idempotency_key=f"runner.attempt.claimed:{attempt_id}",
             )
             return FencedClaimedWork(
                 AttemptIdentity(row[0], attempt_id, attempt, fencing_token, worker_instance_id),
-                row[1], row[2], row[3], row[4], row[5], row[6], seat_id, role,
+                row[1], row[2], row[3], row[4], row[5], row[6], seat_id, role, run_id,
             )
 
     def claim(self, worker_id: str, lease_seconds: int = 30, *,
@@ -376,6 +379,7 @@ class RelayStore:
             seat_id=claim.seat_id,
             role=claim.role,
             correlation_id=claim.correlation_id,
+            run_id=claim.run_id,
         )
 
     @staticmethod

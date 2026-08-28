@@ -74,9 +74,11 @@ class HermesCampaignRoleExecutor:
             "role": work.role,
             "provider_id": response.provider_id,
             "resource_class_ref": provider.resource_class_ref,
+            "run_id": str(work.run_id) if work.run_id else None,
             "response_id": str(response.response_id),
             "evidence_refs": list(response.evidence_refs),
             "summary": response.summary[:8_000],
+            "semantic_outcome": response.semantic_outcome,
         }
         for key in ("candidate_identity", "validation_basis_hash", "implementation_ref"):
             if key in work.parameters:

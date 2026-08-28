@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 from riverview.database import connect
 from riverview.relay import AttemptIdentity, ClaimedWork, FenceNotCurrentError, RelayStore
 from riverview.relay.store import FencedClaimedWork
+from riverview.resources.control import DurableResourcePlanner, ResourceControlError, SeatClaim, SeatClaimStore
 from riverview.river.events import Classification, RiverEvent
 
 from .lifecycle import CampaignLifecycleStore, DefectInput, LifecycleGateError
@@ -80,7 +81,7 @@ def _claimed(work: FencedClaimedWork) -> ClaimedWork:
         work.identity.work_order_id, work.action_type, work.action_version, work.parameters,
         work.hard_timeout_seconds, 0, work.identity.attempt_id, work.identity.lease_generation,
         work.identity.fencing_token, work.identity.worker_instance_id, work.seat_id, work.role,
-        work.correlation_id,
+        work.correlation_id, work.run_id,
     )
 
 
@@ -97,6 +98,8 @@ class CampaignOneGoRunner:
         objective_id: UUID | None = None,
         max_steps: int = 100,
         attention_delivery: Callable[[str], dict[str, Any]] | None = None,
+        resource_planner: DurableResourcePlanner | None = None,
+        resource_claim_store: SeatClaimStore | None = None,
     ) -> None:
         if not workers or max_steps < 1:
             raise ValueError(f"{ONE_GO_CHECKPOINT}: workers and positive max_steps are required.")
@@ -111,6 +114,10 @@ class CampaignOneGoRunner:
         self.objective_id = objective_id
         self.max_steps = max_steps
         self.attention_delivery = attention_delivery
+        if (resource_planner is None) != (resource_claim_store is None):
+            raise ValueError(f"{ONE_GO_CHECKPOINT}: resource planner and claim store must be supplied together.")
+        self.resource_planner = resource_planner
+        self.resource_claim_store = resource_claim_store
 
     def run(self, *, max_steps: int | None = None) -> tuple[dict[str, Any], ...]:
         """Run a bounded number of persisted role transitions, then return history."""
@@ -150,24 +157,49 @@ class CampaignOneGoRunner:
         """Claim and advance at most one exact fenced role attempt."""
         for worker in self.workers:
             for role in worker.roles:
-                if self.objective_id is not None:
-                    claimed = self.relay.claim_fenced(
-                        worker.worker_id, worker.worker_instance_id,
-                        seat_id=worker.seat_id, role=role,
-                        allow_internal=True,
-                        objective_id=self.objective_id,
-                    )
-                else:
-                    claimed = self.relay.claim_fenced(
-                        worker.worker_id, worker.worker_instance_id,
-                        seat_id=worker.seat_id, role=role,
-                        allow_internal=True,
-                    )
+                resource_claim: SeatClaim | None = None
+                selected_seat = worker.seat_id
+                reservation_id = f"campaign-reservation:{uuid4()}"
+                if self.resource_planner is not None and self.resource_claim_store is not None:
+                    try:
+                        if selected_seat.strip().upper() == "AUTO":
+                            resource_claim, _ = self.resource_planner.claim_automatic(
+                                reservation_id, worker.worker_id, role=role,
+                            )
+                            selected_seat = resource_claim.seat_id
+                        else:
+                            resource_claim = self.resource_claim_store.claim(
+                                selected_seat, reservation_id, worker.worker_id,
+                            )
+                    except ResourceControlError as exc:
+                        if selected_seat.strip().upper() != "AUTO":
+                            raise OneGoError(f"{ONE_GO_CHECKPOINT}-0007: explicit seat {selected_seat} is unavailable.") from exc
+                        continue
+                try:
+                    if self.objective_id is not None:
+                        claimed = self.relay.claim_fenced(worker.worker_id, worker.worker_instance_id, seat_id=selected_seat, role=role, allow_internal=True, objective_id=self.objective_id)
+                    else:
+                        claimed = self.relay.claim_fenced(worker.worker_id, worker.worker_instance_id, seat_id=selected_seat, role=role)
+                except Exception:
+                    if resource_claim is not None:
+                        self.resource_claim_store.release(resource_claim.claim_id, reason="work admission failed", failed=True)
+                    raise
                 if claimed is None:
+                    if resource_claim is not None:
+                        self.resource_claim_store.release(resource_claim.claim_id, reason="no work admitted")
                     continue
                 work = _claimed(claimed)
+                resource_failed = False
                 try:
+                    if resource_claim is not None:
+                        if work.seat_id != selected_seat:
+                            raise OneGoError(f"{ONE_GO_CHECKPOINT}-0006: claimed seat differs from admitted work seat.")
+                        self.resource_claim_store.attach_work(resource_claim.claim_id, str(work.work_order_id))
+                    if resource_claim is not None:
+                        self.resource_claim_store.transition(resource_claim.claim_id, "starting")
                     self.lifecycle.mark_running(work)
+                    if resource_claim is not None:
+                        self.resource_claim_store.transition(resource_claim.claim_id, "running")
                     execution = self.executors[role](work)
                     if not isinstance(execution, dict) or execution.get("status") != "succeeded":
                         raise OneGoError(f"{ONE_GO_CHECKPOINT}-0002: role executor did not return a successful result.")
@@ -176,15 +208,26 @@ class CampaignOneGoRunner:
                     transition = self._advance_completed(role, work, execution)
                     return {"status": "succeeded", "role": role, "work_order_id": str(work.work_order_id), "transition": transition}
                 except FenceNotCurrentError as exc:
+                    resource_failed = True
                     return {"status": "stale", "role": role, "work_order_id": str(work.work_order_id), "checkpoint_id": "RIV-WRK-0003", "reason": str(exc)}
                 except RuntimeError as exc:
                     if "RIV-WRK-0003" in str(exc):
+                        resource_failed = True
                         return {"status": "stale", "role": role, "work_order_id": str(work.work_order_id), "checkpoint_id": "RIV-WRK-0003", "reason": str(exc)}
+                    resource_failed = True
                     self._deliver_attention(self._fail_if_current(work, str(exc)))
                     return {"status": "failed", "role": role, "work_order_id": str(work.work_order_id), "checkpoint_id": self._checkpoint(exc), "reason": str(exc)}
                 except (LifecycleGateError, OneGoError, RuntimeError, TypeError, ValueError) as exc:
+                    resource_failed = True
                     self._deliver_attention(self._fail_if_current(work, str(exc)))
                     return {"status": "failed", "role": role, "work_order_id": str(work.work_order_id), "checkpoint_id": self._checkpoint(exc), "reason": str(exc)}
+                finally:
+                    if resource_claim is not None:
+                        self.resource_claim_store.release(
+                            resource_claim.claim_id,
+                            reason="execution failed" if resource_failed else "execution completed",
+                            failed=resource_failed,
+                        )
         return None
 
     def _scoped_work_order_id(self, worker: WorkerSlot, role: str) -> UUID | None:

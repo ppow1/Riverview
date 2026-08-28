@@ -220,6 +220,7 @@ class HermesReasoningProvider:
                 for value in authority_scope
             ):
                 raise HermesPolicyViolationError("Hermes advisory attempted an authority override")
+        semantic_outcome = structured_content.get("semantic_outcome") if isinstance(structured_content, dict) else None
         model_label = returned_model.strip() if isinstance(returned_model, str) and returned_model.strip() else self.model_ref or "configured"
         response_id = uuid4()
         evidence = (
@@ -242,6 +243,7 @@ class HermesReasoningProvider:
             evidence_refs=evidence,
             classification=request.classification,
             created_at=datetime.now(UTC),
+            semantic_outcome=semantic_outcome,
         )
 
 

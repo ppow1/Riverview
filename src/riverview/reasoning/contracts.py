@@ -13,6 +13,7 @@ from uuid import UUID
 CONTRACT_VERSION = "riverview-reasoning-v1"
 REQUEST_TYPES = frozenset({"advice", "analysis", "decision_proposal", "diagnostic"})
 RESPONSE_TYPES = frozenset({"advice", "analysis", "decision_proposal", "escalation", "diagnostic_recommendation"})
+SEMANTIC_OUTCOMES = frozenset({"CONTINUE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"})
 ALLOWED_CLASSIFICATIONS = frozenset({"public", "operational", "private", "river", "internal"})
 MAX_INSTRUCTION = 16_000
 MAX_SUMMARY = 8_000
@@ -98,6 +99,7 @@ class ReasoningResponse:
     classification: str
     created_at: datetime
     contract_version: str = CONTRACT_VERSION
+    semantic_outcome: str | None = None
 
     def __post_init__(self) -> None:
         if self.response_type not in RESPONSE_TYPES:
@@ -106,6 +108,8 @@ class ReasoningResponse:
         _bounded_text(self.summary, "summary", MAX_SUMMARY)
         if self.classification not in ALLOWED_CLASSIFICATIONS:
             raise ValueError("RIV-SEC-0001: response classification is closed.")
+        if self.semantic_outcome is not None and self.semantic_outcome not in SEMANTIC_OUTCOMES:
+            raise ValueError("RIV-REASON-0001: semantic outcome is unsupported.")
         if not 1 <= len(self.evidence_refs) <= MAX_REFS or not all(
             isinstance(item, str) and item.strip() for item in self.evidence_refs
         ):
@@ -123,4 +127,5 @@ class ReasoningResponse:
             "evidence_refs": list(self.evidence_refs),
             "classification": self.classification,
             "created_at": self.created_at.isoformat(),
+            "semantic_outcome": self.semantic_outcome,
         }
