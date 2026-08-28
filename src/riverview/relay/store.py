@@ -238,6 +238,24 @@ class RelayStore:
             self._append_event(cursor, event_type="work.order.duplicate_reconciled", work_order_id=duplicate_work_order_id, correlation_id=duplicate[0], payload={"canonical_work_order_id": str(canonical_work_order_id), "reason": reason, "reconciled_by": reconciled_by}, idempotency_key=f"work.order.duplicate_reconciled:{reconciliation_id}")
             return {"duplicate_work_order_id": str(duplicate_work_order_id), "canonical_work_order_id": str(canonical_work_order_id), "status": "cancelled", "reconciliation_id": str(reconciliation_id), "idempotent_replay": False}
 
+    def repair_queued_lineage(self, work_order_id: UUID, *, root_task_id: UUID, correlation_id: UUID, objective_id: UUID, stage_id: UUID, engineering_intent_id: UUID) -> dict[str, Any]:
+        """Repair only an unstarted exact-intent order whose lineage is incomplete."""
+        with connect(self._config) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT status,active_attempt_id,correlation_id,engineering_intent_id,parameters FROM work_orders WHERE work_order_id=%s FOR UPDATE", (work_order_id,))
+            row = cursor.fetchone()
+            if row is None or row[0] != "queued" or row[1] is not None or row[2] != correlation_id or row[3] != engineering_intent_id:
+                raise RuntimeError("RIV-WRK-0015: queued lineage repair requires the exact unstarted work order and intent.")
+            parameters = row[4] if isinstance(row[4], dict) else json.loads(row[4])
+            current_root = parameters.get("root_task_id")
+            if current_root is not None and current_root != str(root_task_id):
+                raise ValueError("RIV-LOOP-BIND-0015: queued work order already names another root.")
+            parameters["root_task_id"] = str(root_task_id)
+            cursor.execute("UPDATE work_orders SET objective_id=%s,stage_id=%s,parameters=%s::jsonb,updated_at=now() WHERE work_order_id=%s AND status='queued' AND active_attempt_id IS NULL", (objective_id, stage_id, json.dumps(parameters), work_order_id))
+            if cursor.rowcount != 1:
+                raise RuntimeError("RIV-WRK-0015: queued lineage repair lost its unstarted row.")
+            self._append_event(cursor, event_type="work.order.lineage_repaired", work_order_id=work_order_id, correlation_id=correlation_id, payload={"root_task_id": str(root_task_id), "objective_id": str(objective_id), "stage_id": str(stage_id), "engineering_intent_id": str(engineering_intent_id)}, idempotency_key=f"work.order.lineage_repaired:{work_order_id}")
+            return {"work_order_id": str(work_order_id), "root_task_id": str(root_task_id), "correlation_id": str(correlation_id), "objective_id": str(objective_id), "stage_id": str(stage_id), "status": "queued", "repaired": True}
+
     def enqueue(self, action_type: str, parameters: dict[str, Any], requested_by: str, idempotency_key: str, correlation_id: UUID | None = None, causation_id: UUID | None = None, objective_id: UUID | None = None, stage_id: UUID | None = None) -> WorkOrder:
         """Create one durable order or return the existing idempotent order."""
         with connect(self._config) as connection, connection.cursor() as cursor:
