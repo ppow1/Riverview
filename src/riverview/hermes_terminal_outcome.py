@@ -15,7 +15,7 @@ import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from riverview.hermes_attention import submit_hermes_attention
+from riverview.hermes_attention import submit_hermes_attention, submit_hermes_run_boundary
 
 VERSION = "riverview-hermes-terminal-outcome-v1"
 MARKER_RE = re.compile(
@@ -101,6 +101,7 @@ def process_terminal_outcome(
     session_id: str,
     window_description: str | None = None,
     submit: Callable[..., Mapping[str, Any]] = submit_hermes_attention,
+    run_boundary_submit: Callable[..., Mapping[str, Any]] = submit_hermes_run_boundary,
 ) -> str:
     """Process one normal Hermes final response and return report text.
 
@@ -122,6 +123,19 @@ def process_terminal_outcome(
     try:
         outcome = _text(envelope.get("outcome"), "outcome").upper()
         if outcome in NON_ATTENTION_OUTCOMES:
+            boundary = run_boundary_submit(
+                lane=_text(envelope.get("lane"), "lane"), outcome=outcome,
+                checkpoint_id=_text(envelope.get("checkpoint_id"), "checkpoint_id"),
+                evidence_ref=_text(envelope.get("evidence_ref"), "evidence_ref", limit=2000),
+                session_id=session_id,
+                transition_id=_text(envelope.get("terminal_transition_id"), "terminal_transition_id"),
+                task_title=envelope.get("task_title"), roadmap_title=envelope.get("roadmap_title"),
+                window_description=window_description, correlation_id=envelope.get("correlation_id"),
+                resulting_sha=envelope.get("resulting_sha"),
+            )
+            delivery = boundary.get("delivery") if isinstance(boundary, Mapping) else None
+            if not isinstance(delivery, Mapping):
+                raise TypeError("RIV-HERMES-OUTCOME-0007: run-boundary notification returned no delivery result.")
             return clean
         if outcome not in ATTENTION_OUTCOMES:
             raise ValueError(

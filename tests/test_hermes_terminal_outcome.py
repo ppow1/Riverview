@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from uuid import UUID, uuid4
 
-from riverview.hermes_attention import submit_hermes_attention
+from riverview.hermes_attention import submit_hermes_attention, submit_hermes_run_boundary
 from riverview.hermes_terminal_outcome import (
     attention_speech,
     first_window_word,
@@ -34,6 +34,19 @@ class QueuedDelivery:
         return {"delivered": False, "reason": "notification_not_queued", "state": "delivered"}
 
 
+class FakeEventStore:
+    def __init__(self) -> None:
+        self.events = []
+        self.keys = set()
+
+    def append(self, event):
+        inserted = event.idempotency_key not in self.keys
+        if inserted:
+            self.keys.add(event.idempotency_key)
+            self.events.append(event)
+        return type("Append", (), {"event_id": event.event_id, "inserted": inserted})()
+
+
 def _submit(store, deliver, **overrides):
     values = {
         "lane": "Runtime repair",
@@ -50,6 +63,10 @@ def _submit(store, deliver, **overrides):
 
 
 def _marker(**values: object) -> str:
+    values.setdefault("lane", "Runtime repair")
+    values.setdefault("checkpoint_id", "RIV-HERMES-TEST")
+    values.setdefault("evidence_ref", "evidence://test")
+    values.setdefault("terminal_transition_id", "transition-test")
     return "<!-- RIVERVIEW_TERMINAL_OUTCOME " + json.dumps(values, sort_keys=True) + " -->"
 
 
@@ -175,12 +192,30 @@ def test_all_attention_outcomes_are_automatically_routed():
 def test_continue_completed_step_retryable_failure_and_ordinary_turn_stay_silent():
     calls: list[dict[str, object]] = []
     submit = lambda **kwargs: calls.append(kwargs) or {"delivery": {"state": "delivered"}}
+    boundary_calls: list[dict[str, object]] = []
+    boundary = lambda **kwargs: boundary_calls.append(kwargs) or {"delivery": {"state": "delivered"}}
 
     for outcome in ("CONTINUE", "COMPLETED_NO_ATTENTION"):
-        assert process_terminal_outcome(_marker(outcome=outcome), session_id="session-1", submit=submit) == ""
+        assert process_terminal_outcome(_marker(outcome=outcome), session_id="session-1", submit=submit, run_boundary_submit=boundary) == ""
     assert process_terminal_outcome("ordinary completed Hermes response", session_id="session-1", submit=submit) == "ordinary completed Hermes response"
     assert process_terminal_outcome("retryable failure; retrying", session_id="session-1", submit=submit) == "retryable failure; retrying"
     assert calls == []
+    assert [item["outcome"] for item in boundary_calls] == ["CONTINUE", "COMPLETED_NO_ATTENTION"]
+
+
+def test_continue_run_boundary_is_informational_task_specific_and_idempotent():
+    store = FakeStore()
+    events = FakeEventStore()
+    delivery = QueuedDelivery()
+    kwargs = {"lane": "Grace Occupational Acceptance", "outcome": "CONTINUE", "checkpoint_id": "RIV-HERMES-OCCUPATIONAL", "evidence_ref": "evidence://grace/iteration-1", "session_id": "session-1", "transition_id": "transition-1", "task_title": "Grace Occupational Acceptance", "store": store, "event_store": events, "deliver": delivery}
+    first = submit_hermes_run_boundary(**kwargs)
+    second = submit_hermes_run_boundary(**kwargs)
+    assert first["notification_id"] == second["notification_id"]
+    assert first["notification_type"] == "important_completion"
+    assert first["action_required"] is False
+    assert "continuation remains" in first["summary"]
+    assert len(events.events) == 1
+    assert len(delivery.presenter_calls) == 1
 
 
 def test_unknown_or_malformed_outcome_is_visible_and_does_not_notify():

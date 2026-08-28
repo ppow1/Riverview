@@ -13,7 +13,7 @@ from riverview.database import connect
 from riverview.notifications import NotificationStore
 
 
-_ALLOWED_TYPES = {"blocked_requires_steward", "ready_for_steward_review"}
+_ALLOWED_TYPES = {"blocked_requires_steward", "ready_for_steward_review", "important_completion"}
 
 
 def check_annunciation_capability() -> dict[str, Any]:

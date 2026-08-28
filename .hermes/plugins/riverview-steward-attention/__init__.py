@@ -82,36 +82,21 @@ def _handle_attention(args: dict[str, Any], **_: Any) -> str:
     return json.dumps(result, ensure_ascii=False, sort_keys=True)
 
 
-def _transform_riverview_outcome(response_text: str, session_id: str = "", **_: Any) -> str:
-    """Automatically route a semantic outcome in a normal final report."""
+def _transform_riverview_outcome(response_text: str, *, session_id: str, **kwargs: Any) -> str:
+    """Process one final Riverview terminal envelope, when project opt-in is active."""
     if os.environ.get("RIVERVIEW_HERMES_ENGINEERING") != "1":
         return response_text
     from riverview.hermes_terminal_outcome import process_terminal_outcome
 
     return process_terminal_outcome(
         response_text,
-        session_id=session_id or "",
-        window_description=_session_title(session_id),
+        session_id=session_id,
+        window_description=kwargs.get("window_description") or kwargs.get("task_title"),
     )
 
 
-def _session_title(session_id: str) -> str | None:
-    """Read the same persisted title rendered by Hermes' status bar."""
-    if not session_id:
-        return None
-    try:
-        from hermes_state import SessionDB
-
-        db = SessionDB(read_only=True)
-        try:
-            return db.get_session_title(session_id) or None
-        finally:
-            db.close()
-    except Exception:
-        return None
-
-
 def register(ctx) -> None:
+    ctx.register_hook("transform_llm_output", _transform_riverview_outcome)
     ctx.register_tool(
         name="riverview_steward_attention",
         toolset="riverview",
@@ -119,4 +104,3 @@ def register(ctx) -> None:
         handler=_handle_attention,
         description="Riverview terminal-boundary Steward attention bridge.",
     )
-    ctx.register_hook("transform_llm_output", _transform_riverview_outcome)
