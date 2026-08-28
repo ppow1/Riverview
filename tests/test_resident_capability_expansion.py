@@ -68,21 +68,18 @@ def test_broker_exposes_unavailable_and_stale_without_substitution():
     assert ResidentCapabilityBroker(stale).execute(_request(stale)).status is CapabilityResultStatus.STALE
 
 
-def test_typed_capability_request_wins_over_contradictory_prose_decision():
+def test_explicit_answer_does_not_execute_contradictory_capability_field():
     package = _package(lambda request: {"items": [{"formed": True}]})
     calls = []
 
     def model(payload: dict[str, Any]) -> dict[str, Any]:
         calls.append(payload)
-        if payload["phase"] == "first":
-            return {"decision": "answer", "answer": "I will perform the bounded action.", "capability_id": "office.read", "arguments": {}}
-        return {"decision": "answer", "answer": "The bounded action completed with authoritative evidence.", "capability_id": None, "arguments": {}}
+        return {"decision": "answer", "answer": "This is a discussion, not an execution request.", "capability_id": "office.read", "arguments": {}}
 
-    run = ResidentOccupationalReasoner(package, model).run("Proceed with the bounded action.", correlation_id=uuid4())
-    assert run.tool_result is not None
-    assert run.tool_result.status is CapabilityResultStatus.SUCCESS
-    assert run.model_passes == 2
-    assert len(calls) == 2
+    run = ResidentOccupationalReasoner(package, model).run("Explain the bounded action.", correlation_id=uuid4())
+    assert run.tool_result is None
+    assert run.model_passes == 1
+    assert len(calls) == 1
 
 
 def test_engineering_prepare_catalog_exposes_authoritative_contract_shape():

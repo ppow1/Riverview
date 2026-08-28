@@ -275,7 +275,7 @@ class ResidentOccupationalReasoner:
             })
             extra_passes = 1
         capability_id = first.get("capability_id")
-        decision = "capability" if isinstance(capability_id, str) and capability_id.strip() else first.get("decision")
+        decision = first.get("decision")
         if decision == "answer":
             return ResidentOccupationalRun(correlation_id, first, None, self._answer(first), 1)
         if decision != "capability":

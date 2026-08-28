@@ -173,7 +173,7 @@ class ResidentHomeCognitionService:
             if phase == "first" and profile.name.casefold() == "grace":
                 try:
                     from riverview.closed_loop.now_projection import read_now_roots
-                    operational_context = read_now_roots()["items"][:16]
+                    operational_context = [{key: (str(item.get(key))[:600] if key == "latest_result_summary" else item.get(key)) for key in ("root_task_id", "title", "state", "current_checkpoint", "binding_state", "current_actor", "current_executor", "resource", "semantic_outcome", "latest_result_summary", "attention_required") if item.get(key) is not None} for item in read_now_roots()["items"][:8]]
                 except (LookupError, RuntimeError, ValueError):
                     operational_context = []
             tool_result = payload.get("tool_result")
