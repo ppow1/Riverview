@@ -126,7 +126,7 @@ class RelayStore:
         return (""" AND (NOT (w.parameters ? 'root_task_id') OR (
             w.parameters->>'root_task_id' ~ '^[0-9a-fA-F-]{36}$'
             AND EXISTS (SELECT 1 FROM autonomous_governance_bindings b
-              WHERE b.root_task_id=(w.parameters->>'root_task_id')::uuid
+              WHERE b.root_task_id=CASE WHEN w.parameters->>'root_task_id' ~ '^[0-9a-fA-F-]{36}$' THEN (w.parameters->>'root_task_id')::uuid ELSE NULL END
                 AND b.correlation_id=w.correlation_id
                 AND b.objective_id=w.objective_id
                 AND b.stage_id=w.stage_id

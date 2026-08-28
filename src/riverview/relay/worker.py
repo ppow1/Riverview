@@ -85,7 +85,7 @@ class RelayWorker:
                                FROM work_orders w
                                JOIN autonomous_governance_bindings b
                                  ON b.work_order_id=w.work_order_id
-                                AND b.root_task_id=(w.parameters->>'root_task_id')::uuid
+                                AND b.root_task_id=CASE WHEN w.parameters->>'root_task_id' ~ '^[0-9a-fA-F-]{36}$' THEN (w.parameters->>'root_task_id')::uuid ELSE NULL END
                                 AND b.correlation_id=w.correlation_id
                                 AND b.objective_id=w.objective_id
                                 AND b.stage_id=w.stage_id
