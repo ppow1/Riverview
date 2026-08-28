@@ -10,6 +10,7 @@ from riverview.reasoning.occupational import (
     ResidentCapabilityBroker,
     ResidentCapabilityDescriptor,
     ResidentCapabilityRequest,
+    ResidentOccupationalReasoner,
     ResidentOfficeCapabilityPackage,
 )
 
@@ -65,3 +66,20 @@ def test_broker_exposes_unavailable_and_stale_without_substitution():
     stale = _package(lambda request: (_ for _ in ()).throw(CapabilityStaleError("observation expired")))
     assert ResidentCapabilityBroker(unavailable).execute(_request(unavailable)).status is CapabilityResultStatus.UNAVAILABLE
     assert ResidentCapabilityBroker(stale).execute(_request(stale)).status is CapabilityResultStatus.STALE
+
+
+def test_typed_capability_request_wins_over_contradictory_prose_decision():
+    package = _package(lambda request: {"items": [{"formed": True}]})
+    calls = []
+
+    def model(payload: dict[str, Any]) -> dict[str, Any]:
+        calls.append(payload)
+        if payload["phase"] == "first":
+            return {"decision": "answer", "answer": "I will perform the bounded action.", "capability_id": "office.read", "arguments": {}}
+        return {"decision": "answer", "answer": "The bounded action completed with authoritative evidence.", "capability_id": None, "arguments": {}}
+
+    run = ResidentOccupationalReasoner(package, model).run("Proceed with the bounded action.", correlation_id=uuid4())
+    assert run.tool_result is not None
+    assert run.tool_result.status is CapabilityResultStatus.SUCCESS
+    assert run.model_passes == 2
+    assert len(calls) == 2

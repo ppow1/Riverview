@@ -263,12 +263,12 @@ class ResidentOccupationalReasoner:
             "professional_context_refs": list(self.package.professional_domain_refs + self.package.domain_knowledge_refs + self.package.procedure_refs),
             "capability_catalog": self.package.catalog(),
         })
-        decision = first.get("decision")
+        capability_id = first.get("capability_id")
+        decision = "capability" if isinstance(capability_id, str) and capability_id.strip() else first.get("decision")
         if decision == "answer":
             return ResidentOccupationalRun(correlation_id, first, None, self._answer(first), 1)
         if decision != "capability":
             raise ValueError("RIV-OCC-0005: model decision must be answer or capability.")
-        capability_id = first.get("capability_id")
         arguments = first.get("arguments", {})
         if not isinstance(capability_id, str) or not capability_id.strip() or not isinstance(arguments, Mapping):
             raise ValueError("RIV-OCC-0005: model capability request is malformed.")
