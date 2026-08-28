@@ -115,11 +115,13 @@ def _jessica_prepare(request: ResidentCapabilityRequest, store: CharacterStore, 
     from riverview.characters.workflow import CharacterDesignerWorkflow
     target = str(request.arguments.get("target_resident", "")).strip()
     changes = request.arguments.get("changes")
-    if not target or not isinstance(changes, dict) or not changes:
+    sources = [str(x) for x in request.arguments.get("source_evidence", []) if str(x).strip()]
+    rationale = str(request.arguments.get("rationale", "")).strip()
+    if not target or not isinstance(changes, dict) or not changes or not sources or not rationale:
         return {"status": "needs_refinement", "required": ["target_resident", "changes", "rationale", "source_evidence"], "evidence_refs": ["character-store:proposal-contract"]}
     profile = next((p for p in profiles if p.resident_id == target or p.name.casefold() == target.casefold()), None)
     target_id = profile.resident_id if profile else target
-    proposal = CharacterDesignerWorkflow(store).propose(target_id, changes, author="Jessica", sources=[str(x) for x in request.arguments.get("source_evidence", [])], rationale=str(request.arguments.get("rationale", "")))
+    proposal = CharacterDesignerWorkflow(store).propose(target_id, changes, author="Jessica", sources=sources, rationale=rationale)
     return {"status": "prepared_for_independent_review", "proposal": proposal, "published": False, "evidence_refs": ["character-store:proposals"]}
 
 
