@@ -224,6 +224,8 @@ class TracerWorker:
 
     def __init__(self, store: TracerStore, *, executor: Any, max_workers: int = 3, binding_store: Any | None = None) -> None:
         if max_workers < 1: raise ValueError("max_workers must be positive")
+        if not store._memory and binding_store is None:
+            raise PermissionError("RIV-LOOP-0010: production worker requires an authoritative governance binding store.")
         self.store, self.executor, self.binding_store = store, executor, binding_store
         self.pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="riverview-loop")
 

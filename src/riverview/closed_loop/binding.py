@@ -71,7 +71,15 @@ class GovernanceBindingStore:
             return binding
         with connect() as conn, conn.cursor() as cur:
             cur.execute("""INSERT INTO autonomous_governance_bindings(root_task_id,correlation_id,specification_id,engineering_intent_id,objective_id,stage_id,authority_id,work_order_id,attempt_id,lease_generation,fencing_token,worker_id,resource_claim_id,state) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(root_task_id) DO UPDATE SET correlation_id=EXCLUDED.correlation_id,specification_id=EXCLUDED.specification_id,engineering_intent_id=EXCLUDED.engineering_intent_id,objective_id=EXCLUDED.objective_id,stage_id=EXCLUDED.stage_id,authority_id=EXCLUDED.authority_id,work_order_id=EXCLUDED.work_order_id,attempt_id=EXCLUDED.attempt_id,lease_generation=EXCLUDED.lease_generation,fencing_token=EXCLUDED.fencing_token,worker_id=EXCLUDED.worker_id,resource_claim_id=EXCLUDED.resource_claim_id,state=EXCLUDED.state,updated_at=now()""", tuple(getattr(binding, key) for key in ("root_task_id", "correlation_id", "specification_id", "engineering_intent_id", "objective_id", "stage_id", "authority_id", "work_order_id", "attempt_id", "lease_generation", "fencing_token", "worker_id", "resource_claim_id", "state")))
-        EventStore().append(RiverEvent(event_type="root.binding.updated", aggregate_type="autonomous_root_task", aggregate_id=binding.root_task_id, correlation_id=binding.correlation_id, idempotency_key=f"root.binding.updated:{binding.root_task_id}:{binding.state.value}:{binding.work_order_id or 'none'}", classification=Classification.INTERNAL, payload=payload))
+        events = ["root.binding.updated"]
+        if binding.specification_id: events.append("specification.bound")
+        if binding.engineering_intent_id: events.append("intent.bound")
+        if binding.objective_id: events.append("objective.bound")
+        if binding.authority_id: events.append("authority.bound")
+        if binding.work_order_id: events.append("work_order.bound")
+        if binding.state is BindingState.EXECUTABLE: events.append("execution.eligible")
+        for event_type in events:
+            EventStore().append(RiverEvent(event_type=event_type, aggregate_type="autonomous_root_task", aggregate_id=binding.root_task_id, correlation_id=binding.correlation_id, idempotency_key=f"{event_type}:{binding.root_task_id}:{binding.state.value}:{binding.work_order_id or 'none'}", classification=Classification.INTERNAL, payload=payload))
         return binding
 
     def read(self, root_task_id: UUID) -> GovernanceBinding:
@@ -109,3 +117,28 @@ class GovernanceBindingStore:
         if binding.correlation_id == UUID(int=0) and root_task_id not in self._items:
             raise LookupError(f"RIV-LOOP-BIND-0007: unknown root {root_task_id}")
         return {"root_task_id": str(binding.root_task_id), "correlation_id": str(binding.correlation_id), "binding_state": binding.state.value, "execution_eligible": binding.state is BindingState.EXECUTABLE, "specification_id": str(binding.specification_id) if binding.specification_id else None, "engineering_intent_id": str(binding.engineering_intent_id) if binding.engineering_intent_id else None, "objective_id": str(binding.objective_id) if binding.objective_id else None, "stage_id": str(binding.stage_id) if binding.stage_id else None, "authority_id": str(binding.authority_id) if binding.authority_id else None, "work_order_id": str(binding.work_order_id) if binding.work_order_id else None, "attempt_id": str(binding.attempt_id) if binding.attempt_id else None, "lease_generation": binding.lease_generation, "fencing_token": str(binding.fencing_token) if binding.fencing_token else None, "worker_id": binding.worker_id, "resource_claim_id": str(binding.resource_claim_id) if binding.resource_claim_id else None}
+
+    def bind_existing_work(self, binding: GovernanceBinding) -> GovernanceBinding:
+        """Bind only a work order whose exact institutional lineage reconciles."""
+        if binding.state not in {BindingState.BOUND, BindingState.EXECUTABLE}:
+            raise ValueError("RIV-LOOP-BIND-0008: existing work binding must be BOUND or EXECUTABLE.")
+        binding.validate()
+        if self._memory:
+            return self.save(binding)
+        with connect() as conn, conn.cursor() as cur:
+            cur.execute("""SELECT w.correlation_id,w.objective_id,w.stage_id,w.engineering_intent_id,
+                                  w.status,a.status,s.status,o.status
+                             FROM work_orders w
+                             JOIN objective_stages s ON s.stage_id=w.stage_id
+                             JOIN objectives o ON o.objective_id=w.objective_id
+                             LEFT JOIN engineering_intents i ON i.intent_id=w.engineering_intent_id
+                             LEFT JOIN steward_authority_grants a ON a.objective_id=w.objective_id AND a.stage_id=w.stage_id
+                            WHERE w.work_order_id=%s AND w.objective_id=%s AND w.stage_id=%s
+                              AND w.correlation_id=%s AND a.authority_id=%s AND a.status='active'
+                            ORDER BY a.approved_at DESC LIMIT 1""", (binding.work_order_id, binding.objective_id, binding.stage_id, binding.correlation_id, binding.authority_id))
+            row = cur.fetchone()
+            if row is None or row[4] not in {"queued", "claimed", "running"} or row[5] != "active" or row[6] in {"completed", "cancelled"} or row[7] in {"completed", "cancelled"}:
+                raise PermissionError("RIV-LOOP-BIND-0009: exact institutional work lineage is not currently eligible.")
+            if binding.engineering_intent_id is not None and row[3] != binding.engineering_intent_id:
+                raise ValueError("RIV-LOOP-BIND-0010: engineering intent does not match work order.")
+        return self.save(binding)
