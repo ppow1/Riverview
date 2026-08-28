@@ -98,3 +98,25 @@ def test_engineering_prepare_catalog_exposes_authoritative_contract_shape():
     descriptor = next(item for item in package.catalog() if item["capability_id"] == "operations.engineering-request.prepare")
     contract = descriptor["input_schema"]["properties"]["proposal"]["properties"]["formation_contract"]
     assert set(contract["required"]) == {"repository_identity", "repository_root", "expected_base_sha", "bounded_instruction", "allowed_paths", "acceptance_criteria", "evidence_requirements", "capability_name", "action_type", "timeout_seconds", "write_policy"}
+
+
+def test_engineering_prepare_maps_operational_resident_classification_to_internal_storage(monkeypatch):
+    from riverview.residents.occupational_packages import _grace_prepare
+    from riverview.residents import direct_grace
+
+    seen = {}
+
+    def materialize(proposal, *, correlation_id):
+        seen.update(proposal)
+        return {"specification_id": "spec-1", "content": proposal["content"]}
+
+    monkeypatch.setattr(direct_grace.DirectGraceFormation, "materialize_proposal", staticmethod(materialize))
+    package = _package(lambda request: {"items": [{"ok": True}]})
+    request = _request(package)
+    request = request.__class__(**{**request.__dict__, "arguments": {"proposal": {"content": "bounded", "summary": "bounded", "formation_contract": {}}}}) if hasattr(request, "__dict__") else request
+    if request.arguments == {}:
+        from dataclasses import replace
+        request = replace(request, arguments={"proposal": {"content": "bounded", "summary": "bounded", "formation_contract": {}}})
+    request = replace(request, classification="operational")
+    _grace_prepare(request)
+    assert seen["classification"] == "internal"

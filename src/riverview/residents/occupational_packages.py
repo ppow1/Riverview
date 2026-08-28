@@ -112,7 +112,8 @@ def _grace_prepare(request: ResidentCapabilityRequest) -> dict[str, Any]:
     required = {"content", "summary", "formation_contract"}
     if not required <= set(proposal) or not all(isinstance(proposal[key], str) and proposal[key].strip() for key in ("content", "summary")) or not isinstance(proposal["formation_contract"], dict):
         return {"status": "needs_refinement", "required": sorted(required), "evidence_refs": ["riverview://engineering-formation"]}
-    prepared = DirectGraceFormation.materialize_proposal({**proposal, "classification": request.classification}, correlation_id=request.correlation_id)
+    storage_classification = "internal" if request.classification == "operational" else request.classification
+    prepared = DirectGraceFormation.materialize_proposal({**proposal, "classification": storage_classification}, correlation_id=request.correlation_id)
     return {"status": "prepared_for_steward_review", "proposal": prepared, "no_execution": True, "evidence_refs": ["comms5:specification", "riverview://engineering-formation"]}
 
 
