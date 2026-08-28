@@ -34,7 +34,7 @@ _DECISION_FORMAT = {
         "claims": {"type": "array", "maxItems": 8, "items": {"type": "object"}},
         "epistemic_spans": {"type": "array", "maxItems": 32, "items": {"type": "object"}},
     },
-    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "claims"],
+    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "claims", "epistemic_spans"],
     "additionalProperties": False,
 }
 

@@ -13,6 +13,7 @@ from riverview.reasoning.epistemic import (
     mask_labels,
 )
 from riverview.reasoning.contracts import ReasoningResponse
+from riverview.reasoning.resident_home import _DECISION_FORMAT
 
 
 def test_epistemic_masks_are_extensible_and_labelled() -> None:
@@ -33,6 +34,10 @@ def test_span_supports_multiple_classes_and_bounded_provenance() -> None:
     assert metadata["summary_mask"] == VERIFIED | REASONED
     assert metadata["spans"][0]["mask"] == VERIFIED | REASONED
     assert metadata["spans"][0]["provenance"][0]["evidence_ref"] == "evidence://1"
+
+
+def test_home_decision_contract_requires_epistemic_spans() -> None:
+    assert "epistemic_spans" in _DECISION_FORMAT["required"]
 
 
 def test_spans_fail_closed_for_invalid_offsets_or_provenance() -> None:
