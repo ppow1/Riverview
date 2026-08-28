@@ -450,6 +450,18 @@ Commands given to the Steward must be unambiguous.
 - Diagnostic and Cookbook entries must identify applicable versions.
 - Do not use a filename that claims one version while the internal header reports another.
 
+## Resident integration acceptance invariant
+
+No Riverview capability is complete when its accepted design requires a
+resident to observe, reason over, advise on, propose through, or otherwise use
+that capability until resident integration is verified on a novel job-related
+question with an authoritative result, provenance, authority, freshness, and
+failure evidence. Component APIs, operator projections, static context, or
+workflow-only tests do not prove resident occupational competence. The proof
+must show the resident HOME/model decision, bounded broker enforcement,
+authoritative capability result, continuation reasoning, final validation, and
+resident-facing answer while preserving the resident's authority boundary.
+
 ## 28. Self-documenting seams
 
 Each system seam must answer without archaeology:

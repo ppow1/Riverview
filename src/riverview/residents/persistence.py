@@ -302,8 +302,11 @@ class ResidentContinuityStore:
             cursor.execute("SELECT 1 FROM resident_implementations WHERE implementation_id=%s AND lifecycle_status='registered'", (new_implementation_id,))
             if not cursor.fetchone():
                 raise LookupError(f"{CHECKPOINT}: replacement implementation is unavailable.")
-            cursor.execute("UPDATE resident_implementation_bindings SET status='retired',effective_to=%s,retirement_evidence_id=%s,retirement_idempotency_key=%s,successor_binding_id=%s WHERE binding_id=%s", (effective_at, retirement_evidence_id, f"retire:{transition_key}", new_binding_id, old_binding_id))
+            # Insert the successor before linking the predecessor.  The
+            # predecessor's successor_binding_id is a foreign key, so updating
+            # it first makes every valid transition fail inside PostgreSQL.
             cursor.execute("INSERT INTO resident_implementation_bindings(binding_id,idempotency_key,occupant_id,implementation_id,purpose,status,effective_from,policy_ref,activation_evidence_id,predecessor_binding_id) VALUES(%s,%s,%s,%s,%s,'active',%s,%s,%s,%s)", (new_binding_id, f"transition:{transition_key}", occupant_id, new_implementation_id, purpose, effective_at, policy_ref, activation_evidence_id, old_binding_id))
+            cursor.execute("UPDATE resident_implementation_bindings SET status='retired',effective_to=%s,retirement_evidence_id=%s,retirement_idempotency_key=%s,successor_binding_id=%s WHERE binding_id=%s", (effective_at, retirement_evidence_id, f"retire:{transition_key}", new_binding_id, old_binding_id))
             self._event(cursor, "resident.implementation.transition.completed", "binding", new_binding_id, f"resident.implementation.transition.completed:{transition_key}", {"occupant_id": str(occupant_id), "old_binding_id": str(old_binding_id), "new_binding_id": str(new_binding_id), "provenance_id": str(provenance_id)})
             self._event(cursor, "resident.context.invalidated", "occupant", occupant_id, f"resident.context.invalidated:transition:{transition_key}", {"occupant_id": str(occupant_id), "reason": "implementation transition", "old_binding_id": str(old_binding_id)})
             return new_binding_id

@@ -15,6 +15,7 @@ from riverview.characters.workflow import JESSICA_CHARACTER_DEVELOPMENT_WORKFLOW
 from riverview.database import connect
 from riverview.intake.policy import ENGINEERING_ACTION, ENGINEERING_CAPABILITY, ENGINEERING_POLICIES
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
+from riverview.reasoning.resident_home import ResidentHomeCognitionService
 
 
 class RoomTurnPartialFailure(RuntimeError):
@@ -124,7 +125,7 @@ def _normalize_direct_grace_response(response: ReasoningResponse) -> ReasoningRe
 class ResidentConversationGateway:
     """Resolve identity and continuity before provider selection or response."""
 
-    def __init__(self, profiles: tuple[ResidentProfile, ...], *, character_store: CharacterStore | None = None, continuity_store: ContinuityStore | None = None, home_cognition: Any | None = None) -> None:
+    def __init__(self, profiles: tuple[ResidentProfile, ...], *, character_store: CharacterStore | None = None, continuity_store: ContinuityStore | None = None, home_cognition: Any | None = None, resident_home: ResidentHomeCognitionService | None = None) -> None:
         if not profiles:
             raise ValueError("RIV-RES-0002: resident gateway requires profiles.")
         self._profiles = {profile.resident_id: profile for profile in profiles}
@@ -134,6 +135,7 @@ class ResidentConversationGateway:
         self.character_store = character_store or CharacterStore.from_profiles(profiles)
         self.continuity_store = continuity_store or ContinuityStore()
         self.home_cognition = home_cognition
+        self.resident_home = resident_home
 
     @classmethod
     def from_evidence(cls, path: Path | None = None) -> ResidentConversationGateway:
@@ -157,7 +159,7 @@ class ResidentConversationGateway:
         try:
             with connect() as connection, connection.cursor() as cursor:
                 cursor.execute("""SELECT o.occupant_id,o.display_name,COALESCE(c.value_text,''),o.canonical_anchor_ref,
-                                         CASE WHEN b.binding_id IS NOT NULL THEN 'operational' ELSE o.classification END
+                                         o.classification
                                   FROM resident_occupants o
                                   LEFT JOIN resident_claims c ON c.subject_id=o.occupant_id
                                     AND c.claim_key LIKE 'jessica:title' AND c.status='accepted'
@@ -231,6 +233,8 @@ class ResidentConversationGateway:
         direct_grace_approval: dict[str, Any] | None = None,
     ) -> tuple[ResidentSession, ReasoningResponse, dict[str, Any]]:
         profile = self.resolve(resident)
+        if classification == "operational" and profile.classification != "operational" and not profile.is_grace:
+            classification = profile.classification
         session = self._sessions.get(session_id) if session_id else None
         if session is None:
             session = self.open_session(profile.resident_id, interface_id=interface_id, classification=classification)
@@ -239,6 +243,20 @@ class ResidentConversationGateway:
         if session.resident_id != profile.resident_id or session.classification != classification:
             raise PermissionError("RIV-RES-0002: resident session identity or classification mismatch.")
         correlation = correlation_id or uuid4()
+        if self.resident_home is not None:
+            prior_history = tuple(f"{turn['role']}: {str(turn['text'])[:300]}" for turn in self._bounded_history(session.history))
+            turn = self.resident_home.execute(profile, instruction, correlation_id=correlation, conversation_context=prior_history)
+            tool_evidence = turn.run.tool_result.evidence_refs if turn.run.tool_result else ()
+            response = ReasoningResponse(
+                response_id=uuid4(), request_id=uuid4(), correlation_id=correlation,
+                provider_id=turn.provider_id, response_type="advice", summary=turn.run.final_answer,
+                evidence_refs=tuple(dict.fromkeys((*turn.state.evidence_refs, *tool_evidence, *turn.package.provenance_refs))),
+                classification=turn.state.classification, created_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+            )
+            session.history.append({"role": "user", "text": instruction})
+            session.history.append({"role": "resident", "text": response.summary})
+            self.continuity_store.record_session(profile.resident_id, str(session.session_id), session.history)
+            return session, response, {"resident_id": profile.resident_id, "resident_name": profile.name, "role": profile.role, "canonical_reference": profile.canonical_reference, "source_reference": profile.source_reference, "session_id": str(session.session_id), "history_turns": len(session.history), **turn.metadata(), "character_version": session.character_version, "engineering_proposal_separate": True}
         if profile.is_grace and self.home_cognition is not None:
             from riverview.reasoning.home_runtime import invocation_for_message
             prior_history = tuple(f"{turn['role']}: {str(turn['text'])[:300]}" for turn in self._bounded_history(session.history))

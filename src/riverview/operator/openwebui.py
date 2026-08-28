@@ -32,8 +32,11 @@ from riverview.operator.projection import OperatorProjection
 from riverview.operator.room_admin import RoomAdministration
 from riverview.operator.snapshot import build_snapshot
 from riverview.operator.ui import UI_HTML as CLEAN_UI_HTML
+from riverview.operator.vnext import UI_HTML as VNEXT_UI_HTML
+from riverview.operator.vnext_projection import build_vnext_projection
 from riverview.reasoning import ReasoningRequest, ReasoningResponse
 from riverview.reasoning.home_runtime import build_grace_home_cognition
+from riverview.reasoning.resident_home import ResidentHomeCognitionService
 from riverview.residents.direct_grace import DirectGraceFormation, extract_typed_proposal
 from riverview.residents.gateway import ResidentConversationGateway, RoomTurnPartialFailure
 
@@ -126,9 +129,38 @@ class RiverviewOpenWebUIService:
         self.config = config
         self.provider = provider
         self.authorized_model = config.default_model
+        self.source_root = str(Path(__file__).resolve().parents[3])
+        self.source_sha = "unknown"
+        self.git_branch = "unknown"
+        try:
+            self.source_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.source_root,
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=True,
+            ).stdout.strip() or "unknown"
+            self.git_branch = subprocess.run(
+                ["git", "symbolic-ref", "--short", "-q", "HEAD"],
+                cwd=self.source_root,
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            ).stdout.strip() or "DETACHED"
+        except (OSError, subprocess.SubprocessError):
+            pass
         self.resident_gateway = resident_gateway or ResidentConversationGateway.from_evidence()
         if config.home_cognition_enabled and self.resident_gateway.home_cognition is None:
             self.resident_gateway.home_cognition = build_grace_home_cognition(self.provider, self.authorized_model)
+        if config.home_cognition_enabled and self.resident_gateway.resident_home is None:
+            self.resident_gateway.resident_home = ResidentHomeCognitionService(
+                profiles=tuple(self.resident_gateway._profiles.values()),
+                provider=self.provider,
+                model_ref=self.authorized_model,
+                character_store=self.resident_gateway.character_store,
+            )
         self.jessica_workflow = CharacterDesignerWorkflow(self.resident_gateway.character_store)
         self.sessions: set[str] = set()
         # The projection owns UI history only; resident continuity/canon remains
@@ -271,7 +303,10 @@ class RiverviewOpenWebUIService:
                 self.send_header("Pragma", "no-cache")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                    return
 
             def _send_html(self, body: str) -> None:
                 encoded = body.encode()
@@ -307,7 +342,9 @@ class RiverviewOpenWebUIService:
                 self.wfile.write(b'{"authenticated":true}')
 
             def do_GET(self) -> None:
-                if self.path == "/cme":
+                if self.path == "/vnext":
+                    self._send_html(VNEXT_UI_HTML)
+                elif self.path == "/cme":
                     self._send_html(CME_STATUS_HTML)
                 elif self.path == "/":
                     self._send_html(CLEAN_UI_HTML)
@@ -319,16 +356,7 @@ class RiverviewOpenWebUIService:
                     from riverview.spatial.prototype import prototype_html
                     self._send_html(prototype_html())
                 elif self.path == "/health":
-                    try:
-                        source_sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=2, check=True).stdout.strip()
-                    except (OSError, subprocess.SubprocessError):
-                        source_sha = "unknown"
-                    try:
-                        source_root = str(Path(__file__).resolve().parents[3])
-                        branch = subprocess.run(["git", "symbolic-ref", "--short", "-q", "HEAD"], cwd=source_root, capture_output=True, text=True, timeout=2, check=False).stdout.strip() or "DETACHED"
-                    except (OSError, subprocess.SubprocessError):
-                        source_root, branch = "unknown", "unknown"
-                    self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity, "operator_shell": "v1", "source_sha": source_sha, "source_root": source_root, "git_branch": branch, "python_executable": os.sys.executable, "provider": "ollama", "default_model": service.authorized_model, "ollama_endpoint": "http://127.0.0.1:11434", "database_target": "configured Riverview PostgreSQL metadata (credentials redacted)", "launch_mechanism": os.environ.get("RIVERVIEW_LAUNCH_MECHANISM", "unknown"), "home_cognition_enabled": service.config.home_cognition_enabled, "home_cognition_service": type(service.resident_gateway.home_cognition).__name__ if service.resident_gateway.home_cognition else None})
+                    self._send(HTTPStatus.OK, {"status": True, "service": service.config.service_identity, "operator_shell": "v1", "source_sha": service.source_sha, "source_root": service.source_root, "git_branch": service.git_branch, "python_executable": os.sys.executable, "provider": "ollama", "default_model": service.authorized_model, "ollama_endpoint": "http://127.0.0.1:11434", "database_target": "configured Riverview PostgreSQL metadata (credentials redacted)", "launch_mechanism": os.environ.get("RIVERVIEW_LAUNCH_MECHANISM", "unknown"), "home_cognition_enabled": service.config.home_cognition_enabled, "home_cognition_service": type(service.resident_gateway.home_cognition).__name__ if service.resident_gateway.home_cognition else None})
                 elif urlsplit(self.path).path == "/api/runtime/status" and self._auth():
                     try:
                         status_path = Path(__file__).resolve().parents[3] / "runtime" / "riverview-supervisor" / "status.json"
@@ -364,6 +392,54 @@ class RiverviewOpenWebUIService:
                     except (RuntimeError, OSError, TypeError, ValueError):
                         self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "cme_status_unavailable", "checkpoint": "RIV-GRC-0008"})
                 elif urlsplit(self.path).path == "/api/cme/status":
+                    self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
+                elif urlsplit(self.path).path == "/api/vnext/projection" and self._auth():
+                    cme = None
+                    runtime = None
+                    try:
+                        cme = CMEStatusStore().read()
+                    except (RuntimeError, OSError, TypeError, ValueError):
+                        pass
+                    try:
+                        status_path = Path(__file__).resolve().parents[3] / "runtime" / "riverview-supervisor" / "status.json"
+                        runtime = json.loads(status_path.read_text(encoding="utf-8"))
+                    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                        pass
+                    try:
+                        conversations = service.projection.list_summaries(limit=8).get("conversations", [])
+                    except (RuntimeError, OSError, TypeError, ValueError):
+                        conversations = []
+                    try:
+                        residents = service.resident_gateway.residents()
+                    except (RuntimeError, OSError, TypeError, ValueError, LookupError):
+                        residents = []
+                    context = {"state": "empty", "reason": "No current conversation is available from the read model."}
+                    try:
+                        if conversations:
+                            selected = service.projection.refresh(UUID(str(conversations[0]["id"])), include_archived=True)
+                            if selected:
+                                context = {
+                                    "state": "available", "conversation_id": str(selected.get("id", conversations[0].get("id", ""))),
+                                    "kind": selected.get("kind", "conversation"), "title": selected.get("title") or "Untitled conversation",
+                                    "resident_id": selected.get("resident_id"), "resident_name": selected.get("resident_name"),
+                                    "room_id": selected.get("room_id"), "session_id": selected.get("session_id"),
+                                    "participants": selected.get("participant_profiles") or selected.get("participants") or [],
+                                    "history": list(reversed(selected.get("messages", [])[-40:])),
+                                    "history_state": "available" if selected.get("messages") else "empty",
+                                }
+                                if context["kind"] == "room" and context.get("room_id"):
+                                    try:
+                                        context["participants"] = service.room_projection(UUID(str(context["room_id"]))).get("participant_profiles", [])
+                                    except (LookupError, TypeError, ValueError, RuntimeError):
+                                        context["participants"] = []
+                    except (RuntimeError, OSError, TypeError, ValueError, LookupError, KeyError):
+                        context = {"state": "unavailable", "reason": "Conversation read model is temporarily unavailable."}
+                    try:
+                        activity = service.activity.list(after=0, limit=12, category="").get("items", [])
+                    except (RuntimeError, OSError, TypeError, ValueError, LookupError, AttributeError):
+                        activity = []
+                    self._send(HTTPStatus.OK, build_vnext_projection(cme=cme, runtime=runtime, conversations=conversations, residents=residents, context=context, activity=activity))
+                elif urlsplit(self.path).path == "/api/vnext/projection":
                     self._send(HTTPStatus.UNAUTHORIZED, {"error": "authentication_required"})
                 elif urlsplit(self.path).path == "/api/events" and self._auth():
                     try:
@@ -922,9 +998,18 @@ class RiverviewOpenWebUIService:
                     else:
                         response = service.provider(authorized_model(payload), request)
                         body = {"service": service.config.service_identity, "context_refs": list(request.context_refs), "artifact_semantics": "reference_only" if request.context_refs else "none", "response": response.as_typed_payload()}
+                        conversation_id = str(payload.get("conversation_id") or "")
+                        if conversation_id:
+                            conversation = UUID(conversation_id)
+                            service.projection.append(conversation, role="steward", text=request.instruction, speaker_id=None, speaker="Steward", details={"request_id": str(request.request_id), "correlation_id": str(request.correlation_id)})
+                            service.projection.append(conversation, role="operator", text=response.summary, speaker_id=None, speaker="Riverview Operator", details=response.as_typed_payload())
+                            persisted = service.projection.refresh(conversation, include_archived=True)
+                            if persisted is None or len(persisted.get("messages", [])) < 2:
+                                raise RuntimeError("RIV-UI-0021: operator response was not durably reconciled.")
+                            body["persisted_message_count"] = len(persisted["messages"])
                         emit_event("operator.response.completed", "operator", "operator", request.correlation_id, {"provider": authorized_model(payload), "classification": request.classification})
                     self._send(HTTPStatus.OK, body)
-                except (AttributeError, KeyError, TypeError, ValueError, RuntimeError) as exc:  # bounded protocol error
+                except (AttributeError, KeyError, TypeError, ValueError, RuntimeError, PermissionError, LookupError) as exc:  # bounded protocol error
                     provider_failure = "RIV-REASON-0002" in str(exc)
                     checkpoint = "RIV-RES-0002" if resident_id else "RIV-UI-0009"
                     diagnostic(checkpoint, "resident_chat" if resident_id else "operator_chat", "resident_provider_failure" if resident_id else "bounded_request_failure", f"Bounded operator request failed: {type(exc).__name__}: {str(exc)[:240]}")
