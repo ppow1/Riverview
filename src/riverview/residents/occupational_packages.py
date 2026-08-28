@@ -63,8 +63,14 @@ def _grace_resources(request: ResidentCapabilityRequest) -> dict[str, Any]:
 
 
 def _grace_comms(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    from riverview.database import connect
     from riverview.mcp.comms5 import Comms5Service
-    return {"submissions": Comms5Service().recent_steward_submissions(limit=_limit(request)).get("items", []), "evidence_refs": ["postgresql:comms5_seed_drafts", "riverview://comms5"]}
+    submissions = Comms5Service().recent_steward_submissions(limit=_limit(request)).get("items", [])
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT specification_id,version,summary,content_sha256,classification,lifecycle_state,client_id,client_name,correlation_id,created_at FROM comms5_specifications WHERE client_id='operator-grace' ORDER BY created_at DESC LIMIT %s", (_limit(request),))
+        names = ("specification_id", "version", "summary", "content_sha256", "classification", "lifecycle_state", "client_id", "client_name", "correlation_id", "created_at")
+        specifications = [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+    return {"submissions": submissions, "specifications": specifications, "content_returned": False, "evidence_refs": ["postgresql:comms5_seed_drafts", "postgresql:comms5_specifications", "riverview://comms5"]}
 
 
 def _grace_cookbook(request: ResidentCapabilityRequest) -> dict[str, Any]:
