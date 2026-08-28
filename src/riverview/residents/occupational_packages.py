@@ -50,6 +50,24 @@ def _grace_work(request: ResidentCapabilityRequest) -> dict[str, Any]:
     return {"items": snapshot.get("items", []), "source": snapshot.get("source", "postgresql:campaign_runner"), "evidence_refs": ["postgresql:campaign_runner", "riverview://work-orders"]}
 
 
+def _grace_closed_loop(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    """Read one explicit root's bounded governance/result projection."""
+    from riverview.closed_loop.binding import GovernanceBindingStore
+    root_id = str(request.arguments.get("root_task_id", "")).strip()
+    if not root_id:
+        raise ValueError("RIV-OCC-LOOP-0001: root_task_id is required.")
+    from riverview.database import connect
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT root_task_id,correlation_id,objective,state,current_checkpoint_id,originating_resident,attention_state,created_at,updated_at FROM autonomous_root_tasks WHERE root_task_id=%s", (UUID(root_id),))
+        row = cursor.fetchone()
+        if row is None:
+            raise LookupError("RIV-OCC-LOOP-0002: root task was not found.")
+        cursor.execute("SELECT checkpoint_id,title,status,actor,started_at,completed_at,evidence,blocker FROM autonomous_checkpoints WHERE root_task_id=%s ORDER BY sequence", (UUID(root_id),))
+        checkpoints = [dict(zip(("checkpoint_id", "title", "status", "actor", "started_at", "completed_at", "evidence", "blocker"), item, strict=True)) for item in cursor.fetchall()]
+    binding = GovernanceBindingStore().joined_projection(UUID(root_id))
+    return {"root": dict(zip(("root_task_id", "correlation_id", "objective", "state", "current_checkpoint_id", "originating_resident", "attention_state", "created_at", "updated_at"), row, strict=True)), "roadmap": checkpoints, "governance": binding, "next_legitimate_transition": "obtain Steward authority or bind exact existing governed work" if not binding["execution_eligible"] else "Campaign Runner may evaluate the exact bound work", "evidence_refs": ["postgresql:autonomous_root_tasks", "postgresql:autonomous_checkpoints", "postgresql:autonomous_governance_bindings"]}
+
+
 def _grace_cme(request: ResidentCapabilityRequest) -> dict[str, Any]:
     from riverview.autonomy.runtime import CMEStatusStore
     value = CMEStatusStore().read()
@@ -186,6 +204,7 @@ def _descriptor(capability_id: str, name: str, purpose: str, handler: Any, *, cl
 
 def build_grace_operations_package(profile: ResidentProfile, office_id: UUID, implementation_id: UUID, profiles: tuple[ResidentProfile, ...]) -> ResidentOfficeCapabilityPackage:
     capabilities = (
+        _descriptor("operations.closed-loop.read", "Closed-loop task state", "Read one explicit root task's bounded roadmap, governance binding, execution eligibility, and result lineage.", _grace_closed_loop, classification=profile.classification, input_schema={"type": "object", "properties": {"root_task_id": {"type": "string", "format": "uuid"}}, "required": ["root_task_id"], "additionalProperties": False}, evidence=("postgresql:autonomous_governance_bindings",)),
         _descriptor("operations.current-work.read", "Current work", "Read bounded active, ready, blocked, stale, and recent work projections.", _grace_work, classification=profile.classification, evidence=("postgresql:campaign_runner",)),
         _descriptor("operations.cme.read", "CME state", "Read current Continuous Momentum Engine health, cursor, progress, and attention state.", _grace_cme, classification=profile.classification, evidence=("riverview://cme-runtime-status",)),
         _descriptor("operations.resources.read", "Resources", "Read fresh bounded resource, capacity, policy, and claim metadata.", _grace_resources, classification=profile.classification, evidence=("postgresql:resource_policy",)),

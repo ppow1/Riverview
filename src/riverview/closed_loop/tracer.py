@@ -138,8 +138,8 @@ class TracerStore:
             cur.execute("SELECT request_id FROM autonomous_tracer_requests WHERE state='queued' ORDER BY created_at")
             return tuple(str(row[0]) for row in cur.fetchall())
 
-    def worker(self, *, executor: Any | None = None, max_workers: int = 3) -> "TracerWorker":
-        return TracerWorker(self, executor=executor or HermesTracerExecutor(), max_workers=max_workers)
+    def worker(self, *, executor: Any | None = None, max_workers: int = 3, binding_store: Any | None = None) -> "TracerWorker":
+        return TracerWorker(self, executor=executor or HermesTracerExecutor(), max_workers=max_workers, binding_store=binding_store)
 
     def events_for(self, root_id: str) -> list[dict[str, Any]]:
         if self._memory: return [x for x in self._events if x["root_task_id"] == root_id]
@@ -222,9 +222,9 @@ class HermesTracerExecutor:
 class TracerWorker:
     """Nonblocking bounded worker for independently correlated requests."""
 
-    def __init__(self, store: TracerStore, *, executor: Any, max_workers: int = 3) -> None:
+    def __init__(self, store: TracerStore, *, executor: Any, max_workers: int = 3, binding_store: Any | None = None) -> None:
         if max_workers < 1: raise ValueError("max_workers must be positive")
-        self.store, self.executor = store, executor
+        self.store, self.executor, self.binding_store = store, executor, binding_store
         self.pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="riverview-loop")
 
     def submit(self, request_id: str) -> Future:
@@ -241,6 +241,13 @@ class TracerWorker:
     def _run_one(self, request_id: str) -> dict[str, Any]:
         claimed = self.store.claim(request_id, "closed-loop-worker")
         root_id, correlation, run_id = claimed["root_task_id"], claimed["correlation_id"], claimed["run_id"]
+        if self.binding_store is not None:
+            try:
+                self.binding_store.require_executable(UUID(root_id))
+            except Exception as exc:
+                if self.store._memory: self.store._states[root_id] = "blocked"
+                self.store._event(root_id, correlation, "execution.denied", {"request_id": request_id, "reason": str(exc)[:500]})
+                return {"state": "blocked", "root_task_id": root_id, "request_id": request_id, "run_id": run_id, "result_id": None, "reason": str(exc)}
         if self.store._memory: self.store._states[root_id] = "running"
         else:
             with connect() as conn, conn.cursor() as cur: cur.execute("UPDATE autonomous_root_tasks SET state='active',updated_at=now() WHERE root_task_id=%s", (UUID(root_id),))
