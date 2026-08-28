@@ -191,6 +191,8 @@ class ResidentHomeCognitionService:
                 raise RuntimeError("RIV-HOME-0002: Qwen returned malformed structured HOME decision") from exc
             if not isinstance(value, dict):
                 raise RuntimeError("RIV-HOME-0002: Qwen HOME decision is not an object")
+            if phase == "first" and ("assertion_mode" not in value or "claims" not in value):
+                value = {**value, "_contract_missing": True}
             return value
         run = ResidentOccupationalReasoner(package, model).run(question, correlation_id=correlation_id, conversation_context=conversation_context)
         if run.tool_result is None and _unsupported_access_claim(run.final_answer, package.catalog()):
