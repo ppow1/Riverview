@@ -165,6 +165,34 @@ class TracerStore:
                 return {"root_task_id": str(root[0]), "correlation_id": str(root[1]), "request_id": None, "result_id": None, "run_id": None, "current_checkpoint_id": root[2], "semantic_outcome": None, "summary": None, "evidence": [], "state": root[3]}
             return {"root_task_id": str(row[0]), "correlation_id": str(row[1]), "request_id": str(row[2]), "result_id": str(row[3]), "run_id": str(row[4]), "current_checkpoint_id": row[5], "semantic_outcome": row[6], "summary": row[7], "evidence": row[8], "result_digest": row[9], "adapter_id": "hermes.tracer.no_mutation.v1"}
 
+    def record_external_result(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Persist one governed result only when request/root correspondence matches."""
+        required = ("root_task_id", "correlation_id", "request_id", "run_id", "work_order_id", "attempt_id", "semantic_outcome", "summary", "evidence", "adapter_id")
+        if any(key not in result for key in required) or not isinstance(result["evidence"], list):
+            raise ValueError("RIV-LOOP-0013: external result is incomplete.")
+        root_id, correlation, request_id = str(result["root_task_id"]), str(result["correlation_id"]), str(result["request_id"])
+        result_id = str(result.get("result_id") or uuid4())
+        if self._memory:
+            request = self._requests.get(request_id)
+            if request is None or request.root_task_id != root_id or request.correlation_id != correlation:
+                raise ValueError("RIV-LOOP-0014: external result correspondence failed.")
+            outcome = {**result, "result_id": result_id}
+            self._results[result_id] = outcome
+            request.result_id, request.state = result_id, "consumed"
+            self._states[root_id] = "result_available"
+            self._event(root_id, correlation, "result.available", {"request_id": request_id, "result_id": result_id, "work_order_id": result["work_order_id"], "attempt_id": result["attempt_id"]})
+            return outcome
+        with connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT root_task_id,correlation_id FROM autonomous_tracer_requests WHERE request_id=%s", (UUID(request_id),))
+            row = cur.fetchone()
+            if row is None or str(row[0]) != root_id or str(row[1]) != correlation:
+                raise ValueError("RIV-LOOP-0014: external result correspondence failed.")
+            digest = _digest(result)
+            cur.execute("INSERT INTO autonomous_tracer_results(result_id,request_id,root_task_id,correlation_id,run_id,semantic_outcome,summary,evidence,result_digest) VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)", (UUID(result_id), UUID(request_id), UUID(root_id), UUID(correlation), UUID(str(result["run_id"])), result["semantic_outcome"], str(result["summary"])[:8000], json.dumps(result["evidence"]), digest))
+            cur.execute("UPDATE autonomous_tracer_requests SET state='consumed',result_id=%s,updated_at=now() WHERE request_id=%s", (UUID(result_id), UUID(request_id)))
+        self._event(root_id, correlation, "result.available", {"request_id": request_id, "result_id": result_id, "work_order_id": result["work_order_id"], "attempt_id": result["attempt_id"]})
+        return {**result, "result_id": result_id, "result_digest": digest}
+
     def continue_from_result(self, root_id: str, result_id: str, *, objective: str) -> dict[str, Any]:
         """Create and execute one same-root successor request."""
         if self._memory:

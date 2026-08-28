@@ -120,6 +120,21 @@ class RelayStore:
     SUBSTANTIAL_HARD_TIMEOUT_SECONDS = 600
     LEASE_GRACE_SECONDS = 60
 
+    @staticmethod
+    def closed_loop_claim_predicate() -> tuple[str, tuple[Any, ...]]:
+        """Return the fail-closed predicate for orders carrying root identity."""
+        return (""" AND (NOT (w.parameters ? 'root_task_id') OR (
+            w.parameters->>'root_task_id' ~ '^[0-9a-fA-F-]{36}$'
+            AND EXISTS (SELECT 1 FROM autonomous_governance_bindings b
+              WHERE b.root_task_id=(w.parameters->>'root_task_id')::uuid
+                AND b.correlation_id=w.correlation_id
+                AND b.objective_id=w.objective_id
+                AND b.stage_id=w.stage_id
+                AND b.work_order_id=w.work_order_id
+                AND b.state='EXECUTABLE'
+                AND b.authority_id IS NOT NULL)
+        )) """, ())
+
     def __init__(self, config: DatabaseConfig | None = None) -> None:
         self._config = config
 
@@ -263,7 +278,10 @@ class RelayStore:
                              AND source_attempt.worker_instance_id = %s
                       )
                 """
+            gate_sql, gate_params = self.closed_loop_claim_predicate()
+            claim_sql += gate_sql
             claim_params: list[Any] = [role, seat_id, allow_internal, worker_instance_id]
+            claim_params.extend(gate_params)
             if work_order_id is not None:
                 claim_sql += " AND w.work_order_id=%s"
                 claim_params.append(work_order_id)
