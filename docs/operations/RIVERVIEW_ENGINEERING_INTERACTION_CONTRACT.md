@@ -462,6 +462,23 @@ must show the resident HOME/model decision, bounded broker enforcement,
 authoritative capability result, continuation reasoning, final validation, and
 resident-facing answer while preserving the resident's authority boundary.
 
+### Resident initiative and capability-claim boundary
+
+A resident is not occupationally competent merely because it can describe or
+offer to invoke a capability. When a request reasonably calls for an
+authorized professional capability, the resident must recognize that need
+through model reasoning and employ the appropriate bounded capability without
+requiring the Steward to select the internal mechanism. The resident may ask
+for missing domain requirements or legitimate decisions, but must not delegate
+selection of its own internal tool or institutional mechanism to the Steward.
+
+Institutional capability claims must be supportable by the active resident
+package, authority, and implementation binding. Generic model knowledge that a
+repository, service, or resource exists is not evidence of resident access.
+Normal resident speech should express internal capabilities as professional
+competence rather than dumping internal API identifiers; identifiers remain
+available through explicit technical diagnostics and provenance projections.
+
 ## 28. Self-documenting seams
 
 Each system seam must answer without archaeology:
