@@ -361,7 +361,14 @@ class ResidentOccupationalReasoner:
         if second.get("decision") not in {"answer", "synthesis"}:
             raise ValueError("RIV-OCC-0005: second model pass must synthesize an answer.")
         answer = self._answer(second)
-        return ResidentOccupationalRun(correlation_id, first, tool_result, answer, 2 + extra_passes, _epistemic(second, answer, allowed_evidence=allowed_evidence))
+        try:
+            epistemic = _epistemic(second, answer, allowed_evidence=allowed_evidence)
+        except ValueError as error:
+            repair = self._model({"phase": "epistemic_repair", "question": question.strip(), "candidate_answer": answer, "candidate_epistemic_spans": second.get("epistemic_spans", []), "allowed_evidence_refs": list(allowed_evidence), "tool_result": tool_result.as_payload(), "instructions": f"Repair only the epistemic metadata. Preserve the answer unless necessary. Riverview rejected the candidate because {str(error)[:240]}. For VERIFIED or CANON, select only an exact evidence_ref from allowed_evidence_refs; never construct, abbreviate, or infer an evidence identity. If no supplied evidence supports the claim, mark the span UNKNOWN or remove VERIFIED/CANON. Return decision=answer with complete epistemic_spans."})
+            answer = self._answer(repair)
+            epistemic = _epistemic(repair, answer, allowed_evidence=allowed_evidence)
+            extra_passes += 1
+        return ResidentOccupationalRun(correlation_id, first, tool_result, answer, 2 + extra_passes, epistemic)
 
     def _model(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         value = self.model(payload)
