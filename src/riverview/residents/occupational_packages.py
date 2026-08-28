@@ -16,22 +16,23 @@ if TYPE_CHECKING:
     from riverview.residents.gateway import ResidentProfile
 
 from riverview.reasoning.occupational import ResidentCapabilityDescriptor, ResidentCapabilityRequest, ResidentOfficeCapabilityPackage
+from riverview.intake.policy import ENGINEERING_ACTION, ENGINEERING_CAPABILITY, ENGINEERING_POLICIES
 
 
 _ENGINEERING_FORMATION_CONTRACT_SCHEMA = {
     "type": "object",
     "properties": {
-        "repository_identity": {"type": "string"},
+        "repository_identity": {"type": "string", "enum": ["ppow1/Riverview", "Riverview standalone"]},
         "repository_root": {"type": "string"},
         "expected_base_sha": {"type": "string"},
         "bounded_instruction": {"type": "string"},
         "allowed_paths": {"type": "array", "items": {"type": "string"}},
         "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
         "evidence_requirements": {"type": "array", "items": {"type": "string"}},
-        "capability_name": {"type": "string"},
-        "action_type": {"type": "string"},
+        "capability_name": {"const": ENGINEERING_CAPABILITY},
+        "action_type": {"const": ENGINEERING_ACTION},
         "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
-        "write_policy": {"type": "string"},
+        "write_policy": {"enum": sorted(ENGINEERING_POLICIES)},
     },
     "required": ["repository_identity", "repository_root", "expected_base_sha", "bounded_instruction", "allowed_paths", "acceptance_criteria", "evidence_requirements", "capability_name", "action_type", "timeout_seconds", "write_policy"],
     "additionalProperties": False,
