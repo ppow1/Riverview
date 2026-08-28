@@ -36,6 +36,14 @@ class CapabilityAuthority(StrEnum):
     PROPOSE = "PROPOSE"
 
 
+class CapabilityUnavailableError(RuntimeError):
+    """The authoritative capability is temporarily unavailable."""
+
+
+class CapabilityStaleError(RuntimeError):
+    """The authoritative capability result is stale for this request."""
+
+
 @dataclass(frozen=True, slots=True)
 class ResidentCapabilityRequest:
     request_id: UUID
@@ -206,6 +214,10 @@ class ResidentCapabilityBroker:
             return ResidentCapabilityResult(**base, status=CapabilityResultStatus.DENIED, value=None, reason="classification or authority is not permitted", evidence_refs=self.package.provenance_refs)
         try:
             value = descriptor.handler(request)
+        except CapabilityUnavailableError as exc:
+            return ResidentCapabilityResult(**base, status=CapabilityResultStatus.UNAVAILABLE, value=None, reason=str(exc) or "authoritative capability unavailable", evidence_refs=descriptor.evidence_requirements)
+        except CapabilityStaleError as exc:
+            return ResidentCapabilityResult(**base, status=CapabilityResultStatus.STALE, value=None, reason=str(exc) or "authoritative capability result is stale", evidence_refs=descriptor.evidence_requirements)
         except TimeoutError:
             return ResidentCapabilityResult(**base, status=CapabilityResultStatus.TIMEOUT, value=None, reason="authoritative capability timed out", evidence_refs=descriptor.evidence_requirements)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:

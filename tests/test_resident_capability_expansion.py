@@ -5,6 +5,8 @@ from uuid import uuid4
 
 from riverview.reasoning.occupational import (
     CapabilityResultStatus,
+    CapabilityStaleError,
+    CapabilityUnavailableError,
     ResidentCapabilityBroker,
     ResidentCapabilityDescriptor,
     ResidentCapabilityRequest,
@@ -56,3 +58,10 @@ def test_empty_and_backend_failure_are_distinct():
     failed = _package(lambda request: (_ for _ in ()).throw(RuntimeError("backend")))
     assert ResidentCapabilityBroker(empty).execute(_request(empty)).status is CapabilityResultStatus.EMPTY_AUTHORITATIVE_RESULT
     assert ResidentCapabilityBroker(failed).execute(_request(failed)).status is CapabilityResultStatus.BACKEND_FAILURE
+
+
+def test_broker_exposes_unavailable_and_stale_without_substitution():
+    unavailable = _package(lambda request: (_ for _ in ()).throw(CapabilityUnavailableError("provider offline")))
+    stale = _package(lambda request: (_ for _ in ()).throw(CapabilityStaleError("observation expired")))
+    assert ResidentCapabilityBroker(unavailable).execute(_request(unavailable)).status is CapabilityResultStatus.UNAVAILABLE
+    assert ResidentCapabilityBroker(stale).execute(_request(stale)).status is CapabilityResultStatus.STALE
