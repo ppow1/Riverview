@@ -100,6 +100,7 @@ class ReasoningResponse:
     created_at: datetime
     contract_version: str = CONTRACT_VERSION
     semantic_outcome: str | None = None
+    epistemic: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.response_type not in RESPONSE_TYPES:
@@ -110,6 +111,11 @@ class ReasoningResponse:
             raise ValueError("RIV-SEC-0001: response classification is closed.")
         if self.semantic_outcome is not None and self.semantic_outcome not in SEMANTIC_OUTCOMES:
             raise ValueError("RIV-REASON-0001: semantic outcome is unsupported.")
+        if self.epistemic is not None:
+            if not isinstance(self.epistemic, dict) or self.epistemic.get("schema_version") != "resident-epistemic-v1":
+                raise ValueError("RIV-REASON-0001: epistemic metadata is unsupported.")
+            if not isinstance(self.epistemic.get("summary_mask"), int) or self.epistemic["summary_mask"] < 0:
+                raise ValueError("RIV-REASON-0001: epistemic summary mask is invalid.")
         if not 1 <= len(self.evidence_refs) <= MAX_REFS or not all(
             isinstance(item, str) and item.strip() for item in self.evidence_refs
         ):
@@ -128,4 +134,5 @@ class ReasoningResponse:
             "classification": self.classification,
             "created_at": self.created_at.isoformat(),
             "semantic_outcome": self.semantic_outcome,
+            "epistemic": self.epistemic,
         }
