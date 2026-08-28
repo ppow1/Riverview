@@ -65,7 +65,9 @@ def _grace_closed_loop(request: ResidentCapabilityRequest) -> dict[str, Any]:
         cursor.execute("SELECT checkpoint_id,title,status,actor,started_at,completed_at,evidence,blocker FROM autonomous_checkpoints WHERE root_task_id=%s ORDER BY sequence", (UUID(root_id),))
         checkpoints = [dict(zip(("checkpoint_id", "title", "status", "actor", "started_at", "completed_at", "evidence", "blocker"), item, strict=True)) for item in cursor.fetchall()]
     binding = GovernanceBindingStore().joined_projection(UUID(root_id))
-    return {"root": dict(zip(("root_task_id", "correlation_id", "objective", "state", "current_checkpoint_id", "originating_resident", "attention_state", "created_at", "updated_at"), row, strict=True)), "roadmap": checkpoints, "governance": binding, "next_legitimate_transition": "obtain Steward authority or bind exact existing governed work" if not binding["execution_eligible"] else "Campaign Runner may evaluate the exact bound work", "evidence_refs": ["postgresql:autonomous_root_tasks", "postgresql:autonomous_checkpoints", "postgresql:autonomous_governance_bindings"]}
+    from riverview.closed_loop.tracer import TracerStore
+    result = TracerStore().read_projection(root_id)
+    return {"root": dict(zip(("root_task_id", "correlation_id", "objective", "state", "current_checkpoint_id", "originating_resident", "attention_state", "created_at", "updated_at"), row, strict=True)), "roadmap": checkpoints, "governance": binding, "execution_result": result if result.get("result_id") else None, "next_legitimate_transition": "obtain Steward authority or bind exact existing governed work" if not binding["execution_eligible"] else "Campaign Runner may evaluate the exact bound work", "evidence_refs": ["postgresql:autonomous_root_tasks", "postgresql:autonomous_checkpoints", "postgresql:autonomous_governance_bindings", "postgresql:autonomous_tracer_results"]}
 
 
 def _grace_cme(request: ResidentCapabilityRequest) -> dict[str, Any]:

@@ -174,24 +174,50 @@ class TracerStore:
         result_id = str(result.get("result_id") or uuid4())
         if self._memory:
             request = self._requests.get(request_id)
+            if request is None and result.get("external_reconciliation") is True and result.get("adapter_id") == "hermes.campaign_runner.v1":
+                if root_id not in self._roots: raise ValueError("RIV-LOOP-0014: external result root was not found.")
+                request = _MemRequest(request_id, root_id, correlation, run_id=str(result["run_id"]), state="claimed")
+                self._requests[request_id] = request
             if request is None or request.root_task_id != root_id or request.correlation_id != correlation:
                 raise ValueError("RIV-LOOP-0014: external result correspondence failed.")
             outcome = {**result, "result_id": result_id}
             self._results[result_id] = outcome
             request.result_id, request.state = result_id, "consumed"
             self._states[root_id] = "result_available"
+            self._roots[root_id]["state"] = "result_available"; self._roots[root_id]["current_checkpoint_id"] = "result-returned"
             self._event(root_id, correlation, "result.available", {"request_id": request_id, "result_id": result_id, "work_order_id": result["work_order_id"], "attempt_id": result["attempt_id"]})
             return outcome
         with connect() as conn, conn.cursor() as cur:
             cur.execute("SELECT root_task_id,correlation_id FROM autonomous_tracer_requests WHERE request_id=%s", (UUID(request_id),))
             row = cur.fetchone()
             if row is None or str(row[0]) != root_id or str(row[1]) != correlation:
-                raise ValueError("RIV-LOOP-0014: external result correspondence failed.")
+                if not (result.get("external_reconciliation") is True and result.get("adapter_id") == "hermes.campaign_runner.v1"):
+                    raise ValueError("RIV-LOOP-0014: external result correspondence failed.")
+                cur.execute("SELECT objective,originating_resident FROM autonomous_root_tasks WHERE root_task_id=%s", (UUID(root_id),)); root_row = cur.fetchone()
+                if root_row is None: raise ValueError("RIV-LOOP-0014: external result root was not found.")
+                cur.execute("INSERT INTO autonomous_tracer_requests(request_id,root_task_id,correlation_id,checkpoint_id,originating_resident,objective,state,request_digest,run_id) VALUES(%s,%s,%s,'hermes-execution',%s,%s,'consumed',%s,%s)", (UUID(request_id), UUID(root_id), UUID(correlation), root_row[1], root_row[0], _digest(result), UUID(str(result["run_id"]))))
             digest = _digest(result)
             cur.execute("INSERT INTO autonomous_tracer_results(result_id,request_id,root_task_id,correlation_id,run_id,semantic_outcome,summary,evidence,result_digest) VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)", (UUID(result_id), UUID(request_id), UUID(root_id), UUID(correlation), UUID(str(result["run_id"])), result["semantic_outcome"], str(result["summary"])[:8000], json.dumps(result["evidence"]), digest))
             cur.execute("UPDATE autonomous_tracer_requests SET state='consumed',result_id=%s,updated_at=now() WHERE request_id=%s", (UUID(result_id), UUID(request_id)))
+            cur.execute("UPDATE autonomous_root_tasks SET state='result_available',current_checkpoint_id='result-returned',updated_at=now() WHERE root_task_id=%s", (UUID(root_id),))
         self._event(root_id, correlation, "result.available", {"request_id": request_id, "result_id": result_id, "work_order_id": result["work_order_id"], "attempt_id": result["attempt_id"]})
         return {**result, "result_id": result_id, "result_digest": digest}
+
+    def advance_result_projection(self, root_id: str, result_id: str) -> dict[str, Any]:
+        """Advance only the root projection for an existing exact result."""
+        if self._memory:
+            result = self._results.get(result_id)
+            if result is None or result["root_task_id"] != root_id:
+                raise ValueError("RIV-LOOP-0016: result projection correspondence failed.")
+            self._states[root_id] = "result_available"; self._roots[root_id]["state"] = "result_available"; self._roots[root_id]["current_checkpoint_id"] = "result-returned"
+            return self.read_projection(root_id)
+        with connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT root_task_id,correlation_id FROM autonomous_tracer_results WHERE result_id=%s AND root_task_id=%s", (UUID(result_id), UUID(root_id)))
+            row = cur.fetchone()
+            if row is None:
+                raise ValueError("RIV-LOOP-0016: result projection correspondence failed.")
+            cur.execute("UPDATE autonomous_root_tasks SET state='result_available',current_checkpoint_id='result-returned',updated_at=now() WHERE root_task_id=%s", (UUID(root_id),))
+        return self.read_projection(root_id)
 
     def continue_from_result(self, root_id: str, result_id: str, *, objective: str) -> dict[str, Any]:
         """Create and execute one same-root successor request."""
