@@ -192,6 +192,14 @@ def test_model_can_answer_without_selecting_a_tool():
     assert run.final_answer == "Good evening, Steward."
 
 
+def test_unmatched_verified_span_fails_closed() -> None:
+    def model(payload):
+        return {"decision": "answer", "answer": "Unsupported fact", "epistemic_spans": [{"span_id": "bad", "start": 0, "end": 16, "mask": VERIFIED, "provenance": [{"source_class": "institutional", "evidence_ref": "not-in-package"}]}]}
+
+    with pytest.raises(ValueError, match="VERIFIED.*authoritative evidence"):
+        ResidentOccupationalReasoner(package(), model).run("What is true?", correlation_id=uuid4())
+
+
 def test_unsupported_institutional_assertion_is_repaired_through_model_capability_selection():
     descriptor = ResidentCapabilityDescriptor(
         capability_id="operations.current-work.read", capability_version="1.0.0",

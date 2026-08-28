@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Callable, Mapping
 from uuid import UUID, uuid4
-from .epistemic import EpistemicSpan, ProvenanceRecord, build_epistemic_metadata
+from .epistemic import CANON, EpistemicSpan, ProvenanceRecord, VERIFIED, build_epistemic_metadata
 
 MAX_ARGUMENT_BYTES = 16_000
 MAX_RESULT_BYTES = 32_000
@@ -244,7 +244,7 @@ class ResidentOccupationalRun:
     epistemic: dict[str, Any] | None = None
 
 
-def _epistemic(value: Mapping[str, Any], answer: str) -> dict[str, Any] | None:
+def _epistemic(value: Mapping[str, Any], answer: str, *, allowed_evidence: tuple[str, ...] = ()) -> dict[str, Any] | None:
     raw = value.get("epistemic_spans")
     if raw is None:
         return None
@@ -259,7 +259,12 @@ def _epistemic(value: Mapping[str, Any], answer: str) -> dict[str, Any] | None:
             if not isinstance(record, Mapping):
                 raise ValueError("RIV-OCC-0005: epistemic provenance must be an object.")
             provenance.append(ProvenanceRecord(source_class=str(record.get("source_class", "")), evidence_ref=str(record.get("evidence_ref", "")), freshness=record.get("freshness"), capability=record.get("capability"), source_refs=tuple(str(x) for x in record.get("source_refs", ()))))
-        spans.append(EpistemicSpan(span_id=str(item.get("span_id", "")), start=int(item.get("start", -1)), end=int(item.get("end", -1)), mask=int(item.get("mask", -1)), provenance=tuple(provenance)))
+        mask = int(item.get("mask", -1))
+        if mask & VERIFIED and (not provenance or any(record.evidence_ref not in allowed_evidence for record in provenance)):
+            raise ValueError("RIV-OCC-0005: VERIFIED epistemic span lacks matching authoritative evidence.")
+        if mask & CANON and (not provenance or any(record.source_class not in {"canon", "institutional", "postgresql", "repository"} or record.evidence_ref not in allowed_evidence for record in provenance)):
+            raise ValueError("RIV-OCC-0005: CANON epistemic span lacks matching canonical evidence.")
+        spans.append(EpistemicSpan(span_id=str(item.get("span_id", "")), start=int(item.get("start", -1)), end=int(item.get("end", -1)), mask=mask, provenance=tuple(provenance)))
     return build_epistemic_metadata(spans, response_text=answer)
 
 
@@ -305,10 +310,10 @@ class ResidentOccupationalReasoner:
                     first, capability_id, decision, extra_passes = review, reviewed_id, "capability", 1
                 else:
                     answer = self._answer(review)
-                    return ResidentOccupationalRun(correlation_id, review, None, answer, 2, _epistemic(review, answer))
+                    return ResidentOccupationalRun(correlation_id, review, None, answer, 2, _epistemic(review, answer, allowed_evidence=self.package.provenance_refs))
             else:
                 answer = self._answer(first)
-                return ResidentOccupationalRun(correlation_id, first, None, answer, 1, _epistemic(first, answer))
+                return ResidentOccupationalRun(correlation_id, first, None, answer, 1, _epistemic(first, answer, allowed_evidence=self.package.provenance_refs))
         if decision != "capability":
             raise ValueError("RIV-OCC-0005: model decision must be answer or capability.")
         arguments = first.get("arguments", {})
@@ -354,7 +359,8 @@ class ResidentOccupationalReasoner:
         if second.get("decision") not in {"answer", "synthesis"}:
             raise ValueError("RIV-OCC-0005: second model pass must synthesize an answer.")
         answer = self._answer(second)
-        return ResidentOccupationalRun(correlation_id, first, tool_result, answer, 2 + extra_passes, _epistemic(second, answer))
+        allowed_evidence = tuple(dict.fromkeys((*tool_result.evidence_refs, *self.package.provenance_refs)))
+        return ResidentOccupationalRun(correlation_id, first, tool_result, answer, 2 + extra_passes, _epistemic(second, answer, allowed_evidence=allowed_evidence))
 
     def _model(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         value = self.model(payload)
