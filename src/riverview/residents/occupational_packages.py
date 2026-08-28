@@ -65,6 +65,64 @@ def _grace_responsibility(request: ResidentCapabilityRequest, profiles: tuple[Re
     return {"items": rows[:_limit(request)], "evidence_refs": ["riverview://resident-registry"]}
 
 
+def _grace_diagnostics(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    from riverview.mcp.read_model import ReadOnlyRelay
+    return {"items": ReadOnlyRelay().diagnostics(_limit(request)), "evidence_refs": ["postgresql:diagnostic_events", "riverview://diagnostics"]}
+
+
+def _grace_attention(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    from riverview.database import connect
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT notification_id,notification_type,checkpoint_id,summary,evidence_refs,state,created_at,acknowledged_at FROM steward_notifications WHERE state IN ('queued','delivered','acknowledged') ORDER BY created_at DESC LIMIT %s", (_limit(request),))
+        rows = [dict(zip(("notification_id", "notification_type", "checkpoint_id", "summary", "evidence_refs", "state", "created_at", "acknowledged_at"), row, strict=True)) for row in cursor.fetchall()]
+    return {"items": rows, "evidence_refs": ["postgresql:steward_notifications", "riverview://steward-attention"]}
+
+
+def _grace_roadmap(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    from riverview.mcp.read_model import ReadOnlyRelay
+    relay = ReadOnlyRelay()
+    return {"position": relay.current_position(), "revision": relay.roadmap_revision(), "evidence_refs": ["postgresql:roadmap_items", "riverview://roadmap"]}
+
+
+def _grace_prepare(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    from riverview.residents.direct_grace import DirectGraceFormation
+    proposal = request.arguments.get("proposal")
+    if not isinstance(proposal, dict):
+        return {"status": "needs_refinement", "required": ["proposal.content", "proposal.summary", "proposal.formation_contract"], "evidence_refs": ["riverview://engineering-formation"]}
+    required = {"content", "summary", "formation_contract"}
+    if not required <= set(proposal) or not all(isinstance(proposal[key], str) and proposal[key].strip() for key in ("content", "summary")) or not isinstance(proposal["formation_contract"], dict):
+        return {"status": "needs_refinement", "required": sorted(required), "evidence_refs": ["riverview://engineering-formation"]}
+    prepared = DirectGraceFormation.materialize_proposal({**proposal, "classification": request.classification}, correlation_id=request.correlation_id)
+    return {"status": "prepared_for_steward_review", "proposal": prepared, "no_execution": True, "evidence_refs": ["comms5:specification", "riverview://engineering-formation"]}
+
+
+def _jessica_evidence(request: ResidentCapabilityRequest, store: CharacterStore) -> dict[str, Any]:
+    target = str(request.arguments.get("target_resident", "")).strip() or "grace"
+    current = None
+    try:
+        current = store.current(target)
+    except LookupError:
+        current = next((v for v in store.data.get("versions", []) if v.get("name", "").casefold() == target.casefold() and v.get("status") == "accepted"), None)
+    proposals = store.proposals(str(current.get("resident_id"))) if current else []
+    evidence = []
+    if current:
+        evidence.append({"class": "accepted_canon", "source": current.get("source_evidence", []), "version": current.get("version"), "record": current})
+    evidence.extend({"class": "proposal", "source": item.get("source_evidence", []), "status": item.get("status"), "record": item} for item in proposals)
+    return {"target_resident": target, "items": evidence, "unknown": [] if evidence else ["no accepted canon or proposal record found"], "evidence_refs": ["character-store:current", "character-store:proposals"]}
+
+
+def _jessica_prepare(request: ResidentCapabilityRequest, store: CharacterStore, profiles: tuple[ResidentProfile, ...]) -> dict[str, Any]:
+    from riverview.characters.workflow import CharacterDesignerWorkflow
+    target = str(request.arguments.get("target_resident", "")).strip()
+    changes = request.arguments.get("changes")
+    if not target or not isinstance(changes, dict) or not changes:
+        return {"status": "needs_refinement", "required": ["target_resident", "changes", "rationale", "source_evidence"], "evidence_refs": ["character-store:proposal-contract"]}
+    profile = next((p for p in profiles if p.resident_id == target or p.name.casefold() == target.casefold()), None)
+    target_id = profile.resident_id if profile else target
+    proposal = CharacterDesignerWorkflow(store).propose(target_id, changes, author="Jessica", sources=[str(x) for x in request.arguments.get("source_evidence", [])], rationale=str(request.arguments.get("rationale", "")))
+    return {"status": "prepared_for_independent_review", "proposal": proposal, "published": False, "evidence_refs": ["character-store:proposals"]}
+
+
 def _jessica_character(request: ResidentCapabilityRequest, store: CharacterStore, profiles: tuple[ResidentProfile, ...]) -> dict[str, Any]:
     target = str(request.arguments.get("resident_id", "")).strip()
     if not target:
@@ -104,6 +162,10 @@ def build_grace_operations_package(profile: ResidentProfile, office_id: UUID, im
         _descriptor("operations.comms5.lineage.read", "Comms5 lineage", "Read recent governed submissions and lineage metadata.", _grace_comms, classification=profile.classification, evidence=("riverview://comms5",)),
         _descriptor("operations.cookbook.lookup", "Cookbook", "Lookup bounded troubleshooting and recovery knowledge.", _grace_cookbook, classification=profile.classification, input_schema={"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer"}}}, evidence=("postgresql:cookbook_entries",)),
         _descriptor("operations.responsibility.read", "Responsibilities", "Read resident and office responsibility metadata.", lambda request: _grace_responsibility(request, profiles), classification=profile.classification, evidence=("riverview://resident-registry",)),
+        _descriptor("operations.diagnostics.lookup", "Diagnostics", "Read bounded current diagnostic evidence and related recovery references.", _grace_diagnostics, classification=profile.classification, evidence=("riverview://diagnostics",)),
+        _descriptor("operations.attention.read", "Steward attention", "Read pending and acknowledged Steward attention without acceptance authority.", _grace_attention, classification=profile.classification, evidence=("riverview://steward-attention",)),
+        _descriptor("operations.roadmap.read", "Roadmap", "Read the current authoritative roadmap position and revision.", _grace_roadmap, classification=profile.classification, evidence=("riverview://roadmap",)),
+        _descriptor("operations.engineering-request.prepare", "Engineering request preparation", "Prepare a typed governed engineering request for Steward review without execution.", _grace_prepare, classification=profile.classification, authority="PROPOSE", input_schema={"type": "object", "properties": {"proposal": {"type": "object"}}}, evidence=("riverview://engineering-formation",)),
     )
     return ResidentOfficeCapabilityPackage("grace-operations-v1", "1.0.0", UUID(profile.resident_id), UUID(profile.resident_id), UUID(str(office_id)), UUID(str(implementation_id)), profile.name, profile.role, "Coordinate bounded Riverview operations and progression.", ("observe operational state", "advise on progression", "prepare governed proposals"), ("riverview://office/operations",), ("riverview://cme-runtime-status", "riverview://capability/codex.engineering.v1"), capabilities, ("read:bounded", "return:advisory"), ("cookbook://operations",), profile.classification, 300, "institutional evidence outranks generic priors", "bounded operational metadata only", ("grace-authority:v1", "resident-continuity:operations"))
 
@@ -113,5 +175,7 @@ def build_jessica_character_package(profile: ResidentProfile, office_id: UUID, i
         _descriptor("character.canon.read", "Accepted character canon", "Read the accepted character state for a named target resident.", lambda request: _jessica_character(request, store, profiles), classification=profile.classification, input_schema={"type": "object", "properties": {"target_resident": {"type": "string", "description": "Authoritative resident name or resident ID."}}, "required": ["target_resident"], "additionalProperties": False}, evidence=("character-store:current",)),
         _descriptor("character.versions.read", "Character versions", "Read bounded accepted version history for a target resident.", lambda request: _jessica_versions(request, store), classification=profile.classification, input_schema={"type": "object", "properties": {"target_resident": {"type": "string"}}, "required": ["target_resident"], "additionalProperties": False}, evidence=("character-store:versions",)),
         _descriptor("character.proposals.read", "Character proposals", "Read proposals and review/publication status without publishing.", lambda request: _jessica_proposals(request, store), classification=profile.classification, input_schema={"type": "object", "properties": {"target_resident": {"type": "string"}}, "required": ["target_resident"], "additionalProperties": False}, evidence=("character-store:proposals",)),
+        _descriptor("character.evidence.read", "Character evidence", "Read bounded classified canon, proposal, and unknown evidence for a target resident.", lambda request: _jessica_evidence(request, store), classification=profile.classification, input_schema={"type": "object", "properties": {"target_resident": {"type": "string"}}, "required": ["target_resident"], "additionalProperties": False}, evidence=("character-store:evidence",)),
+        _descriptor("character.proposal.prepare", "Character proposal preparation", "Prepare a bounded character proposal without independent review, Steward review, or publication.", lambda request: _jessica_prepare(request, store, profiles), classification=profile.classification, authority="PROPOSE", input_schema={"type": "object", "properties": {"target_resident": {"type": "string"}, "changes": {"type": "object"}, "source_evidence": {"type": "array", "items": {"type": "string"}}, "rationale": {"type": "string"}}, "required": ["target_resident", "changes", "source_evidence", "rationale"], "additionalProperties": False}, evidence=("character-store:proposals",)),
     )
     return ResidentOfficeCapabilityPackage("jessica-character-architecture-v1", "1.0.0", UUID(profile.resident_id), UUID(profile.resident_id), UUID(str(office_id)), UUID(str(implementation_id)), profile.name, profile.role, "Recover, inspect, and develop character architecture within governed review boundaries.", ("inspect character canon", "classify evidence", "prepare bounded proposals"), ("riverview://office/character-architecture",), ("character-store:current", "character-store:proposals"), capabilities, ("read:bounded", "return:advisory"), ("character://inspection",), profile.classification, 300, "accepted canon outranks proposal, observation, and generic priors", "bounded character metadata only", ("jessica-workflow:v1", "resident-continuity:character-architecture"))

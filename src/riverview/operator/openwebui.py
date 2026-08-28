@@ -976,6 +976,19 @@ class RiverviewOpenWebUIService:
                                     typed_proposal, correlation_id=request.correlation_id
                                 )
                         response_payload = response.as_typed_payload()
+                        response_payload["resident_cognition"] = {
+                            key: value for key, value in resident_metadata.items()
+                            if key in {
+                                "resident_generic", "user_turn_id", "cognition_session_id",
+                                "cognition_correlation_id", "resident_id", "occupant_id",
+                                "office_id", "implementation_id", "package_id",
+                                "package_version", "model_passes", "selected_capability",
+                                "tool_status", "tool_request_id", "tool_result_id",
+                                "tool_evidence_refs", "provider", "model", "resource",
+                                "first_pass", "second_pass", "authority_scope",
+                                "role_authority_expanded",
+                            }
+                        }
                         if resident_metadata.get("direct_grace_proposal") is not None:
                             response_payload["direct_grace_proposal"] = resident_metadata["direct_grace_proposal"]
                         if resident_metadata.get("formation") is not None:
