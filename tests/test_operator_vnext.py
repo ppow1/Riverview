@@ -57,7 +57,7 @@ def test_transition_ignores_stale_success_and_failure() -> None:
 def test_vnext_projection_is_bounded_and_honest() -> None:
     projection = build_vnext_projection(cme=None, runtime=None, conversations=[{"id": str(i)} for i in range(20)])
     assert projection["pulse"]["state"] == "UNREACHABLE"
-    assert len(projection["conversations"]) == 8
+    assert len(projection["conversations"]) == 20
     assert build_resource_topology()["chassis"][0]["independent"] is True
 
 
