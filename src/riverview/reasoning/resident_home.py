@@ -150,22 +150,22 @@ class ResidentHomeCognitionService:
     def execute(self, profile: ResidentProfile, question: str, *, correlation_id: UUID, conversation_context: tuple[str, ...] = ()) -> ResidentHomeTurn:
         state = self.state_resolver.resolve(profile)
         package = self._package(profile, state)
-        provider_id = f"ollama:{self.model_ref}"
+        bound_model = str(state.implementation.get("model_ref") or self.model_ref)
+        provider_ref = str(state.implementation.get("provider_ref") or "ollama")
+        provider_id = f"{provider_ref}:{bound_model}"
         resource_ref = str(state.implementation.get("device_ref") or "local:RTX4090")
-        if str(state.implementation.get("provider_ref") or "ollama") != "ollama":
+        if provider_ref != "ollama":
             raise RuntimeError("RIV-HOME-0002: resident implementation provider is not Ollama")
-        if state.implementation.get("model_ref") and str(state.implementation["model_ref"]) != self.model_ref:
-            raise RuntimeError("RIV-HOME-0002: active resident implementation model does not match authorized HOME model")
         def model(payload: Mapping[str, Any]) -> Mapping[str, Any]:
             request = ReasoningRequest(
                 request_id=uuid4(), correlation_id=correlation_id, request_type="advice",
-                instruction=json.dumps({"phase": payload["phase"], "question": question, "resident": {"id": str(state.resident_id), "name": state.resident_name, "title": state.title, "office_id": str(state.office_id), "authority_ref": state.authority_ref}, "conversation_context": list(conversation_context), "capability_catalog": payload.get("capability_catalog", package.catalog()), "tool_result": payload.get("tool_result"), "policy": "Qwen chooses capabilities; Riverview only validates and executes the named request. Return structured JSON; do not expose private reasoning."}, separators=(",", ":")),
+                instruction=json.dumps({"phase": payload["phase"], "question": question, "resident": {"id": str(state.resident_id), "name": state.resident_name, "title": state.title, "office_id": str(state.office_id), "authority_ref": state.authority_ref}, "conversation_context": list(conversation_context), "capability_catalog": payload.get("capability_catalog", package.catalog()), "tool_result": payload.get("tool_result"), "policy": "Qwen chooses capabilities; Riverview only validates and executes the named request. Return structured JSON; do not expose private reasoning. Use a capability only when the Steward requests or clearly needs current authoritative Riverview or professional information. Greetings, pleasantries, compliments, personal household statements, and ordinary social conversation require decision=answer with no capability unless the user explicitly asks for operational or character-architecture work. Do not infer a professional lookup from an isolated keyword or broad metaphor."}, separators=(",", ":")),
                 context_refs=state.evidence_refs + state.state_refs + package.provenance_refs,
                 classification=state.classification, required_output_schema="resident-home-occupational-v1",
                 evidence_requirements=("resident-state", "package", "capability-selection", "provider-pass"),
                 expires_at=datetime.now(UTC) + timedelta(minutes=5), allowed_authority=("read:bounded", "return:advisory"), response_format=_DECISION_FORMAT,
             )
-            response = self.provider(self.model_ref, request)
+            response = self.provider(bound_model, request)
             try:
                 value = json.loads(response.summary)
             except (json.JSONDecodeError, TypeError) as exc:
@@ -174,7 +174,7 @@ class ResidentHomeCognitionService:
                 raise RuntimeError("RIV-HOME-0002: Qwen HOME decision is not an object")
             return value
         run = ResidentOccupationalReasoner(package, model).run(question, correlation_id=correlation_id, conversation_context=conversation_context)
-        return ResidentHomeTurn(uuid4(), uuid4(), correlation_id, state, package, run, provider_id, self.model_ref, resource_ref)
+        return ResidentHomeTurn(uuid4(), uuid4(), correlation_id, state, package, run, provider_id, bound_model, resource_ref)
 
     def _package(self, profile: ResidentProfile, state: AuthoritativeResidentState) -> ResidentOfficeCapabilityPackage:
         if profile.name.casefold() == "grace":
