@@ -264,6 +264,16 @@ class ResidentOccupationalReasoner:
             "professional_context_refs": list(self.package.professional_domain_refs + self.package.domain_knowledge_refs + self.package.procedure_refs),
             "capability_catalog": self.package.catalog(),
         })
+        extra_passes = 0
+        if first.get("decision") == "answer" and first.get("assertion_mode") == "institutional" and not first.get("evidence_refs"):
+            first = self._model({
+                "phase": "repair", "question": question.strip(), "conversation_context": list(conversation_context),
+                "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},
+                "capability_catalog": self.package.catalog(),
+                "previous_answer": first.get("answer"),
+                "instructions": "The prior answer declared an institutional assertion without authoritative evidence. Reconsider the meaning using the capability catalog. Return decision=capability with typed arguments for the needed authoritative read, or decision=answer only if the question is not an institutional assertion.",
+            })
+            extra_passes = 1
         capability_id = first.get("capability_id")
         decision = "capability" if isinstance(capability_id, str) and capability_id.strip() else first.get("decision")
         if decision == "answer":
@@ -312,7 +322,7 @@ class ResidentOccupationalReasoner:
         })
         if second.get("decision") not in {"answer", "synthesis"}:
             raise ValueError("RIV-OCC-0005: second model pass must synthesize an answer.")
-        return ResidentOccupationalRun(correlation_id, first, tool_result, self._answer(second), 2)
+        return ResidentOccupationalRun(correlation_id, first, tool_result, self._answer(second), 2 + extra_passes)
 
     def _model(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         value = self.model(payload)

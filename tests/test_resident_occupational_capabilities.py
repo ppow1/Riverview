@@ -188,3 +188,28 @@ def test_model_can_answer_without_selecting_a_tool():
     assert phases == ["first"]
     assert run.tool_result is None
     assert run.final_answer == "Good evening, Steward."
+
+
+def test_unsupported_institutional_assertion_is_repaired_through_model_capability_selection():
+    descriptor = ResidentCapabilityDescriptor(
+        capability_id="operations.current-work.read", capability_version="1.0.0",
+        name="Current work", purpose="Read current work.", authority_class="READ",
+        input_schema={"type": "object"}, result_schema={"type": "object"},
+        handler=lambda request: {"items": [{"title": "Accepted work", "state": "result_available"}], "evidence_refs": ["work://authoritative"]},
+        classification="operational", freshness_seconds=60, timeout_seconds=5,
+        max_result_bytes=8_000, evidence_requirements=("work://authoritative",),
+    )
+    phases = []
+
+    def model(payload):
+        phases.append(payload["phase"])
+        if payload["phase"] == "first":
+            return {"decision": "answer", "answer": "The work is completed and accepted.", "assertion_mode": "institutional", "claims": [{"kind": "lifecycle", "value": "accepted"}]}
+        if payload["phase"] == "repair":
+            return {"decision": "capability", "capability_id": descriptor.capability_id, "arguments": {}}
+        return {"decision": "answer", "answer": "The authoritative record shows work is available for review, not accepted."}
+
+    run = ResidentOccupationalReasoner(package(descriptor), model).run("Is the work accepted?", correlation_id=uuid4())
+    assert phases == ["first", "repair", "second"]
+    assert run.tool_result is not None
+    assert run.final_answer.startswith("The authoritative record")
