@@ -204,7 +204,7 @@ def test_unsupported_institutional_assertion_is_repaired_through_model_capabilit
     def model(payload):
         phases.append(payload["phase"])
         if payload["phase"] == "first":
-            return {"decision": "answer", "answer": "The work is completed and accepted.", "assertion_mode": "institutional", "claims": [{"kind": "lifecycle", "value": "accepted"}]}
+            return {"decision": "answer", "answer": "The work is completed and accepted.", "claims": [{"kind": "lifecycle", "value": "accepted"}]}
         if payload["phase"] == "repair":
             return {"decision": "capability", "capability_id": descriptor.capability_id, "arguments": {}}
         return {"decision": "answer", "answer": "The authoritative record shows work is available for review, not accepted."}

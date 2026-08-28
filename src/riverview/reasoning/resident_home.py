@@ -30,8 +30,10 @@ _DECISION_FORMAT = {
         "answer": {"type": ["string", "null"]},
         "capability_id": {"type": ["string", "null"]},
         "arguments": {"type": "object"},
+        "assertion_mode": {"type": "string", "enum": ["general", "institutional"]},
+        "claims": {"type": "array", "maxItems": 8, "items": {"type": "object"}},
     },
-    "required": ["decision", "answer", "capability_id", "arguments"],
+    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "claims"],
     "additionalProperties": False,
 }
 

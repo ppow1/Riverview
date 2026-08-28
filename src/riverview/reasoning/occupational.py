@@ -265,7 +265,7 @@ class ResidentOccupationalReasoner:
             "capability_catalog": self.package.catalog(),
         })
         extra_passes = 0
-        if first.get("decision") == "answer" and first.get("assertion_mode") == "institutional" and not first.get("evidence_refs"):
+        if first.get("decision") == "answer" and (first.get("assertion_mode") == "institutional" or first.get("claims")):
             first = self._model({
                 "phase": "repair", "question": question.strip(), "conversation_context": list(conversation_context),
                 "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},
