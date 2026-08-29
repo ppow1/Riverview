@@ -8,6 +8,8 @@ selection remains entirely with the model callback.
 from __future__ import annotations
 
 import json
+import hashlib
+from time import monotonic
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable, Mapping, TYPE_CHECKING
@@ -75,6 +77,7 @@ class ResidentHomeTurn:
     provider_id: str
     model_ref: str
     resource_ref: str
+    provider_calls: tuple[dict[str, Any], ...] = ()
 
     def metadata(self) -> dict[str, Any]:
         result = self.run.tool_result
@@ -104,6 +107,7 @@ class ResidentHomeTurn:
             "authority_scope": ["return:advisory"],
             "role_authority_expanded": False,
             "epistemic": self.run.epistemic,
+            "provider_calls": list(self.provider_calls),
         }
 
 
@@ -159,7 +163,7 @@ class ResidentHomeCognitionService:
         self.character_store = character_store or CharacterStore.from_profiles(profiles)
         self.state_resolver = state_resolver or ResidentHomeStateResolver()
 
-    def execute(self, profile: ResidentProfile, question: str, *, correlation_id: UUID, conversation_context: tuple[str, ...] = ()) -> ResidentHomeTurn:
+    def execute(self, profile: ResidentProfile, question: str, *, correlation_id: UUID, conversation_context: tuple[str, ...] = (), conversation_id: UUID | None = None) -> ResidentHomeTurn:
         state = self.state_resolver.resolve(profile)
         package = self._package(profile, state)
         package = replace(package, provenance_refs=tuple(dict.fromkeys((*state.evidence_refs, *state.state_refs, *package.provenance_refs))))
@@ -169,6 +173,8 @@ class ResidentHomeCognitionService:
         resource_ref = str(state.implementation.get("device_ref") or "local:RTX4090")
         if provider_ref != "ollama":
             raise RuntimeError("RIV-HOME-0002: resident implementation provider is not Ollama")
+        turn_id = uuid4()
+        provider_calls: list[dict[str, Any]] = []
         def model(payload: Mapping[str, Any]) -> Mapping[str, Any]:
             phase = str(payload["phase"])
             catalog = payload.get("capability_catalog", package.catalog()) if phase in {"first", "repair"} else []
@@ -200,7 +206,18 @@ class ResidentHomeCognitionService:
                 evidence_requirements=("resident-state", "package", "capability-selection", "provider-pass"),
                 expires_at=datetime.now(UTC) + timedelta(minutes=5), allowed_authority=("read:bounded", "return:advisory"), response_format=response_format,
             )
-            response = self.provider(bound_model, request)
+            call_id = uuid4()
+            started = monotonic()
+            schema_json = json.dumps(response_format, sort_keys=True, separators=(",", ":"))
+            record = {"provider_call_id": str(call_id), "turn_id": str(turn_id), "conversation_id": str(conversation_id) if conversation_id else None, "resident_id": str(state.resident_id), "correlation_id": str(correlation_id), "request_id": str(request.request_id), "phase": phase, "attempt": len(provider_calls) + 1, "started_at": datetime.now(UTC).isoformat(), "provider": provider_ref, "model": bound_model, "resource": resource_ref, "schema_id": f"{request.required_output_schema}:{hashlib.sha256(schema_json.encode()).hexdigest()[:16]}", "structured_output": request.response_format is not None}
+            try:
+                response = self.provider(bound_model, request)
+                record.update({"ended_at": datetime.now(UTC).isoformat(), "duration_ms": round((monotonic() - started) * 1000, 2), "status": "success", "failure_class": None, "error": None})
+                provider_calls.append(record)
+            except Exception as exc:
+                record.update({"ended_at": datetime.now(UTC).isoformat(), "duration_ms": round((monotonic() - started) * 1000, 2), "status": "failure", "failure_class": type(exc).__name__, "error": str(exc)[:240]})
+                provider_calls.append(record)
+                raise
             try:
                 value = json.loads(response.summary)
             except (json.JSONDecodeError, TypeError) as exc:
@@ -226,7 +243,7 @@ class ResidentHomeCognitionService:
             if correction.get("decision") not in {"answer", "synthesis"}:
                 raise RuntimeError("RIV-HOME-0004: capability claim correction did not synthesize an answer")
             run = ResidentOccupationalRun(run.correlation_id, run.first_decision, None, ResidentOccupationalReasoner._answer(correction), 2)
-        return ResidentHomeTurn(uuid4(), uuid4(), correlation_id, state, package, run, provider_id, bound_model, resource_ref)
+        return ResidentHomeTurn(uuid4(), uuid4(), correlation_id, state, package, run, provider_id, bound_model, resource_ref, tuple(provider_calls))
 
     def _package(self, profile: ResidentProfile, state: AuthoritativeResidentState) -> ResidentOfficeCapabilityPackage:
         if profile.name.casefold() == "grace":

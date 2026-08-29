@@ -975,6 +975,7 @@ class RiverviewOpenWebUIService:
                             classification=request.classification,
                             session_id=UUID(str(payload["session_id"])) if payload.get("session_id") else None,
                             correlation_id=request.correlation_id,
+                            conversation_id=UUID(str(payload["conversation_id"])) if payload.get("conversation_id") else None,
                             direct_grace_approval=direct_grace_approval,
                         )
                         if resident_id == "grace" and direct_grace_approval is None:

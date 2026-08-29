@@ -230,6 +230,7 @@ class ResidentConversationGateway:
         classification: str = "operational",
         session_id: UUID | None = None,
         correlation_id: UUID | None = None,
+        conversation_id: UUID | None = None,
         direct_grace_approval: dict[str, Any] | None = None,
     ) -> tuple[ResidentSession, ReasoningResponse, dict[str, Any]]:
         profile = self.resolve(resident)
@@ -245,7 +246,7 @@ class ResidentConversationGateway:
         correlation = correlation_id or uuid4()
         if self.resident_home is not None:
             prior_history = tuple(f"{turn['role']}: {str(turn['text'])[:300]}" for turn in self._bounded_history(session.history))
-            turn = self.resident_home.execute(profile, instruction, correlation_id=correlation, conversation_context=prior_history)
+            turn = self.resident_home.execute(profile, instruction, correlation_id=correlation, conversation_context=prior_history, conversation_id=conversation_id)
             tool_evidence = turn.run.tool_result.evidence_refs if turn.run.tool_result else ()
             response = ReasoningResponse(
                 response_id=uuid4(), request_id=uuid4(), correlation_id=correlation,
