@@ -72,6 +72,13 @@ _SCOPE_FORMAT = {
 }
 
 
+_SYNTHESIS_FORMAT = json.loads(json.dumps(_DECISION_FORMAT))
+_SYNTHESIS_FORMAT["properties"].pop("scope", None)
+_SYNTHESIS_FORMAT["properties"].pop("evidence_requirement", None)
+_SYNTHESIS_FORMAT["required"] = [item for item in _SYNTHESIS_FORMAT["required"] if item not in {"scope", "evidence_requirement"}]
+_SYNTHESIS_FORMAT["properties"]["decision"] = {"type": "string", "enum": ["answer", "synthesis"]}
+
+
 def _unsupported_access_claim(answer: str, catalog: list[dict[str, Any]]) -> bool:
     text = answer.casefold()
     access_claim = any(phrase in text for phrase in ("i can read", "i can access", "i have access", "i'm capable of reading", "i am capable of reading"))
@@ -228,7 +235,7 @@ class ResidentHomeCognitionService:
             evidence_catalog = []
             for handle in dict.fromkeys((*state.evidence_refs, *state.state_refs, *(tool_result or {}).get("evidence_refs", ()), *package.provenance_refs)):
                 evidence_catalog.append({"handle": str(handle), "display_label": "Authoritative evidence handle supplied for this turn", "source_class": "institutional", "capability": (tool_result or {}).get("capability_id"), "freshness": "current"})
-            response_format = json.loads(json.dumps(payload.get("response_format") or (_SCOPE_FORMAT if phase == "scope_adjudication" else _ROUTING_FORMAT if phase in {"first", "repair", "review", "validation"} else _DECISION_FORMAT)))
+            response_format = json.loads(json.dumps(payload.get("response_format") or (_SCOPE_FORMAT if phase == "scope_adjudication" else _ROUTING_FORMAT if phase in {"first", "repair", "review", "validation"} else _SYNTHESIS_FORMAT if phase == "second" else _DECISION_FORMAT)))
             if phase == "repair" and payload.get("required_scope") in {"resident_local", "institutional_broad"}:
                 response_format["properties"]["scope"] = {"const": payload["required_scope"]}
                 response_format["properties"]["evidence_requirement"] = {"const": payload.get("required_evidence_requirement", "authoritative_state" if payload["required_scope"] == "institutional_broad" else "local_context")}
