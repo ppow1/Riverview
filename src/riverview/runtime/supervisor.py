@@ -150,6 +150,17 @@ class RuntimeSupervisor:
         self.states = {spec.service_id: ServiceState(spec) for spec in self.registry.ordered()}
         self.stop_requested = False
         self.started_at = _now()
+        self.lifecycle_path = self.repository / "runtime" / "riverview-supervisor" / "lifecycle.ndjson"
+
+    def _lifecycle(self, event: str, **details: Any) -> None:
+        """Append bounded lifecycle evidence without affecting supervision."""
+        try:
+            self.lifecycle_path.parent.mkdir(parents=True, exist_ok=True)
+            record = {"at": _now(), "event": event, "supervisor_pid": os.getpid(), **{key: str(value)[:240] for key, value in details.items()}}
+            with self.lifecycle_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+        except Exception:
+            return
 
     def _processes(self) -> list[dict[str, Any]]:
         try:
@@ -485,6 +496,7 @@ class RuntimeSupervisor:
                 creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
             )
         except (OSError, RuntimeError) as exc:
+            self._lifecycle("child_start_failed", service_id=spec.service_id, error=type(exc).__name__)
             for handle in locals().get("stdout_handle"), locals().get("stderr_handle"):
                 if handle is not None:
                     handle.close()
@@ -502,6 +514,7 @@ class RuntimeSupervisor:
         state.status = "starting"
         state.last_change = _now()
         state.started_monotonic = time.monotonic()
+        self._lifecycle("child_started", service_id=spec.service_id, pid=process.pid)
 
     @staticmethod
     def _expand_command_item(item: str) -> str:
@@ -515,6 +528,7 @@ class RuntimeSupervisor:
     def _refresh(self, state: ServiceState) -> None:
         if state.process is not None and state.process.poll() is not None:
             returncode = state.process.returncode
+            self._lifecycle("child_exited", service_id=state.spec.service_id, pid=state.pid, exit_code=returncode)
             state.process = None
             for handle in (state.stdout_handle, state.stderr_handle):
                 if handle is not None:
@@ -677,6 +691,7 @@ class RuntimeSupervisor:
         if process_lock is None:
             return
         try:
+            self._lifecycle("supervisor_started")
             shutil.rmtree(lock, ignore_errors=True)
             lock.mkdir()
             (lock / "owner.json").write_text(
@@ -685,7 +700,11 @@ class RuntimeSupervisor:
             while not self.stop_requested:
                 self.reconcile_once()
                 time.sleep(self.poll_seconds)
+        except Exception as exc:
+            self._lifecycle("supervisor_exception", error=type(exc).__name__, message=str(exc)[:240])
+            raise
         finally:
+            self._lifecycle("supervisor_stopping", reason="stop_requested" if self.stop_requested else "run_exit")
             self.stop_all()
             self.write_status()
             try:
@@ -771,6 +790,9 @@ def main() -> None:
         supervisor.run()
     except KeyboardInterrupt:
         supervisor.stop_all()
+    except Exception as exc:
+        supervisor._lifecycle("supervisor_uncaught_exception", error=type(exc).__name__, message=str(exc)[:240])
+        raise
 
 
 if __name__ == "__main__":
