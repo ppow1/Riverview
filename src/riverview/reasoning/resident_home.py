@@ -235,6 +235,9 @@ class ResidentHomeCognitionService:
                     raise RuntimeError("RIV-HOME-0002: Qwen structured-output repair remained malformed") from repair_error
             if not isinstance(value, dict):
                 raise RuntimeError("RIV-HOME-0002: Qwen HOME decision is not an object")
+            if provider_calls:
+                provider_calls[-1]["structured_summary"] = {"answer_chars": len(value.get("answer")) if isinstance(value.get("answer"), str) else None, "assertion_mode": value.get("assertion_mode"), "claim_count": len(value.get("claims", ())) if isinstance(value.get("claims"), list) else None, "span_count": len(value.get("epistemic_spans", ())) if isinstance(value.get("epistemic_spans"), list) else None, "span_masks": [item.get("mask") for item in value.get("epistemic_spans", ()) if isinstance(item, Mapping)][:32], "span_ids": [item.get("span_id") for item in value.get("epistemic_spans", ()) if isinstance(item, Mapping)][:32], "claim_span_ids": [item.get("span_id") for item in value.get("claims", ()) if isinstance(item, Mapping)][:32], "evidence_choice_counts": [len(item.get("evidence_choice_ids", ())) for item in value.get("epistemic_spans", ()) if isinstance(item, Mapping)][:32]}
+                self.last_provider_calls = tuple(provider_calls)
             if phase == "first" and ("assertion_mode" not in value or "claims" not in value):
                 value = {**value, "_contract_missing": True}
             return value
