@@ -232,6 +232,9 @@ class ResidentHomeCognitionService:
             if phase == "repair" and payload.get("required_scope") in {"resident_local", "institutional_broad"}:
                 response_format["properties"]["scope"] = {"const": payload["required_scope"]}
                 response_format["properties"]["evidence_requirement"] = {"const": payload.get("required_evidence_requirement", "authoritative_state" if payload["required_scope"] == "institutional_broad" else "local_context")}
+                if payload["required_scope"] == "institutional_broad":
+                    response_format["properties"]["decision"] = {"const": "capability"}
+                    response_format["properties"]["capability_id"] = {"type": "string", "enum": [str(item.get("capability_id")) for item in catalog if item.get("capability_id")]}
             if evidence_catalog and "epistemic_spans" in response_format["properties"] and "provenance" in response_format["properties"]["epistemic_spans"]["items"].get("properties", {}):
                 response_format["properties"]["epistemic_spans"]["items"]["properties"]["provenance"]["items"]["properties"]["evidence_ref"]["enum"] = [item["handle"] for item in evidence_catalog]
             request = ReasoningRequest(
