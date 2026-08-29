@@ -15,7 +15,7 @@ import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from riverview.hermes_attention import submit_hermes_attention
+from riverview.hermes_attention import submit_hermes_attention, submit_hermes_run_boundary
 
 VERSION = "riverview-hermes-terminal-outcome-v1"
 MARKER_RE = re.compile(
@@ -30,7 +30,8 @@ ATTENTION_OUTCOMES = frozenset(
         "STEWARD_DECISION_REQUIRED",
     }
 )
-NON_ATTENTION_OUTCOMES = frozenset({"CONTINUE", "COMPLETED_NO_ATTENTION"})
+FAILURE_OUTCOMES = frozenset({"RETRYABLE_FAILURE", "TERMINAL_FAILURE"})
+NON_ATTENTION_OUTCOMES = frozenset({"CONTINUE", "OBJECTIVE_COMPLETE", "COMPLETED_NO_ATTENTION"})
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.IGNORECASE)
 _SHA_RE = re.compile(r"^[0-9a-f]{7,64}$", re.IGNORECASE)
 _CHECKPOINT_RE = re.compile(r"^RIV-[A-Z0-9-]+$", re.IGNORECASE)
@@ -101,6 +102,8 @@ def process_terminal_outcome(
     session_id: str,
     window_description: str | None = None,
     submit: Callable[..., Mapping[str, Any]] = submit_hermes_attention,
+    run_boundary_submit: Callable[..., Mapping[str, Any]] = submit_hermes_run_boundary,
+    notify: bool = True,
 ) -> str:
     """Process one normal Hermes final response and return report text.
 
@@ -120,8 +123,21 @@ def process_terminal_outcome(
         return response_text
 
     try:
-        outcome = _text(envelope.get("outcome"), "outcome").upper()
+        outcome = _text(envelope.get("disposition", envelope.get("outcome")), "disposition").upper()
+        if outcome in FAILURE_OUTCOMES:
+            return _diagnostic(clean, f"structured objective disposition is {outcome}; no successful completion was recorded")
+        if outcome in NON_ATTENTION_OUTCOMES and not notify:
+            return clean
         if outcome in NON_ATTENTION_OUTCOMES:
+            # Legacy CONTINUE/COMPLETED_NO_ATTENTION markers were display-only
+            # and did not carry the run-boundary identity fields. Preserve that
+            # compatibility behavior while requiring the full envelope for the
+            # new objective-boundary path.
+            if any(not envelope.get(key) for key in ("lane", "checkpoint_id", "evidence_ref", "terminal_transition_id")):
+                return clean
+            result = run_boundary_submit(lane=_text(envelope.get("lane"), "lane"), outcome=outcome, checkpoint_id=_text(envelope.get("checkpoint_id"), "checkpoint_id"), evidence_ref=_text(envelope.get("evidence_ref"), "evidence_ref", limit=2000), session_id=session_id, transition_id=_text(envelope.get("terminal_transition_id"), "terminal_transition_id"), task_title=envelope.get("task_title"), roadmap_title=envelope.get("roadmap_title"), window_description=window_description, correlation_id=envelope.get("correlation_id"), resulting_sha=envelope.get("resulting_sha"))
+            if not isinstance(result.get("delivery") if isinstance(result, Mapping) else None, Mapping):
+                raise TypeError("RIV-HERMES-OUTCOME-0007: run-boundary notification returned no delivery result.")
             return clean
         if outcome not in ATTENTION_OUTCOMES:
             raise ValueError(

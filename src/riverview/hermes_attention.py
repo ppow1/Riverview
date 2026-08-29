@@ -10,9 +10,12 @@ boundary to Riverview, which owns persistence, idempotency, and delivery.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from riverview.notifications import NotificationStore
 from riverview.notifications_audio import deliver_steward_notification
+from riverview.river.events import Classification, RiverEvent
+from riverview.river.store import EventStore
 
 VERSION = "riverview-hermes-attention-v1"
 _ALLOWED_BOUNDARIES = {
@@ -121,4 +124,35 @@ def submit_hermes_attention(
     }
 
 
-__all__ = ["VERSION", "submit_hermes_attention"]
+def submit_hermes_run_boundary(*, lane: str, outcome: str, checkpoint_id: str,
+    evidence_ref: str, session_id: str, transition_id: str,
+    task_title: str | None = None, roadmap_title: str | None = None,
+    window_description: str | None = None, correlation_id: str | None = None,
+    run_started_at: str | None = None, run_completed_at: str | None = None,
+    resulting_sha: str | None = None, store: NotificationStore | None = None,
+    event_store: EventStore | None = None,
+    deliver=deliver_steward_notification) -> dict[str, Any]:
+    """Record an objective/run boundary without accepting authoritative state."""
+    lane_value = _required_text(lane, "lane")
+    outcome_value = _required_text(outcome, "outcome").upper()
+    if outcome_value not in {"CONTINUE", "OBJECTIVE_COMPLETE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"}:
+        raise ValueError("RIV-HERMES-ATTN-0004: run outcome is unsupported.")
+    checkpoint_value = _required_text(checkpoint_id, "checkpoint_id")
+    evidence_value = _required_text(evidence_ref, "evidence_ref", max_length=512)
+    session_value = _required_text(session_id, "session_id")
+    transition_value = _required_text(transition_id, "transition_id")
+    suffix = "continuation remains." if outcome_value == "CONTINUE" else "completed."
+    key = f"hermes.run_boundary:{session_value}:{transition_value}"
+    notification_id = (store or NotificationStore()).emit(
+        idempotency_key=key, notification_type="important_completion",
+        checkpoint_id=checkpoint_value,
+        summary=f"{task_title or roadmap_title or lane_value} iteration complete; {suffix}",
+        evidence_refs=(f"lane:{lane_value}", f"session:{session_value}", evidence_value),
+    )
+    delivery = deliver(notification_id)
+    if event_store is not None and correlation_id:
+        event_store.append(RiverEvent(event_type="hermes.run_boundary", aggregate_type="hermes_session", aggregate_id=notification_id, correlation_id=UUID(correlation_id), idempotency_key=key, classification=Classification.INTERNAL, payload={"outcome": outcome_value, "checkpoint_id": checkpoint_value}))
+    return {"schema_version": VERSION, "notification_id": str(notification_id), "idempotency_key": key, "outcome": outcome_value, "delivery": delivery, "institutionally_accepted": False}
+
+
+__all__ = ["VERSION", "submit_hermes_attention", "submit_hermes_run_boundary"]

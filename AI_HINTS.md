@@ -61,6 +61,15 @@ Rules:
 - Do not add governance unless an existing document cannot absorb the requirement.
 - Do not route work through an OpenAI API model.
 - Do not expose Undercurrent or sensitive data through ordinary River paths.
+
+## HERMES OBJECTIVE CONTINUITY AND TASK SUBMISSION
+
+Search: `objective continuity`, `Hermes task submission`, or `Hermes submission template`.
+For Hermes task submission use
+`docs/operations/hermes/HERMES_ENGINEERING_TASK_SUBMISSION_TEMPLATE.md`.
+For premature stop, turn complete versus objective complete, `CONTINUE`, and
+CME semantics use `docs/operations/hermes/HERMES_OBJECTIVE_CONTINUITY_CONTRACT.md`
+and `tools/hermes/skills/riverview-objective-continuity/SKILL.md`.
 - A capability is not complete until its failure behavior is diagnosable and recovery is verifiable.
 - Follow the Engineering Interaction and Delivery Contract for versioned artifacts, complete PowerShell files, self-installation, durable reports, clipboard capture, Cookbook-first diagnostics, bounded scope, staged publication, and evidence terminology.
 - For Steward-requested engineering work through Grace, read `docs/operations/GRACE_ENGINEERING_TASK_SUBMISSION_TEMPLATE.md` before forming or submitting the task. It is the canonical single-task and parallel-task Comms5/Grace submission, one-approval, lineage-following, and same-lineage recovery template.
