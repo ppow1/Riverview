@@ -150,6 +150,8 @@ class RuntimeSupervisor:
         self.states = {spec.service_id: ServiceState(spec) for spec in self.registry.ordered()}
         self.stop_requested = False
         self.started_at = _now()
+        self.supervisor_last_failure: str | None = None
+        self.supervisor_failure_count = 0
         self.lifecycle_path = self.repository / "runtime" / "riverview-supervisor" / "lifecycle.ndjson"
 
     def _lifecycle(self, event: str, **details: Any) -> None:
@@ -635,6 +637,8 @@ class RuntimeSupervisor:
             "started_at": self.started_at,
             "updated_at": _now(),
             "git_sha": self._git_sha(),
+            "supervisor_last_failure": self.supervisor_last_failure,
+            "supervisor_failure_count": self.supervisor_failure_count,
             "services": {
                 service_id: {
                     "status": state.status,
@@ -698,7 +702,15 @@ class RuntimeSupervisor:
                 json.dumps({"pid": os.getpid(), "started_at": self.started_at}), encoding="utf-8"
             )
             while not self.stop_requested:
-                self.reconcile_once()
+                try:
+                    self.reconcile_once()
+                    self.supervisor_last_failure = None
+                    self.supervisor_failure_count = 0
+                except Exception as exc:
+                    self.supervisor_last_failure = f"{type(exc).__name__}: {str(exc)[:240]}"
+                    self.supervisor_failure_count += 1
+                    self._lifecycle("reconcile_failed", error=type(exc).__name__, message=str(exc)[:240], attempt=self.supervisor_failure_count)
+                    self.write_status()
                 time.sleep(self.poll_seconds)
         except Exception as exc:
             self._lifecycle("supervisor_exception", error=type(exc).__name__, message=str(exc)[:240])
@@ -764,7 +776,7 @@ class RuntimeSupervisor:
         self.stop_requested = True
         for state in self.states.values():
             if state.process is not None and state.process.poll() is None:
-                state.process.terminate()
+                self._terminate_process_tree(state.process.pid)
                 try:
                     state.process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
