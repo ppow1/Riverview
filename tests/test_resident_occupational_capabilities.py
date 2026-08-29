@@ -169,7 +169,7 @@ def test_model_selects_capability_and_receives_result_on_second_pass():
             return {"decision": "capability", "capability_id": descriptor.capability_id, "arguments": {}}
         assert payload["tool_result"]["status"] == "SUCCESS"
         assert payload["tool_result"]["value"]["items"][0]["state"] == "active"
-        return {"decision": "answer", "answer": "Alpha is active.", "epistemic_spans": [{"span_id": "alpha", "start": 0, "end": 5, "mask": VERIFIED | REASONED, "provenance": [{"source_class": "live_telemetry", "evidence_ref": "work://alpha", "freshness": "current"}]}]}
+        return {"decision": "answer", "answer": "Alpha is active.", "claims": [{"span_id": "alpha", "claim_text": "Alpha", "assertion_kind": "verified_fact"}], "epistemic_spans": [{"span_id": "alpha", "start": 0, "end": 5, "mask": VERIFIED | REASONED, "provenance": [{"source_class": "live_telemetry", "evidence_ref": "work://alpha", "freshness": "current"}]}]}
 
     run = ResidentOccupationalReasoner(pkg, model).run("What is currently moving?", correlation_id=uuid4())
     assert phases == ["first", "second"]
@@ -211,7 +211,7 @@ def test_canon_claim_must_match_the_tagged_span() -> None:
 
 
 def test_answer_whitespace_is_part_of_the_coordinate_contract() -> None:
-    value = {"epistemic_spans": [{"span_id": "answer", "start": 1, "end": 7, "mask": VERIFIED, "evidence_choice_ids": [0]}]}
+    value = {"claims": [{"span_id": "answer", "claim_text": "Answer", "assertion_kind": "verified_fact"}], "epistemic_spans": [{"span_id": "answer", "start": 1, "end": 7, "mask": VERIFIED, "evidence_choice_ids": [0]}]}
     metadata = _epistemic(value, " Answer", allowed_evidence=("work://answer",))
     assert metadata["spans"][0]["start"] == 1
 
@@ -220,6 +220,12 @@ def test_substantive_typed_claims_cannot_bypass_epistemic_coverage() -> None:
     value = {"claims": [{"assertion_kind": "canonical_identity"}], "epistemic_spans": []}
     with pytest.raises(ValueError, match="epistemic coverage"):
         _epistemic(value, "Jessica is an established resident.", allowed_evidence=("canon://jessica",))
+
+
+def test_verified_span_requires_matching_typed_claim() -> None:
+    value = {"claims": [], "epistemic_spans": [{"span_id": "fact", "start": 0, "end": 16, "mask": VERIFIED, "evidence_choice_ids": [0]}]}
+    with pytest.raises(ValueError, match="VERIFIED.*claim"):
+        _epistemic(value, "Unsupported fact", allowed_evidence=("state://current",))
 
 
 def test_unsupported_institutional_assertion_is_repaired_through_model_capability_selection():

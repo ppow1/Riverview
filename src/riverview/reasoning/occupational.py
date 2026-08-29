@@ -266,19 +266,21 @@ def _epistemic(value: Mapping[str, Any], answer: str, *, allowed_evidence: tuple
                 raise ValueError("RIV-OCC-0005: epistemic provenance must be an object.")
             provenance.append(ProvenanceRecord(source_class=str(record.get("source_class", "")), evidence_ref=str(record.get("evidence_ref", "")), freshness=record.get("freshness"), capability=record.get("capability"), source_refs=tuple(str(x) for x in record.get("source_refs", ()))))
         mask = int(item.get("mask", -1))
-        canonical_claim = any(
+        matching_claims = [claim for claim in value.get("claims", ()) if
             isinstance(claim, Mapping)
             and str(claim.get("span_id", "")) == str(item.get("span_id", ""))
-            and str(claim.get("assertion_kind", "")).casefold() in {"canonical_fact", "canonical_identity", "resident_canon"}
             and str(claim.get("claim_text", "")) == answer[int(item.get("start", -1)):int(item.get("end", -1))]
-            for claim in value.get("claims", ())
-        )
+        ]
+        canonical_claim = any(str(claim.get("assertion_kind", "")).casefold() in {"canonical_fact", "canonical_identity", "resident_canon"} for claim in matching_claims)
+        verified_claim = any(str(claim.get("assertion_kind", "")).casefold() in {"verified_fact", "authoritative_fact"} for claim in matching_claims)
         if mask & VERIFIED and (not provenance or any(record.evidence_ref not in allowed_evidence for record in provenance)):
             raise ValueError(f"RIV-OCC-0005: VERIFIED epistemic span lacks matching authoritative evidence (declared={[record.evidence_ref for record in provenance]!r}, allowed={list(allowed_evidence)!r}).")
         if mask & CANON and (not provenance or any(record.source_class not in {"canon", "institutional", "postgresql", "repository"} or record.evidence_ref not in allowed_evidence for record in provenance)):
             raise ValueError("RIV-OCC-0005: CANON epistemic span lacks matching canonical evidence.")
         if mask & CANON and not canonical_claim:
             raise ValueError("RIV-OCC-0005: CANON epistemic span lacks a matching canonical claim.")
+        if mask & VERIFIED and not verified_claim:
+            raise ValueError("RIV-OCC-0005: VERIFIED epistemic span lacks a matching authoritative claim.")
         spans.append(EpistemicSpan(span_id=str(item.get("span_id", "")), start=int(item.get("start", -1)), end=int(item.get("end", -1)), mask=mask, provenance=tuple(provenance)))
     return build_epistemic_metadata(spans, response_text=answer)
 
@@ -371,7 +373,7 @@ class ResidentOccupationalReasoner:
             "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},
             "tool_result": tool_result.as_payload(),
             "allowed_evidence_refs": list(allowed_evidence),
-            "instructions": "This is the mandatory final continuation pass. Do not request another capability. Reason over the authoritative capability result, distinguish canon from unknown/proposal, and return decision=answer with a natural resident-facing answer. Also return epistemic_spans for meaningful portions of the exact answer string. For every CANON span, claims must include the same span_id, an allowed canonical assertion_kind, and claim_text copied exactly from answer[start:end]; unrelated conversational text must not be CANON. REASONED for evidence-based conclusions; GENERAL for unverified general knowledge; CREATIVE for intentional personality/metaphor; and UNKNOWN where truth is not established. Never invent evidence references or private reasoning.",
+            "instructions": "This is the mandatory final continuation pass. Do not request another capability. Reason over the authoritative capability result, distinguish canon from unknown/proposal, and return decision=answer with a natural resident-facing answer. Also return epistemic_spans for meaningful portions of the exact answer string. For every VERIFIED span, claims must include the same span_id, assertion_kind=verified_fact or authoritative_fact, and claim_text copied exactly from answer[start:end]. For every CANON span, claims must include the same span_id, an allowed canonical assertion_kind, and claim_text copied exactly from answer[start:end]; unrelated conversational text must not be CANON. REASONED for evidence-based conclusions; GENERAL for unverified general knowledge; CREATIVE for intentional personality/metaphor; and UNKNOWN where truth is not established. Never invent evidence references or private reasoning.",
         })
         if second.get("decision") not in {"answer", "synthesis"}:
             raise ValueError("RIV-OCC-0005: second model pass must synthesize an answer.")
