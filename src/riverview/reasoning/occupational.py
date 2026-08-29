@@ -314,7 +314,7 @@ class ResidentOccupationalReasoner:
                 "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},
                 "capability_catalog": self.package.catalog(),
                 "previous_answer": first.get("answer"),
-                "instructions": "The prior answer declared an institutional assertion without authoritative evidence. Reconsider the meaning using the capability catalog. Return decision=capability with typed arguments for the needed authoritative read, or decision=answer only if the question is not an institutional assertion.",
+                "instructions": "The prior routing answer declared an institutional assertion without authoritative evidence. Reconsider using the capability catalog. For decision=answer return routing context only with claims=[] and epistemic_spans=[]; do not preserve unsupported VERIFIED/CANON metadata. Return decision=capability with typed arguments for the needed authoritative read, or decision=answer only if the question is not an institutional assertion.",
             })
             extra_passes = 1
         capability_id = first.get("capability_id")
