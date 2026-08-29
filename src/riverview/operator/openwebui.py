@@ -1036,7 +1036,8 @@ class RiverviewOpenWebUIService:
                     provider_resource_failure = "RIV-REASON-0003" in str(exc)
                     checkpoint = "RIV-RES-0002" if resident_id else "RIV-UI-0009"
                     diagnostic(checkpoint, "resident_chat" if resident_id else "operator_chat", "provider_resource_failure" if provider_resource_failure else "resident_provider_failure" if resident_id else "bounded_request_failure", f"Bounded operator request failed: {type(exc).__name__}: {str(exc)[:240]}")
-                    self._send(HTTPStatus.BAD_REQUEST, {"error": "provider_resource_unavailable" if provider_resource_failure else "bounded_request_rejected", "checkpoint": checkpoint, "cause_checkpoint": "RIV-REASON-0003" if provider_resource_failure else "RIV-REASON-0002" if provider_failure else "unavailable", "reason": str(exc)[:240]})
+                    calls = getattr(getattr(service.resident_gateway, "resident_home", None), "last_provider_calls", ())
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": "provider_resource_unavailable" if provider_resource_failure else "bounded_request_rejected", "checkpoint": checkpoint, "cause_checkpoint": "RIV-REASON-0003" if provider_resource_failure else "RIV-REASON-0002" if provider_failure else "unavailable", "reason": str(exc)[:240], "provider_calls": list(calls)[:8]})
 
             def do_PATCH(self) -> None:
                 if self._auth() and self.path.startswith("/api/rooms/"):

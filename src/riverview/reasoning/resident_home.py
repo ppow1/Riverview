@@ -162,6 +162,7 @@ class ResidentHomeCognitionService:
         self.model_ref = model_ref
         self.character_store = character_store or CharacterStore.from_profiles(profiles)
         self.state_resolver = state_resolver or ResidentHomeStateResolver()
+        self.last_provider_calls: tuple[dict[str, Any], ...] = ()
 
     def execute(self, profile: ResidentProfile, question: str, *, correlation_id: UUID, conversation_context: tuple[str, ...] = (), conversation_id: UUID | None = None) -> ResidentHomeTurn:
         state = self.state_resolver.resolve(profile)
@@ -175,6 +176,7 @@ class ResidentHomeCognitionService:
             raise RuntimeError("RIV-HOME-0002: resident implementation provider is not Ollama")
         turn_id = uuid4()
         provider_calls: list[dict[str, Any]] = []
+        self.last_provider_calls = ()
         def model(payload: Mapping[str, Any]) -> Mapping[str, Any]:
             phase = str(payload["phase"])
             catalog = payload.get("capability_catalog", package.catalog()) if phase in {"first", "repair"} else []
@@ -214,9 +216,11 @@ class ResidentHomeCognitionService:
                 response = self.provider(bound_model, request)
                 record.update({"ended_at": datetime.now(UTC).isoformat(), "duration_ms": round((monotonic() - started) * 1000, 2), "status": "success", "failure_class": None, "error": None})
                 provider_calls.append(record)
+                self.last_provider_calls = tuple(provider_calls)
             except Exception as exc:
                 record.update({"ended_at": datetime.now(UTC).isoformat(), "duration_ms": round((monotonic() - started) * 1000, 2), "status": "failure", "failure_class": type(exc).__name__, "error": str(exc)[:240]})
                 provider_calls.append(record)
+                self.last_provider_calls = tuple(provider_calls)
                 raise
             try:
                 value = json.loads(response.summary)
