@@ -381,7 +381,9 @@ class ResidentOccupationalReasoner:
         try:
             epistemic = _epistemic(second, answer, allowed_evidence=allowed_evidence)
         except ValueError as error:
-            repair = self._model({"phase": "epistemic_repair", "question": question.strip(), "candidate_answer": answer, "candidate_epistemic_spans": second.get("epistemic_spans", []), "allowed_evidence_refs": list(allowed_evidence), "tool_result": tool_result.as_payload(), "instructions": f"Repair only the epistemic metadata. Preserve the answer unless necessary. Riverview rejected the candidate because {str(error)[:240]}. For VERIFIED or CANON, select only exact supplied evidence and regenerate the claim bound to the same span_id: use assertion_kind=verified_fact/authoritative_fact for VERIFIED or canonical_fact/canonical_identity/resident_canon for CANON, and claim_text must equal candidate_answer[start:end] exactly. If no supplied evidence supports the claim, remove VERIFIED/CANON or use UNKNOWN. Return decision=answer with complete epistemic_spans and claims."})
+            repair_format = json.loads(json.dumps(_DECISION_FORMAT))
+            repair_format["properties"]["epistemic_spans"]["items"]["properties"]["mask"] = {"type": "integer", "enum": [4, 8, 16, 32]}
+            repair = self._model({"phase": "epistemic_repair", "question": question.strip(), "candidate_answer": answer, "candidate_epistemic_spans": second.get("epistemic_spans", []), "allowed_evidence_refs": list(allowed_evidence), "tool_result": tool_result.as_payload(), "response_format": repair_format, "instructions": f"Repair only the epistemic metadata. Preserve the answer unless necessary. Riverview rejected the candidate because {str(error)[:240]}. The repair schema intentionally permits only REASONED, GENERAL, CREATIVE, or UNKNOWN; do not retain VERIFIED/CANON unless the original final pass already satisfied its exact evidence and typed-claim contract. Return decision=answer with complete epistemic_spans and claims."})
             answer = self._answer(repair)
             epistemic = _epistemic(repair, answer, allowed_evidence=allowed_evidence)
             extra_passes += 1
