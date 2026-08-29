@@ -229,6 +229,9 @@ class ResidentHomeCognitionService:
             for handle in dict.fromkeys((*state.evidence_refs, *state.state_refs, *(tool_result or {}).get("evidence_refs", ()), *package.provenance_refs)):
                 evidence_catalog.append({"handle": str(handle), "display_label": "Authoritative evidence handle supplied for this turn", "source_class": "institutional", "capability": (tool_result or {}).get("capability_id"), "freshness": "current"})
             response_format = json.loads(json.dumps(payload.get("response_format") or (_SCOPE_FORMAT if phase == "scope_adjudication" else _ROUTING_FORMAT if phase in {"first", "repair", "review", "validation"} else _DECISION_FORMAT)))
+            if phase == "repair" and payload.get("required_scope") in {"resident_local", "institutional_broad"}:
+                response_format["properties"]["scope"] = {"const": payload["required_scope"]}
+                response_format["properties"]["evidence_requirement"] = {"const": payload.get("required_evidence_requirement", "authoritative_state" if payload["required_scope"] == "institutional_broad" else "local_context")}
             if evidence_catalog and "epistemic_spans" in response_format["properties"] and "provenance" in response_format["properties"]["epistemic_spans"]["items"].get("properties", {}):
                 response_format["properties"]["epistemic_spans"]["items"]["properties"]["provenance"]["items"]["properties"]["evidence_ref"]["enum"] = [item["handle"] for item in evidence_catalog]
             request = ReasoningRequest(

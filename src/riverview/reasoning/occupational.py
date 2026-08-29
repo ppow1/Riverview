@@ -320,6 +320,8 @@ class ResidentOccupationalReasoner:
                 "resident": {"resident_id": str(self.package.resident_id), "occupant_id": str(self.package.occupant_id), "office_id": str(self.package.office_id), "title": self.package.title},
                 "capability_catalog": self.package.catalog(),
                 "previous_answer": first.get("answer"),
+                "required_scope": first.get("scope"),
+                "required_evidence_requirement": first.get("evidence_requirement"),
                 "instructions": "The prior routing answer identified an institutional_broad scope or institutional assertion without an authoritative capability result. Reconsider using the capability catalog. Return decision=capability with typed arguments for the appropriate authoritative read; for the resident registry use institutional.resident-registry.read. Only use decision=answer for genuinely resident_local scope, with claims=[] and epistemic_spans=[]; do not preserve unsupported VERIFIED/CANON metadata.",
             })
             extra_passes = 1
