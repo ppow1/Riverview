@@ -42,6 +42,23 @@ _DECISION_FORMAT = {
 }
 
 
+_ROUTING_FORMAT = {
+    "type": "object",
+    "properties": {
+        "decision": {"type": "string", "enum": ["answer", "capability"]},
+        "answer": {"type": ["string", "null"]},
+        "capability_id": {"type": ["string", "null"]},
+        "arguments": {"type": "object"},
+        "assertion_mode": {"type": "string", "enum": ["general", "institutional"]},
+        "scope": {"type": "string", "enum": ["resident_local", "institutional_broad"]},
+        "claims": {"type": "array", "maxItems": 0, "items": {}},
+        "epistemic_spans": {"type": "array", "maxItems": 0, "items": {}},
+    },
+    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "scope", "claims", "epistemic_spans"],
+    "additionalProperties": False,
+}
+
+
 def _unsupported_access_claim(answer: str, catalog: list[dict[str, Any]]) -> bool:
     text = answer.casefold()
     access_claim = any(phrase in text for phrase in ("i can read", "i can access", "i have access", "i'm capable of reading", "i am capable of reading"))
@@ -198,8 +215,8 @@ class ResidentHomeCognitionService:
             evidence_catalog = []
             for handle in dict.fromkeys((*state.evidence_refs, *state.state_refs, *(tool_result or {}).get("evidence_refs", ()), *package.provenance_refs)):
                 evidence_catalog.append({"handle": str(handle), "display_label": "Authoritative evidence handle supplied for this turn", "source_class": "institutional", "capability": (tool_result or {}).get("capability_id"), "freshness": "current"})
-            response_format = json.loads(json.dumps(payload.get("response_format") or _DECISION_FORMAT))
-            if evidence_catalog:
+            response_format = json.loads(json.dumps(payload.get("response_format") or (_ROUTING_FORMAT if phase in {"first", "repair", "review", "validation"} else _DECISION_FORMAT)))
+            if evidence_catalog and "provenance" in response_format["properties"]["epistemic_spans"]["items"].get("properties", {}):
                 response_format["properties"]["epistemic_spans"]["items"]["properties"]["provenance"]["items"]["properties"]["evidence_ref"]["enum"] = [item["handle"] for item in evidence_catalog]
             request = ReasoningRequest(
                 request_id=uuid4(), correlation_id=correlation_id, request_type="advice",
