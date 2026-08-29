@@ -19,3 +19,15 @@ def test_cme_v1_anti_spin_is_root_scoped():
     policy.observe(event(a)); policy.observe(event(a)); anomaly = policy.observe(event(a))
     assert anomaly["state"] == "MOMENTUM_ANOMALY"
     assert policy.observe(event(b))["state"] == "CONTINUATION_QUEUED"
+
+
+def test_cme_does_not_advance_authority_from_objective_complete_report():
+    queued = []
+    policy = CMEV1ContinuationPolicy(enqueue=queued.append)
+    result = policy.observe({
+        "root_task_id": str(uuid4()), "correlation_id": str(uuid4()),
+        "request_id": str(uuid4()), "result_id": str(uuid4()),
+        "semantic_outcome": "OBJECTIVE_COMPLETE", "result_digest": "accepted-candidate",
+    })
+    assert result["state"] == "AWAITING_ACCEPTANCE"
+    assert queued == []

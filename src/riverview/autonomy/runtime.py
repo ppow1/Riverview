@@ -30,7 +30,7 @@ CONSUMER_ID = "cme.primary"
 class CMEV1ContinuationPolicy:
     """Root-scoped V1 continuation policy over an existing enqueue seam."""
 
-    PARKED_OUTCOMES = {"STEWARD_DECISION_REQUIRED", "BLOCKED_REQUIRES_STEWARD", "READY_FOR_STEWARD_REVIEW", "COMPLETED_NO_ATTENTION"}
+    PARKED_OUTCOMES = {"OBJECTIVE_COMPLETE", "STEWARD_DECISION_REQUIRED", "BLOCKED_REQUIRES_STEWARD", "READY_FOR_STEWARD_REVIEW", "COMPLETED_NO_ATTENTION", "RETRYABLE_FAILURE", "TERMINAL_FAILURE"}
 
     def __init__(self, *, enqueue: Any, event_sink: Any | None = None, event_store: EventStore | None = None, max_no_progress: int = 3) -> None:
         if not callable(enqueue) or max_no_progress < 1:
@@ -65,7 +65,8 @@ class CMEV1ContinuationPolicy:
         if outcome not in self.PARKED_OUTCOMES:
             raise ValueError(f"RIV-GRC-0011: unsupported CME semantic outcome {outcome}.")
         self._event("root.parked", result)
-        return {"state": "PARKED", "root_task_id": root, "correlation_id": str(result["correlation_id"]), "semantic_outcome": outcome}
+        state = "AWAITING_ACCEPTANCE" if outcome in {"OBJECTIVE_COMPLETE", "COMPLETED_NO_ATTENTION"} else "PARKED"
+        return {"state": state, "root_task_id": root, "correlation_id": str(result["correlation_id"]), "semantic_outcome": outcome}
 
 
 def _iso(value: Any) -> str | None:

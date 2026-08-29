@@ -57,7 +57,16 @@ class OllamaReasoningAdapter:
             structured = json.loads(summary) if summary.lstrip().startswith("{") else None
         except json.JSONDecodeError:
             structured = None
-        semantic_outcome = structured.get("semantic_outcome") if isinstance(structured, dict) else None
+        semantic_outcome = (
+            structured.get("semantic_outcome", structured.get("disposition"))
+            if isinstance(structured, dict) else None
+        )
+        objective_disposition = (
+            structured.get("objective_disposition", structured)
+            if isinstance(structured, dict)
+            and ("objective_disposition" in structured or "disposition" in structured)
+            else None
+        )
         return ReasoningResponse(
             response_id=response_id or uuid4(),
             request_id=request.request_id,
@@ -69,4 +78,5 @@ class OllamaReasoningAdapter:
             classification=request.classification,
             created_at=datetime.now(UTC),
             semantic_outcome=semantic_outcome,
+            objective_disposition=objective_disposition,
         )

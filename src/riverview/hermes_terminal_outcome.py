@@ -30,7 +30,8 @@ ATTENTION_OUTCOMES = frozenset(
         "STEWARD_DECISION_REQUIRED",
     }
 )
-NON_ATTENTION_OUTCOMES = frozenset({"CONTINUE", "COMPLETED_NO_ATTENTION"})
+FAILURE_OUTCOMES = frozenset({"RETRYABLE_FAILURE", "TERMINAL_FAILURE"})
+NON_ATTENTION_OUTCOMES = frozenset({"CONTINUE", "OBJECTIVE_COMPLETE", "COMPLETED_NO_ATTENTION"})
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.IGNORECASE)
 _SHA_RE = re.compile(r"^[0-9a-f]{7,64}$", re.IGNORECASE)
 _CHECKPOINT_RE = re.compile(r"^RIV-[A-Z0-9-]+$", re.IGNORECASE)
@@ -107,10 +108,11 @@ def process_terminal_outcome(
     """Process one normal Hermes final response and return report text.
 
     No marker means ordinary Hermes output and is left unchanged. A marker with
-    CONTINUE or COMPLETED_NO_ATTENTION is removed without notification. An
-    attention marker is submitted automatically exactly once by the existing
-    Riverview idempotency machinery. Any malformed or failed submission is
-    visible in the returned report and never retried recursively.
+    CONTINUE or an objective-complete compatibility state is removed without
+    attention; the Hermes core consumes CONTINUE before this post-response hook.
+    Attention markers are submitted exactly once by the existing Riverview
+    idempotency machinery. Failure dispositions remain visible diagnostics and
+    never masquerade as successful completion.
     """
     if not isinstance(response_text, str):
         return response_text
@@ -122,7 +124,14 @@ def process_terminal_outcome(
         return response_text
 
     try:
-        outcome = _text(envelope.get("outcome"), "outcome").upper()
+        outcome = _text(
+            envelope.get("disposition", envelope.get("outcome")), "disposition"
+        ).upper()
+        if outcome in FAILURE_OUTCOMES:
+            return _diagnostic(
+                clean,
+                f"structured objective disposition is {outcome}; no successful completion was recorded",
+            )
         if outcome in NON_ATTENTION_OUTCOMES and not notify:
             return clean
         if outcome in NON_ATTENTION_OUTCOMES:

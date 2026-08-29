@@ -106,13 +106,14 @@ def _post_response_rendered(response_text: str, *, session_id: str, **kwargs: An
     _, envelope = _parse_marker(response_text)
     if envelope is None:
         return
-    outcome = _text(envelope.get("outcome"), "outcome").upper()
-    if outcome not in {"CONTINUE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"}:
+    outcome = _text(envelope.get("disposition", envelope.get("outcome")), "disposition").upper()
+    if outcome not in {"CONTINUE", "OBJECTIVE_COMPLETE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"}:
         return
     title = envelope.get("task_title") or kwargs.get("task_title") or envelope.get("lane") or "Riverview Hermes"
     labels = {
         "CONTINUE": ("HERMES ITERATION COMPLETE", "CONTINUATION REMAINS · WAITING"),
         "COMPLETED_NO_ATTENTION": ("TASK COMPLETE", "NO STEWARD ACTION REQUIRED"),
+        "OBJECTIVE_COMPLETE": ("OBJECTIVE COMPLETE", "NO STEWARD ACTION REQUIRED"),
         "READY_FOR_STEWARD_REVIEW": ("HERMES WAITING", "READY FOR STEWARD REVIEW"),
         "BLOCKED_REQUIRES_STEWARD": ("HERMES WAITING", "BLOCKED · STEWARD INPUT REQUIRED"),
         "STEWARD_DECISION_REQUIRED": ("HERMES WAITING", "STEWARD DECISION REQUIRED"),
@@ -132,6 +133,11 @@ def _post_response_rendered(response_text: str, *, session_id: str, **kwargs: An
 
 
 def register(ctx) -> None:
+    # Opt the Hermes core into the same structured envelope that this bridge
+    # consumes.  The core remains Riverview-import-free; the plugin is the
+    # project-owned activation boundary.
+    os.environ.setdefault("HERMES_OBJECTIVE_CONTINUITY", "1")
+    os.environ.setdefault("RIVERVIEW_HERMES_ENGINEERING", "1")
     ctx.register_hook("transform_llm_output", _transform_riverview_outcome)
     ctx.register_hook("post_response_rendered", _post_response_rendered)
     ctx.register_tool(

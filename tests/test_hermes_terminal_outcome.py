@@ -203,6 +203,30 @@ def test_continue_completed_step_retryable_failure_and_ordinary_turn_stay_silent
     assert [item["outcome"] for item in boundary_calls] == ["CONTINUE", "COMPLETED_NO_ATTENTION"]
 
 
+def test_objective_complete_alias_uses_existing_run_boundary_without_acceptance():
+    boundary_calls: list[dict[str, object]] = []
+    boundary = lambda **kwargs: boundary_calls.append(kwargs) or {"delivery": {"state": "delivered"}}
+    cleaned = process_terminal_outcome(
+        _marker(disposition="OBJECTIVE_COMPLETE"),
+        session_id="session-1",
+        run_boundary_submit=boundary,
+    )
+    assert cleaned == ""
+    assert boundary_calls[0]["outcome"] == "OBJECTIVE_COMPLETE"
+
+
+def test_failure_dispositions_never_become_successful_run_boundaries():
+    boundary_calls: list[dict[str, object]] = []
+    boundary = lambda **kwargs: boundary_calls.append(kwargs) or {"delivery": {"state": "delivered"}}
+    cleaned = process_terminal_outcome(
+        _marker(disposition="TERMINAL_FAILURE", summary="provider failed"),
+        session_id="session-1",
+        run_boundary_submit=boundary,
+    )
+    assert "TERMINAL_FAILURE" in cleaned
+    assert boundary_calls == []
+
+
 def test_continue_run_boundary_is_informational_task_specific_and_idempotent():
     store = FakeStore()
     events = FakeEventStore()

@@ -13,7 +13,7 @@ from uuid import UUID
 CONTRACT_VERSION = "riverview-reasoning-v1"
 REQUEST_TYPES = frozenset({"advice", "analysis", "decision_proposal", "diagnostic"})
 RESPONSE_TYPES = frozenset({"advice", "analysis", "decision_proposal", "escalation", "diagnostic_recommendation"})
-SEMANTIC_OUTCOMES = frozenset({"CONTINUE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"})
+SEMANTIC_OUTCOMES = frozenset({"CONTINUE", "OBJECTIVE_COMPLETE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED", "RETRYABLE_FAILURE", "TERMINAL_FAILURE"})
 ALLOWED_CLASSIFICATIONS = frozenset({"public", "operational", "private", "river", "internal"})
 MAX_INSTRUCTION = 16_000
 MAX_SUMMARY = 8_000
@@ -101,6 +101,7 @@ class ReasoningResponse:
     contract_version: str = CONTRACT_VERSION
     semantic_outcome: str | None = None
     epistemic: dict[str, Any] | None = None
+    objective_disposition: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.response_type not in RESPONSE_TYPES:
@@ -111,6 +112,12 @@ class ReasoningResponse:
             raise ValueError("RIV-SEC-0001: response classification is closed.")
         if self.semantic_outcome is not None and self.semantic_outcome not in SEMANTIC_OUTCOMES:
             raise ValueError("RIV-REASON-0001: semantic outcome is unsupported.")
+        if self.objective_disposition is not None:
+            if not isinstance(self.objective_disposition, dict):
+                raise ValueError("RIV-REASON-0001: objective disposition must be an object.")
+            disposition = self.objective_disposition.get("disposition", self.objective_disposition.get("outcome"))
+            if disposition not in SEMANTIC_OUTCOMES:
+                raise ValueError("RIV-REASON-0001: objective disposition is unsupported.")
         if self.epistemic is not None:
             if not isinstance(self.epistemic, dict) or self.epistemic.get("schema_version") != "resident-epistemic-v1":
                 raise ValueError("RIV-REASON-0001: epistemic metadata is unsupported.")
@@ -134,5 +141,6 @@ class ReasoningResponse:
             "classification": self.classification,
             "created_at": self.created_at.isoformat(),
             "semantic_outcome": self.semantic_outcome,
+            "objective_disposition": self.objective_disposition,
             "epistemic": self.epistemic,
         }

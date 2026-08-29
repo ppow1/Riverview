@@ -160,7 +160,7 @@ def submit_hermes_run_boundary(
     """Record one completed Hermes invocation independently of task outcome."""
     lane_value = _required_text(lane, "lane")
     outcome_value = _required_text(outcome, "outcome").upper()
-    if outcome_value not in {"CONTINUE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"}:
+    if outcome_value not in {"CONTINUE", "OBJECTIVE_COMPLETE", "COMPLETED_NO_ATTENTION", "READY_FOR_STEWARD_REVIEW", "BLOCKED_REQUIRES_STEWARD", "STEWARD_DECISION_REQUIRED"}:
         raise ValueError("RIV-HERMES-ATTN-0004: run outcome is not a valid terminal envelope outcome.")
     checkpoint_value = _required_text(checkpoint_id, "checkpoint_id")
     evidence_value = _required_text(evidence_ref, "evidence_ref", max_length=512)
