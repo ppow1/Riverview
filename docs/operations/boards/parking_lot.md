@@ -1,4 +1,4 @@
-<!-- Version: 1.6.0 | Date: 2026-08-27 | Status: Active -->
+<!-- Version: 1.7.0 | Date: 2026-08-28 | Status: Active -->
 # Riverview Parking Lot
 
 The Parking Lot preserves valuable ideas without committing Riverview to implementation or interrupting current execution.
@@ -22,5 +22,6 @@ This is not a backlog and not an execution queue. Capturing an item does not aut
 | PL-0011 | Riverview Remote Machine Control Surface | Operator UX / Stream Deck / Remote Compute / Infrastructure | High | Steward | 2026-08-26 | CAPTURED | Promote as Octominer 2/daily-driver identities become known, shutdown/Wake-on-LAN becomes active work, migration settles the durable layout, or upon explicit Steward direction. |
 | PL-0012 | Riverview Linux/Ubuntu Hosting and Cross-Platform Portability | Runtime Architecture / Infrastructure / Cross-Platform Portability / Local AI | Strategic | Steward | 2026-08-26 | CAPTURED | Promote when the Steward directs Linux migration elaboration, the current migration reaches a stable checkpoint, Linux hosting becomes a compute dependency, Windows becomes a material blocker, or durable server/core placement is being selected. |
 | PL-0013 | Codex Resource Binding and Reset-First Capacity Policy | Resource Scheduling / Hermes / Codex / Capacity Management | High | Steward | 2026-08-27 | CAPTURED | Promote after the current C1/C2/C3 acceptance/duplicate-work-order incident reaches a clean checkpoint, when exclusive claim semantics block legitimate concurrency, when rollover causes stranded capacity, or upon explicit Steward direction. |
+| PL-0014 | Local Repository Governor and Task-Workspace Admission Gate | Repository Governance / Local Infrastructure / Agent Enforcement | High | Steward | 2026-08-28 | CAPTURED | Promote after the current Monday-afternoon engineering-use objective reaches a stable checkpoint, when serial `main` materially blocks parallel work, after another branch/worktree discipline incident, when local-first repository authority becomes active work, or upon explicit Steward direction. |
 
 For substantial entries, read the corresponding detailed artifact under `docs/operations/parking_lot/` before acting.
