@@ -112,6 +112,25 @@ def _grace_responsibility(request: ResidentCapabilityRequest, profiles: tuple[Re
     return {"items": rows[:_limit(request)], "evidence_refs": ["riverview://resident-registry"]}
 
 
+def _resident_registry(request: ResidentCapabilityRequest) -> dict[str, Any]:
+    """Read the complete active non-test resident/office projection."""
+    from riverview.database import connect
+    with connect() as connection, connection.cursor() as cursor:
+        cursor.execute("""SELECT o.occupant_id,o.display_name,o.classification,o.canonical_anchor_ref,
+                                of.office_id,of.canonical_title
+                         FROM resident_occupants o
+                         LEFT JOIN resident_occupancies oc ON oc.occupant_id=o.occupant_id
+                           AND oc.status='active'
+                         LEFT JOIN resident_offices of ON of.office_id=oc.office_id
+                           AND of.lifecycle_status='active'
+                         WHERE o.lifecycle_status='active' AND o.retired_at IS NULL
+                           AND COALESCE(o.classification,'') <> 'test_fixture'
+                         ORDER BY o.display_name
+                         LIMIT %s""", (_limit(request, 50),))
+        rows = [{"resident_id": str(row[0]), "name": row[1], "classification": row[2], "canonical_reference": row[3], "office_id": str(row[4]) if row[4] else None, "office": row[5]} for row in cursor.fetchall()]
+    return {"items": rows, "complete_active_non_test_inventory": True, "evidence_refs": ["postgresql:resident_occupants", "postgresql:resident_occupancies", "postgresql:resident_offices", "riverview://resident-registry"]}
+
+
 def _grace_diagnostics(request: ResidentCapabilityRequest) -> dict[str, Any]:
     from riverview.mcp.read_model import ReadOnlyRelay
     return {"items": ReadOnlyRelay().diagnostics(_limit(request)), "evidence_refs": ["postgresql:diagnostic_events", "riverview://diagnostics"]}
@@ -211,6 +230,7 @@ def _descriptor(capability_id: str, name: str, purpose: str, handler: Any, *, cl
 
 def build_grace_operations_package(profile: ResidentProfile, office_id: UUID, implementation_id: UUID, profiles: tuple[ResidentProfile, ...]) -> ResidentOfficeCapabilityPackage:
     capabilities = (
+        _descriptor("institutional.resident-registry.read", "Resident registry", "Read the complete active non-test resident registry and current office associations from the authoritative institutional projection.", _resident_registry, classification=profile.classification, input_schema={"type": "object", "properties": {"limit": {"type": "integer"}}}, evidence=("riverview://resident-registry",)),
         _descriptor("operations.closed-loop.read", "Closed-loop task state", "Read one explicit root task's bounded roadmap, governance binding, execution eligibility, and result lineage.", _grace_closed_loop, classification=profile.classification, input_schema={"type": "object", "properties": {"root_task_id": {"type": "string", "format": "uuid"}}, "required": ["root_task_id"], "additionalProperties": False}, evidence=("postgresql:autonomous_governance_bindings",)),
         _descriptor("operations.current-work.read", "Current work", "Read bounded active, ready, blocked, stale, and recent work projections.", _grace_work, classification=profile.classification, evidence=("postgresql:campaign_runner",)),
         _descriptor("operations.cme.read", "CME state", "Read current Continuous Momentum Engine health, cursor, progress, and attention state.", _grace_cme, classification=profile.classification, evidence=("riverview://cme-runtime-status",)),
@@ -229,6 +249,7 @@ def build_grace_operations_package(profile: ResidentProfile, office_id: UUID, im
 
 def build_jessica_character_package(profile: ResidentProfile, office_id: UUID, implementation_id: UUID, store: CharacterStore, profiles: tuple[ResidentProfile, ...]) -> ResidentOfficeCapabilityPackage:
     capabilities = (
+        _descriptor("institutional.resident-registry.read", "Resident registry", "Read the complete active non-test resident registry and current office associations from the authoritative institutional projection.", _resident_registry, classification=profile.classification, input_schema={"type": "object", "properties": {"limit": {"type": "integer"}}}, evidence=("riverview://resident-registry",)),
         _descriptor("character.canon.read", "Accepted character canon", "Read the accepted character state for a named target resident.", lambda request: _jessica_character(request, store, profiles), classification=profile.classification, input_schema={"type": "object", "properties": {"target_resident": {"type": "string", "description": "Authoritative resident name or resident ID."}}, "required": ["target_resident"], "additionalProperties": False}, evidence=("character-store:current",)),
         _descriptor("character.versions.read", "Character versions", "Read bounded accepted version history for a target resident.", lambda request: _jessica_versions(request, store), classification=profile.classification, input_schema={"type": "object", "properties": {"target_resident": {"type": "string"}}, "required": ["target_resident"], "additionalProperties": False}, evidence=("character-store:versions",)),
         _descriptor("character.proposals.read", "Character proposals", "Read proposals and review/publication status without publishing.", lambda request: _jessica_proposals(request, store), classification=profile.classification, input_schema={"type": "object", "properties": {"target_resident": {"type": "string"}}, "required": ["target_resident"], "additionalProperties": False}, evidence=("character-store:proposals",)),
