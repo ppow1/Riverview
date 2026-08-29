@@ -43,6 +43,12 @@ class OllamaReasoningAdapter:
         summary = payload.get("response")
         if not isinstance(summary, str) or not summary.strip():
             raise RuntimeError("RIV-REASON-0002: local provider returned an invalid response.")
+        try:
+            structured = json.loads(summary) if summary.lstrip().startswith("{") else None
+        except json.JSONDecodeError:
+            structured = None
+        semantic_outcome = structured.get("semantic_outcome", structured.get("disposition")) if isinstance(structured, dict) else None
+        objective_disposition = structured.get("objective_disposition", structured) if isinstance(structured, dict) and ("objective_disposition" in structured or "disposition" in structured) else None
         return ReasoningResponse(
             response_id=response_id or uuid4(),
             request_id=request.request_id,
@@ -53,4 +59,6 @@ class OllamaReasoningAdapter:
             evidence_refs=(f"provider://ollama/{model}",),
             classification=request.classification,
             created_at=datetime.now(UTC),
+            semantic_outcome=semantic_outcome,
+            objective_disposition=objective_disposition,
         )

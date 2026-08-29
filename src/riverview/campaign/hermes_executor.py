@@ -77,6 +77,8 @@ class HermesCampaignRoleExecutor:
             "response_id": str(response.response_id),
             "evidence_refs": list(response.evidence_refs),
             "summary": response.summary[:8_000],
+            "semantic_outcome": response.semantic_outcome,
+            "objective_disposition": response.objective_disposition,
         }
         for key in ("candidate_identity", "validation_basis_hash", "implementation_ref"):
             if key in work.parameters:
