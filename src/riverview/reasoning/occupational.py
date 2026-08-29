@@ -385,6 +385,9 @@ class ResidentOccupationalReasoner:
         })
         if second.get("decision") not in {"answer", "synthesis"}:
             raise ValueError("RIV-OCC-0005: second model pass must synthesize an answer.")
+        if str(second.get("answer") or "").strip().casefold() in {"resident_local", "institutional_broad", "local_context", "authoritative_state"}:
+            second = self._model({"phase": "final_synthesis_repair", "question": question.strip(), "conversation_context": list(conversation_context), "resident": {"resident_id": str(self.package.resident_id), "office_id": str(self.package.office_id), "title": self.package.title}, "tool_result": tool_result.as_payload(), "allowed_evidence_refs": list(allowed_evidence), "candidate_answer": second.get("answer"), "instructions": "The candidate answer leaked a routing field instead of answering the Steward. Return decision=answer with a natural resident-facing answer to the original question, grounded only in the authoritative capability result. Do not output scope labels, capability field names, or routing tokens as the answer. Include claim-bound epistemic spans when supported."})
+            extra_passes += 1
         answer = self._answer(second)
         try:
             epistemic = _epistemic(second, answer, allowed_evidence=allowed_evidence)
