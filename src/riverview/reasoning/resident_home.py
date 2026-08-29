@@ -189,13 +189,16 @@ class ResidentHomeCognitionService:
             evidence_catalog = []
             for handle in dict.fromkeys((*state.evidence_refs, *state.state_refs, *(tool_result or {}).get("evidence_refs", ()), *package.provenance_refs)):
                 evidence_catalog.append({"handle": str(handle), "display_label": "Authoritative evidence handle supplied for this turn", "source_class": "institutional", "capability": (tool_result or {}).get("capability_id"), "freshness": "current"})
+            response_format = json.loads(json.dumps(_DECISION_FORMAT))
+            if evidence_catalog:
+                response_format["properties"]["epistemic_spans"]["items"]["properties"]["provenance"]["items"]["properties"]["evidence_ref"]["enum"] = [item["handle"] for item in evidence_catalog]
             request = ReasoningRequest(
                 request_id=uuid4(), correlation_id=correlation_id, request_type="advice",
                 instruction=json.dumps({"phase": phase, "question": question, "resident": {"id": str(state.resident_id), "name": state.resident_name, "title": state.title, "office_id": str(state.office_id), "authority_ref": state.authority_ref}, "conversation_context": list(conversation_context)[-4:], "capability_catalog": catalog, "available_capability_ids": [item.get("capability_id") for item in catalog], "authoritative_current_work_context": operational_context, "tool_result": tool_result, "available_evidence": evidence_catalog, "policy": "For phase=first or phase=repair, decision must be exactly answer or capability; phase=second/review may return synthesis or answer. Qwen selects capabilities semantically; Riverview validates typed requests. Use operations.current-work.read for unspecified current institutional work and operations.closed-loop.read for an explicit root. Never invent identifiers or acceptance. General questions may be answered without a tool. For VERIFIED or CANON provenance, evidence_ref MUST be copied exactly from an available_evidence.handle value; handle is the immutable value, display_label is descriptive only. Never summarize, reconstruct, abbreviate, or invent a handle. If no supplied handle supports the claim, use another valid class or UNKNOWN. For the final answer, return epistemic_spans over meaningful immutable text ranges using VERIFIED/CANON only with supplied matching evidence, REASONED for evidence-based conclusions, GENERAL for unverified general knowledge, CREATIVE for intentional personality or metaphor, and UNKNOWN when truth is not established. Do not invent evidence references or private reasoning."}, default=str, separators=(",", ":")),
                 context_refs=state.evidence_refs + state.state_refs + package.provenance_refs,
                 classification=state.classification, required_output_schema="resident-home-occupational-v1",
                 evidence_requirements=("resident-state", "package", "capability-selection", "provider-pass"),
-                expires_at=datetime.now(UTC) + timedelta(minutes=5), allowed_authority=("read:bounded", "return:advisory"), response_format=_DECISION_FORMAT,
+                expires_at=datetime.now(UTC) + timedelta(minutes=5), allowed_authority=("read:bounded", "return:advisory"), response_format=response_format,
             )
             response = self.provider(bound_model, request)
             try:
