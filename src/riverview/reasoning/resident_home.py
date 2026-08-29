@@ -33,10 +33,11 @@ _DECISION_FORMAT = {
         "capability_id": {"type": ["string", "null"]},
         "arguments": {"type": "object"},
         "assertion_mode": {"type": "string", "enum": ["general", "institutional"]},
+        "scope": {"type": "string", "enum": ["resident_local", "institutional_broad", "general"]},
         "claims": {"type": "array", "maxItems": 4, "items": {"type": "object", "properties": {"span_id": {"type": "string", "minLength": 1, "maxLength": 120}, "claim_text": {"type": "string", "minLength": 1, "maxLength": 400}, "assertion_kind": {"type": "string", "enum": ["verified_fact", "authoritative_fact", "canonical_fact", "canonical_identity", "resident_canon"]}}, "required": ["span_id", "claim_text", "assertion_kind"], "additionalProperties": False}},
         "epistemic_spans": {"type": "array", "maxItems": 32, "items": {"type": "object", "properties": {"span_id": {"type": "string", "minLength": 1, "maxLength": 120}, "start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}, "mask": {"type": "integer", "minimum": 1, "maximum": 63}, "evidence_choice_ids": {"type": "array", "maxItems": 8, "items": {"type": "integer", "minimum": 0}}, "provenance": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {"source_class": {"type": "string", "enum": ["institutional", "live_telemetry", "postgresql", "river", "local_artifact", "repository", "steward", "canon", "external_authoritative", "web_research", "cross_validation"]}, "evidence_ref": {"type": "string", "minLength": 1, "maxLength": 240}, "observed_at": {"type": ["string", "null"]}, "freshness": {"type": ["string", "null"]}, "capability": {"type": ["string", "null"]}, "source_refs": {"type": "array", "maxItems": 8, "items": {"type": "string"}}}, "required": ["source_class", "evidence_ref", "observed_at", "freshness", "capability", "source_refs"], "additionalProperties": False}}}, "required": ["span_id", "start", "end", "mask", "evidence_choice_ids"], "additionalProperties": False}},
     },
-    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "claims", "epistemic_spans"],
+    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "scope", "claims", "epistemic_spans"],
     "additionalProperties": False,
 }
 
