@@ -148,6 +148,27 @@ class OperatorProjection:
             cursor.execute("SELECT conversation_id,resident_id,room_id,kind,title,classification,archived_at,source_conversation_id,inherited_context_window,inherited_message_count,participants_added FROM operator_conversations WHERE conversation_id=%s", (conversation_id,))
             return self._conversation(cursor, cursor.fetchone())
 
+    def reset_conversation_corpus(self) -> dict[str, int]:
+        """Delete the explicitly authorized non-production conversation corpus."""
+        self._recover_if_available()
+        if not self.available:
+            counts = {"conversations": len(self.memory), "messages": sum(len(item.get("messages", ())) for item in self.memory.values())}
+            self.memory.clear()
+            return {"pre_conversations": counts["conversations"], "pre_messages": counts["messages"], "post_conversations": 0, "post_messages": 0}
+        with connect() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT count(*) FROM operator_conversations")
+            pre_conversations = int(cursor.fetchone()[0])
+            cursor.execute("SELECT count(*) FROM operator_messages")
+            pre_messages = int(cursor.fetchone()[0])
+            cursor.execute("DELETE FROM operator_room_memberships")
+            cursor.execute("DELETE FROM operator_messages")
+            cursor.execute("DELETE FROM operator_conversations")
+            cursor.execute("SELECT count(*) FROM operator_conversations")
+            post_conversations = int(cursor.fetchone()[0])
+            cursor.execute("SELECT count(*) FROM operator_messages")
+            post_messages = int(cursor.fetchone()[0])
+        return {"pre_conversations": pre_conversations, "pre_messages": pre_messages, "post_conversations": post_conversations, "post_messages": post_messages}
+
     def assign_resident(self, conversation_id: UUID, resident_id: str, title: str) -> dict[str, Any] | None:
         """Assign the initial resident exactly once on a neutral conversation."""
         self._recover_if_available()
