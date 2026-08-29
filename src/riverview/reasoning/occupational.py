@@ -395,6 +395,7 @@ class ResidentOccupationalReasoner:
             if tool_result.status is CapabilityResultStatus.SUCCESS and epistemic is not None and not has_epistemic_spans:
                 raise ValueError("RIV-OCC-0005: authoritative capability answer lacks epistemic coverage")
         except ValueError as error:
+            from .resident_home import _DECISION_FORMAT
             repair_format = json.loads(json.dumps(_DECISION_FORMAT))
             repair_format["properties"]["epistemic_spans"]["items"]["properties"]["mask"] = {"type": "integer", "enum": [1, 2, 4, 8, 16, 32] if tool_result.status is CapabilityResultStatus.SUCCESS else [4, 8, 16, 32]}
             repair = self._model({"phase": "epistemic_repair", "question": question.strip(), "candidate_answer": answer, "candidate_epistemic_spans": second.get("epistemic_spans", []), "allowed_evidence_refs": list(allowed_evidence), "tool_result": tool_result.as_payload(), "response_format": repair_format, "instructions": f"Repair only the epistemic metadata. Preserve the answer unless necessary. Riverview rejected the candidate because {str(error)[:240]}. A successful authoritative capability result requires coverage. Use VERIFIED/CANON only with the exact supplied evidence and matching typed claim/span text; otherwise use REASONED, GENERAL, CREATIVE, or UNKNOWN. Return decision=answer with complete epistemic_spans and claims."})
