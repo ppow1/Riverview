@@ -255,6 +255,10 @@ def _epistemic(value: Mapping[str, Any], answer: str, *, allowed_evidence: tuple
         if not isinstance(item, Mapping):
             raise ValueError("RIV-OCC-0005: epistemic span must be an object.")
         provenance = []
+        for choice in item.get("evidence_choice_ids", ()):
+            if not isinstance(choice, int) or choice < 0 or choice >= len(allowed_evidence):
+                raise ValueError("RIV-OCC-0005: epistemic evidence choice is not available for this turn.")
+            provenance.append(ProvenanceRecord(source_class="institutional", evidence_ref=allowed_evidence[choice], freshness="current"))
         for record in item.get("provenance", ()):
             if not isinstance(record, Mapping):
                 raise ValueError("RIV-OCC-0005: epistemic provenance must be an object.")
