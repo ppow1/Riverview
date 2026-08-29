@@ -111,9 +111,9 @@ UI_HTML = UI_HTML.replace("</body></html>", r'''<script>
     d.hidden=false;
   }
   function decorate(){
-    if(!enabled()||!state.active)return;
+    if(!enabled()||!window.riverviewVnextState?.active)return;
     document.querySelectorAll('#history .message').forEach((node,i)=>{
-      const m=state.active.messages?.[i],meta=m?.details?.epistemic;if(!meta||node.dataset.epistemicDecorated)return;
+      const m=window.riverviewVnextState.active.messages?.[i],meta=m?.details?.epistemic;if(!meta||node.dataset.epistemicDecorated)return;
       node.dataset.epistemicDecorated='1';const who=node.querySelector('.who');if(!who)return;
       const badgeBox=document.createElement('span');badgeBox.className='epistemic-badges';
       labels(meta.summary_mask).forEach(label=>{const b=document.createElement('button');b.type='button';b.className='epistemic-badge';b.dataset.epistemicLabel=label;b.textContent=label;b.onclick=()=>detail(meta,label);badgeBox.append(' ',b)});who.appendChild(badgeBox);
