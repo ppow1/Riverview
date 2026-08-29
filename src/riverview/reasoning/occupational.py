@@ -308,6 +308,12 @@ class ResidentOccupationalReasoner:
             "capability_catalog": self.package.catalog(),
         })
         extra_passes = 0
+        inconsistent_scope = (first.get("scope") == "resident_local" and first.get("evidence_requirement") == "authoritative_state") or (first.get("scope") == "institutional_broad" and first.get("evidence_requirement") == "local_context")
+        if first.get("decision") == "answer" and inconsistent_scope:
+            adjudication = self._model({"phase": "scope_adjudication", "question": question.strip(), "conversation_context": list(conversation_context), "resident": {"resident_id": str(self.package.resident_id), "office_id": str(self.package.office_id), "title": self.package.title}, "scope": first.get("scope"), "evidence_requirement": first.get("evidence_requirement"), "answer_summary": str(first.get("answer") or "")[:400], "instructions": "Adjudicate only the evidence scope required by the Steward utterance. institutional_broad means facts outside the bounded current-resident packet and requires authoritative state; resident_local means only this resident's immediate context. Do not write an answer, claims, spans, or explanations."})
+            adjudicated_scope = adjudication.get("scope")
+            if adjudicated_scope in {"resident_local", "institutional_broad"}:
+                first = {**first, "scope": adjudicated_scope, "evidence_requirement": "authoritative_state" if adjudicated_scope == "institutional_broad" else "local_context"}
         if first.get("decision") == "answer" and (first.get("_contract_missing") or first.get("scope") == "institutional_broad" or first.get("assertion_mode") == "institutional" or first.get("claims")):
             first = self._model({
                 "phase": "repair", "question": question.strip(), "conversation_context": list(conversation_context),

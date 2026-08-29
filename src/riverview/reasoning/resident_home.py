@@ -34,10 +34,11 @@ _DECISION_FORMAT = {
         "arguments": {"type": "object"},
         "assertion_mode": {"type": "string", "enum": ["general", "institutional"]},
         "scope": {"type": "string", "enum": ["resident_local", "institutional_broad"]},
+        "evidence_requirement": {"type": "string", "enum": ["local_context", "authoritative_state"]},
         "claims": {"type": "array", "maxItems": 4, "items": {"type": "object", "properties": {"span_id": {"type": "string", "minLength": 1, "maxLength": 120}, "claim_text": {"type": "string", "minLength": 1, "maxLength": 400}, "assertion_kind": {"type": "string", "enum": ["verified_fact", "authoritative_fact", "canonical_fact", "canonical_identity", "resident_canon"]}}, "required": ["span_id", "claim_text", "assertion_kind"], "additionalProperties": False}},
         "epistemic_spans": {"type": "array", "maxItems": 32, "items": {"type": "object", "properties": {"span_id": {"type": "string", "minLength": 1, "maxLength": 120}, "start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}, "mask": {"type": "integer", "minimum": 1, "maximum": 63}, "evidence_choice_ids": {"type": "array", "maxItems": 8, "items": {"type": "integer", "minimum": 0}}, "provenance": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {"source_class": {"type": "string", "enum": ["institutional", "live_telemetry", "postgresql", "river", "local_artifact", "repository", "steward", "canon", "external_authoritative", "web_research", "cross_validation"]}, "evidence_ref": {"type": "string", "minLength": 1, "maxLength": 240}, "observed_at": {"type": ["string", "null"]}, "freshness": {"type": ["string", "null"]}, "capability": {"type": ["string", "null"]}, "source_refs": {"type": "array", "maxItems": 8, "items": {"type": "string"}}}, "required": ["source_class", "evidence_ref", "observed_at", "freshness", "capability", "source_refs"], "additionalProperties": False}}}, "required": ["span_id", "start", "end", "mask", "evidence_choice_ids"], "additionalProperties": False}},
     },
-    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "scope", "claims", "epistemic_spans"],
+    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "scope", "evidence_requirement", "claims", "epistemic_spans"],
     "additionalProperties": False,
 }
 
@@ -51,10 +52,22 @@ _ROUTING_FORMAT = {
         "arguments": {"type": "object"},
         "assertion_mode": {"type": "string", "enum": ["general", "institutional"]},
         "scope": {"type": "string", "enum": ["resident_local", "institutional_broad"]},
+        "evidence_requirement": {"type": "string", "enum": ["local_context", "authoritative_state"]},
         "claims": {"type": "array", "maxItems": 0, "items": {}},
         "epistemic_spans": {"type": "array", "maxItems": 0, "items": {}},
     },
-    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "scope", "claims", "epistemic_spans"],
+    "required": ["decision", "answer", "capability_id", "arguments", "assertion_mode", "scope", "evidence_requirement", "claims", "epistemic_spans"],
+    "additionalProperties": False,
+}
+
+
+_SCOPE_FORMAT = {
+    "type": "object",
+    "properties": {
+        "scope": {"type": "string", "enum": ["resident_local", "institutional_broad"]},
+        "requires_authoritative_state": {"type": "boolean"},
+    },
+    "required": ["scope", "requires_authoritative_state"],
     "additionalProperties": False,
 }
 
@@ -197,7 +210,7 @@ class ResidentHomeCognitionService:
         self.last_provider_calls = ()
         def model(payload: Mapping[str, Any]) -> Mapping[str, Any]:
             phase = str(payload["phase"])
-            catalog = payload.get("capability_catalog", package.catalog()) if phase in {"first", "repair"} else []
+            catalog = payload.get("capability_catalog", package.catalog()) if phase in {"scope_adjudication", "first", "repair"} else []
             operational_context = []
             if phase == "first" and profile.name.casefold() == "grace":
                 try:
@@ -215,7 +228,7 @@ class ResidentHomeCognitionService:
             evidence_catalog = []
             for handle in dict.fromkeys((*state.evidence_refs, *state.state_refs, *(tool_result or {}).get("evidence_refs", ()), *package.provenance_refs)):
                 evidence_catalog.append({"handle": str(handle), "display_label": "Authoritative evidence handle supplied for this turn", "source_class": "institutional", "capability": (tool_result or {}).get("capability_id"), "freshness": "current"})
-            response_format = json.loads(json.dumps(payload.get("response_format") or (_ROUTING_FORMAT if phase in {"first", "repair", "review", "validation"} else _DECISION_FORMAT)))
+            response_format = json.loads(json.dumps(payload.get("response_format") or (_SCOPE_FORMAT if phase == "scope_adjudication" else _ROUTING_FORMAT if phase in {"first", "repair", "review", "validation"} else _DECISION_FORMAT)))
             if evidence_catalog and "provenance" in response_format["properties"]["epistemic_spans"]["items"].get("properties", {}):
                 response_format["properties"]["epistemic_spans"]["items"]["properties"]["provenance"]["items"]["properties"]["evidence_ref"]["enum"] = [item["handle"] for item in evidence_catalog]
             request = ReasoningRequest(
