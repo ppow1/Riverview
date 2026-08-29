@@ -320,7 +320,7 @@ class ResidentOccupationalReasoner:
         capability_id = first.get("capability_id")
         decision = first.get("decision")
         if decision == "answer":
-            if first.get("assertion_mode") is not None or first.get("claims") is not None:
+            if first.get("assertion_mode") == "institutional" or first.get("claims"):
                 review = self._model({"phase": "review", "question": question.strip(), "conversation_context": list(conversation_context), "resident": {"resident_id": str(self.package.resident_id), "office_id": str(self.package.office_id), "title": self.package.title}, "capability_catalog": self.package.catalog(), "proposed_answer": first.get("answer"), "assertion_mode": first.get("assertion_mode"), "claims": first.get("claims", []), "instructions": "Reassess the proposed answer epistemically. Mutable or institutional facts require authoritative evidence: select the appropriate capability with typed arguments. Stable general or social questions may remain decision=answer with assertion_mode=general and claims=[]. Do not guess identifiers or acceptance."})
                 reviewed_id = review.get("capability_id")
                 if review.get("decision") == "capability" and isinstance(reviewed_id, str) and reviewed_id.strip():
