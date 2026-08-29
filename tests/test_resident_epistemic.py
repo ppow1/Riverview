@@ -38,6 +38,9 @@ def test_span_supports_multiple_classes_and_bounded_provenance() -> None:
 
 def test_home_decision_contract_requires_epistemic_spans() -> None:
     assert "epistemic_spans" in _DECISION_FORMAT["required"]
+    claims = _DECISION_FORMAT["properties"]["claims"]
+    assert claims["maxItems"] <= 4
+    assert claims["items"]["required"] == ["span_id", "claim_text", "assertion_kind"]
 
 
 def test_spans_fail_closed_for_invalid_offsets_or_provenance() -> None:
