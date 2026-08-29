@@ -250,6 +250,8 @@ def _epistemic(value: Mapping[str, Any], answer: str, *, allowed_evidence: tuple
         return None
     if not isinstance(raw, list):
         raise ValueError("RIV-OCC-0005: epistemic spans must be an array.")
+    if not raw and (value.get("assertion_mode") == "institutional" or value.get("claims")):
+        raise ValueError("RIV-OCC-0005: epistemic coverage is missing for typed institutional claims.")
     spans = []
     for item in raw:
         if not isinstance(item, Mapping):

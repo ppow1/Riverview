@@ -216,6 +216,12 @@ def test_answer_whitespace_is_part_of_the_coordinate_contract() -> None:
     assert metadata["spans"][0]["start"] == 1
 
 
+def test_substantive_typed_claims_cannot_bypass_epistemic_coverage() -> None:
+    value = {"claims": [{"assertion_kind": "canonical_identity"}], "epistemic_spans": []}
+    with pytest.raises(ValueError, match="epistemic coverage"):
+        _epistemic(value, "Jessica is an established resident.", allowed_evidence=("canon://jessica",))
+
+
 def test_unsupported_institutional_assertion_is_repaired_through_model_capability_selection():
     descriptor = ResidentCapabilityDescriptor(
         capability_id="operations.current-work.read", capability_version="1.0.0",
