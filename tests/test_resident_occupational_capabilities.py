@@ -11,8 +11,9 @@ from riverview.reasoning.occupational import (
     ResidentCapabilityRequest,
     ResidentOfficeCapabilityPackage,
     ResidentOccupationalReasoner,
+    _epistemic,
 )
-from riverview.reasoning.epistemic import REASONED, VERIFIED
+from riverview.reasoning.epistemic import CANON, REASONED, VERIFIED
 
 
 RESIDENT = uuid4()
@@ -198,6 +199,21 @@ def test_unmatched_verified_span_fails_closed() -> None:
 
     with pytest.raises(ValueError, match="VERIFIED.*authoritative evidence"):
         ResidentOccupationalReasoner(package(), model).run("What is true?", correlation_id=uuid4())
+
+
+def test_canon_claim_must_match_the_tagged_span() -> None:
+    value = {
+        "claims": [{"assertion_kind": "canonical_identity", "span_id": "canon", "claim_text": "Grace is canonical."}],
+        "epistemic_spans": [{"span_id": "canon", "start": 0, "end": 8, "mask": CANON, "evidence_choice_ids": [0]}],
+    }
+    with pytest.raises(ValueError, match="CANON.*claim"):
+        _epistemic(value, "Thank you!", allowed_evidence=("grace-authority:v1",))
+
+
+def test_answer_whitespace_is_part_of_the_coordinate_contract() -> None:
+    value = {"epistemic_spans": [{"span_id": "answer", "start": 1, "end": 7, "mask": VERIFIED, "evidence_choice_ids": [0]}]}
+    metadata = _epistemic(value, " Answer", allowed_evidence=("work://answer",))
+    assert metadata["spans"][0]["start"] == 1
 
 
 def test_unsupported_institutional_assertion_is_repaired_through_model_capability_selection():
