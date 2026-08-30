@@ -1,4 +1,4 @@
-<!-- Version: 0.6.4 -->
+<!-- Version: 0.6.5 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -86,9 +86,161 @@ The detailed acceptance evidence remains in `docs/operations/roadmap/evidence/C1
 
 ## LOCAL CAD / PARAMETRIC ENGINEERING
 
-For Local CAD, Build123d, natural-language-to-CAD, STL reverse engineering, editable primitive recovery, mating-interface reconstruction, or CAD-worker harness work, read **`docs/operations/LOCAL_CAD_ENGINEERING_SUMMARY.md`** before modifying or diagnosing the capability.
+For LocalCAD, Build123d, natural-language-to-CAD, recorded/verbal CAD input, semantic recipe compilation, independent CAD QA, feature-aware drawings, STL reverse engineering, editable primitive recovery, mating-interface reconstruction, or CAD-worker harness work, read **`docs/operations/LOCAL_CAD_ENGINEERING_SUMMARY.md`** before modifying or diagnosing the capability.
 
-The canonical dedicated CAD Python environment is `A:\AI\LocalCAD\.venv`; its interpreter is `A:\AI\LocalCAD\.venv\Scripts\python.exe`. Launch CAD workers through that interpreter rather than Riverview's `.venv`. The detailed document records the verified dependency stack, Experiments 001-003, current 003B defects, architectural conclusions, recovery guidance, and future image/scan and interface-to-interface adapter work.
+### Current proven LocalCAD architecture
+
+The currently successful path is **not** the old free-form LLM-writes-Build123d loop. The accepted architecture is:
+
+```text
+verbal/natural-language intent
+    -> local Mistral semantic interpretation
+    -> explicit feature recipe + lineage
+    -> deterministic recipe validation
+    -> deterministic Build123d compiler
+    -> Build123d/OpenCascade execution
+    -> Python + parameters + STEP + STL
+    -> preview / human intent check
+    -> independent geometry QA
+    -> feature-aware drawing plan
+    -> deterministic drafting
+```
+
+The model reasons about what the part means; deterministic code owns API spelling, arithmetic, construction, execution, and measurement. Do not return ordinary supported jobs to repeated free-form model-generated Build123d Python unless a live capability gap demonstrates a reason.
+
+### Canonical runtime
+
+LocalCAD working root:
+
+`A:\AI\LocalCAD`
+
+Dedicated Python environment:
+
+`A:\AI\LocalCAD\.venv`
+
+Canonical interpreter:
+
+`A:\AI\LocalCAD\.venv\Scripts\python.exe`
+
+Launch LocalCAD scripts through that interpreter, not Riverview's `.venv`.
+
+Current recipe work uses the locally served Mistral model through the OpenAI-compatible local endpoint:
+
+`http://127.0.0.1:8093/v1/chat/completions`
+
+Current proven model for Recipe Compiler v3 work:
+
+`Mistral Small 3.1 24B Q4_K_M`
+
+This model ran locally on the RTX 4090 during Acceptance Specimens 001 and 002. No OpenAI API model is part of the accepted LocalCAD execution path.
+
+### Current runnable reference implementations
+
+**Acceptance Specimen 001 / rectangular adapter plate**
+
+Root:
+
+`A:\AI\LocalCAD\builder-worker-v3`
+
+Important files:
+
+- `recipe_compiler_v3.py` — semantic recipe -> deterministic Build123d compiler/run for Specimen 001
+- `recipe.json` — accepted semantic feature recipe
+- `adapter_plate.py` — deterministic compiled Build123d source
+- `parameters.json` — resolved parameters
+- `adapter_plate.step` / `adapter_plate.stl` — accepted geometry
+- `qa_candidate_v1.py` and `qa_report.*` — independent geometry QA
+- `drawing_planner_v2.py` — feature-aware drawing planning
+- `drawing_plan_v2.json` — drawing plan
+- `execute_drawing_plan_v2.py` — deterministic drawing execution
+
+**Acceptance Specimen 002 / verbal annular ring**
+
+Root:
+
+`A:\AI\LocalCAD\specimen-002`
+
+Important files:
+
+- `verbal_intent.txt` — raw natural-language/transcript-style input consumed by the current specimen runner
+- `run_specimen_002.py` — raw intent -> local Mistral recipe -> deterministic validation/compiler -> STEP/STL
+- `evidence\mistral_recipe_raw.txt` — raw local-model semantic response
+- `recipe.json` — canonical semantic recipe for the built candidate
+- `ring_adapter.py` — deterministic compiled Build123d source; Mistral did not write this
+- `parameters.json` — resolved parameters and derived values
+- `ring_adapter.step` / `ring_adapter.stl` — candidate manufacturing/interchange artifacts
+- `qa_specimen_002.py` — independent recipe-vs-STL metrology
+- `qa_report.json` / `qa_report.txt` — final QA evidence
+
+Specimen 002 final independent QA against the unchanged candidate was `268/268`, `100.00`, `PASS`.
+
+### How to run the current verbal path
+
+The current implementation is useful but still an experimental reference harness, **not yet a generalized LocalCAD CLI or Riverview service**.
+
+To rerun the current Specimen 002 path, place the raw natural-language description in:
+
+`A:\AI\LocalCAD\specimen-002\verbal_intent.txt`
+
+then run:
+
+```powershell
+Clear-Host
+Set-Location 'A:\AI\LocalCAD\specimen-002'
+& 'A:\AI\LocalCAD\.venv\Scripts\python.exe' '.\run_specimen_002.py'
+```
+
+Expected successful outputs include:
+
+- `recipe.json`
+- `ring_adapter.py`
+- `parameters.json`
+- `ring_adapter.step`
+- `ring_adapter.stl`
+
+For the accepted Specimen 002 geometry, independent QA is run separately:
+
+```powershell
+Clear-Host
+Set-Location 'A:\AI\LocalCAD\specimen-002'
+& 'A:\AI\LocalCAD\.venv\Scripts\python.exe' '.\qa_specimen_002.py'
+```
+
+Do not treat generated Python as QA proof. QA must inspect the final geometry against recipe intent.
+
+### Transcript / recorded-audio status
+
+Recorded-audio capture is **not implemented yet**. The current proven ingestion boundary is text in `verbal_intent.txt`.
+
+The intended next adapter is:
+
+```text
+record button / audio file
+    -> local speech-to-text
+    -> raw transcript text
+    -> verbal_intent-style ingestion
+    -> LocalCAD recipe/compiler pipeline
+```
+
+Local Whisper is the intended direction because the CAD execution path is being kept local. Until the audio adapter exists, transcribe or paste speech into the verbal-intent text file rather than inventing a new service boundary.
+
+### Hermes / Riverview integration status
+
+LocalCAD is **not currently a Hermes execution requirement** and is not yet a finalized Riverview service. The accepted specimens were run directly from `A:\AI\LocalCAD` through the dedicated LocalCAD Python environment and the local Mistral endpoint.
+
+Do not claim that Hermes owns or launches LocalCAD today. A future Riverview/Hermes adapter may submit LocalCAD work, but that integration is still future work. Preserve the currently proven direct local execution path while integration is designed.
+
+### Accepted evidence and recovery rules
+
+- Acceptance Specimen 001: independent QA `132/132`, `100.00`, `PASS`.
+- Acceptance Specimen 002: independent QA `268/268`, `100.00`, `PASS`.
+- Specimen 002 exercised annular geometry, a 12-hole radial pattern, alternating top/bottom counterbores, a centered square circumferential outer-wall groove, and a bottom-inner R3 fillet.
+- The Specimen 002 candidate was **not rebuilt** while QA defects were repaired. QA initially rejected correct geometry because of a 0/360-degree angular comparison defect and incorrect semantic loop selection on annular sections. Repair the faulty layer rather than automatically mutating a candidate after a failed observer result.
+- Preserve semantic lineage (`parent`, named face/edge targets, pattern membership) so later compiler, QA, and drawing stages do not rediscover intent from raw topology.
+- Do not silently alter unusual but valid dimensions. Ask only when missing/ambiguous information materially changes geometry.
+- Add recipe vocabulary from demonstrated need rather than building a universal CAD framework in advance.
+
+The detailed engineering record contains the experiments, architecture rationale, accepted specimens, QA lessons, drawing work, reverse-engineering direction, and next capability work. fileciteturn196file0
 
 ## HERMES WINDOWS LAUNCH / RECOVERY
 
