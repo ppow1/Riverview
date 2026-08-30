@@ -1,4 +1,4 @@
-<!-- Version: 0.6.3 -->
+<!-- Version: 0.6.4 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -83,6 +83,12 @@ For Hermes resource scheduling, C1/C2/C3 authentication, Codex capacity/fuel, qu
 That operational summary records the accepted C1/C2/C3 `CODEX_HOME`/safe-fingerprint mappings, telemetry and reset semantics, durable PostgreSQL policy modes, Riverview -> Hermes -> native Codex execution path, Grace/Comms5/Operator visibility, exactly-once and governed recovery behavior, current conservative claim/lease semantics, and the PL-0013 follow-up for non-exclusive resource binding and reset-first default scheduling.
 
 The detailed acceptance evidence remains in `docs/operations/roadmap/evidence/C1_C2_C3_HERMES_NATIVE_BINDING_2026-08-27.md`.
+
+## LOCAL CAD / PARAMETRIC ENGINEERING
+
+For Local CAD, Build123d, natural-language-to-CAD, STL reverse engineering, editable primitive recovery, mating-interface reconstruction, or CAD-worker harness work, read **`docs/operations/LOCAL_CAD_ENGINEERING_SUMMARY.md`** before modifying or diagnosing the capability.
+
+The canonical dedicated CAD Python environment is `A:\AI\LocalCAD\.venv`; its interpreter is `A:\AI\LocalCAD\.venv\Scripts\python.exe`. Launch CAD workers through that interpreter rather than Riverview's `.venv`. The detailed document records the verified dependency stack, Experiments 001-003, current 003B defects, architectural conclusions, recovery guidance, and future image/scan and interface-to-interface adapter work.
 
 ## HERMES WINDOWS LAUNCH / RECOVERY
 
