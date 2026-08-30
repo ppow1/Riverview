@@ -1,4 +1,4 @@
-<!-- Version: 0.6.5 -->
+<!-- Version: 0.6.6 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -153,6 +153,8 @@ Important files:
 - `drawing_planner_v2.py` — feature-aware drawing planning
 - `drawing_plan_v2.json` — drawing plan
 - `execute_drawing_plan_v2.py` — deterministic drawing execution
+- `drawings_v2\adapter_plate_drawing_v2.png` / `.pdf` — feature-aware drawing outputs
+- `drawings_v2\drawing_v2_conformance.json` / `.txt` — drawing-plan conformance evidence
 
 **Acceptance Specimen 002 / verbal annular ring**
 
@@ -208,6 +210,57 @@ Set-Location 'A:\AI\LocalCAD\specimen-002'
 
 Do not treat generated Python as QA proof. QA must inspect the final geometry against recipe intent.
 
+### CAD drawing generation and recovery
+
+CAD drawings are part of the demonstrated capability and must not be omitted from recovery. The drawing path is deliberately downstream of accepted geometry:
+
+```text
+accepted recipe + accepted geometry
+    -> feature-aware Drawing Planner v2
+    -> drawing_plan_v2.json
+    -> deterministic drawing executor
+    -> PNG/PDF drawing + plan-conformance evidence
+```
+
+The drawing planner decides what engineering information must be communicated. It is **not** a fixed `TOP + FRONT + RIGHT` template. It may suppress equivalent views, require unique opposite-face views when features differ, request sections for hidden/depth features, and preserve feature IDs for deterministic callouts. The drafting engine then renders the approved plan without asking the model to redraw or reinterpret the CAD.
+
+The currently proven drawing implementation is in Acceptance Specimen 001 at:
+
+`A:\AI\LocalCAD\builder-worker-v3`
+
+Run Drawing Planner v2 against the already accepted Specimen 001 recipe/geometry:
+
+```powershell
+Clear-Host
+Set-Location 'A:\AI\LocalCAD\builder-worker-v3'
+& 'A:\AI\LocalCAD\.venv\Scripts\python.exe' '.\drawing_planner_v2.py'
+```
+
+Expected planner outputs:
+
+- `drawing_plan_v2.json`
+- `drawing_plan_v2.txt`
+- `evidence\drawing_planner_v2_raw.txt`
+
+Then execute the existing plan deterministically:
+
+```powershell
+Clear-Host
+Set-Location 'A:\AI\LocalCAD\builder-worker-v3'
+& 'A:\AI\LocalCAD\.venv\Scripts\python.exe' '.\execute_drawing_plan_v2.py'
+```
+
+Expected drawing outputs:
+
+- `drawings_v2\adapter_plate_drawing_v2.png`
+- `drawings_v2\adapter_plate_drawing_v2.pdf`
+- `drawings_v2\drawing_v2_conformance.json`
+- `drawings_v2\drawing_v2_conformance.txt`
+
+Drawing v2 completed successfully and passed plan conformance for Acceptance Specimen 001. The earlier `generate_drawings_v1.py` fixed-template implementation is useful historical evidence but is not the preferred architecture.
+
+Do **not** claim that Drawing Planner v2 has already been generalized and accepted for arbitrary new parts. Its architecture is proven on Specimen 001, but Specimen 002 was accepted geometrically before a feature-aware drawing package was run for it. New-part drawing work should reuse the planner/executor separation and extend deterministic drafting only when the new recipe exposes a concrete missing view/detail/section capability.
+
 ### Transcript / recorded-audio status
 
 Recorded-audio capture is **not implemented yet**. The current proven ingestion boundary is text in `verbal_intent.txt`.
@@ -240,7 +293,7 @@ Do not claim that Hermes owns or launches LocalCAD today. A future Riverview/Her
 - Do not silently alter unusual but valid dimensions. Ask only when missing/ambiguous information materially changes geometry.
 - Add recipe vocabulary from demonstrated need rather than building a universal CAD framework in advance.
 
-The detailed engineering record contains the experiments, architecture rationale, accepted specimens, QA lessons, drawing work, reverse-engineering direction, and next capability work. fileciteturn196file0
+The detailed engineering record contains the experiments, architecture rationale, accepted specimens, QA lessons, drawing work, reverse-engineering direction, and next capability work.
 
 ## HERMES WINDOWS LAUNCH / RECOVERY
 
