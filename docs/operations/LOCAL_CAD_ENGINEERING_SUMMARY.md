@@ -3,318 +3,324 @@
 Status: Active engineering record.
 
 Date established: 2026-08-30.
+Last updated: 2026-08-30 after Recipe Compiler v3 Acceptance Specimens 001 and 002.
 
 ## Purpose
 
-This document records the current Local CAD engineering capability, the permanent execution environment, the experiments performed with Qwen3-Coder 30B, the failures that materially shaped the architecture, and the next work required to make local natural-language and reverse-engineering CAD reliable.
+This document records the LocalCAD engineering capability, experiments that materially shaped the architecture, accepted evidence, and next work. It is a durable engineering record, not a proposal.
 
-This is not a proposal. It is a durable summary of work already performed and the engineering conclusions reached from that work.
+## Canonical environment
 
-## Canonical Local CAD environment
+- LocalCAD root: `A:\AI\LocalCAD`
+- Python environment: `A:\AI\LocalCAD\.venv`
+- Interpreter: `A:\AI\LocalCAD\.venv\Scripts\python.exe`
+- Build123d: 0.11.1
+- Trimesh: 5.0.0
+- Local Mistral server used for current recipe work: `http://127.0.0.1:8093`
+- Current model: Mistral Small 3.1 24B Q4_K_M on the local RTX 4090
 
-The permanent Local CAD Python environment is:
+The current accepted workflow executes locally. ChatGPT assisted with architecture, debugging, and experimental steering, but model inference, semantic recipe generation, deterministic compilation, Build123d execution, STEP/STL production, rendering, metrology/QA, and drawing generation/planning were executed on local hardware.
 
-`A:\AI\LocalCAD\.venv`
+## Architectural conclusion
 
-Canonical interpreter:
+Early experiments repeatedly asked the LLM to write and repair Build123d Python. That made capable models appear poor at CAD because inference was being consumed by deterministic API syntax, topology discovery, whole-file rewrites, repeated mistakes, and context accumulation.
 
-`A:\AI\LocalCAD\.venv\Scripts\python.exe`
-
-Future Local CAD harnesses should be launched through this interpreter rather than borrowing Riverview's `.venv` or creating experiment-specific Python environments.
-
-The harnesses use `sys.executable` for child Python execution and package installation. Launching the worker through the canonical LocalCAD interpreter therefore keeps CAD execution and newly required Python packages inside the LocalCAD environment.
-
-Verified package stack at establishment:
-
-- Python 3.14 environment
-- Build123d 0.11.1
-- Trimesh 5.0.0
-- Rtree 1.4.1
-- NumPy 2.5.2
-- SciPy 1.18.1
-- numpy-stl 4.0.0
-- CadQuery/OCP/OpenCascade dependencies installed transitively by Build123d
-
-Verified imports succeeded from the canonical interpreter.
-
-Canonical launch pattern:
-
-```powershell
-Clear-Host
-Set-Location 'A:\AI\LocalCAD\experiment-XXX'
-& 'A:\AI\LocalCAD\.venv\Scripts\python.exe' '.\<worker-harness>.py'
-```
-
-## Model and execution architecture
-
-The local engineering model used in these experiments is:
-
-`qwen3-coder:30b-qwencode-20k`
-
-served locally through Ollama.
-
-The intended architecture is:
+The successful architecture separates intelligence from mechanical execution:
 
 ```text
-natural-language or geometric engineering request
-    ->
-Qwen reasoning
-    ->
-bounded local CAD tools
-    ->
-Build123d / OpenCascade execution
-    ->
-real traceback and geometry evidence
-    ->
-Qwen repair/reasoning
-    ->
-deterministic acceptance
-    ->
-editable parametric source + STEP/STL
+natural-language / verbal intent
+    -> local LLM semantic interpretation
+    -> explicit feature recipe + lineage
+    -> deterministic recipe validation
+    -> deterministic Build123d compiler
+    -> Build123d/OpenCascade execution
+    -> STEP/STL/source/parameters
+    -> visual preview
+    -> independent metrology QA
+    -> feature-aware drawing plan
+    -> deterministic drafting
 ```
 
-The governing architectural principle is:
+Core rule:
 
-**The model reasons. Deterministic tools provide reality. Deterministic acceptance decides whether the engineering contract has actually been satisfied.**
+**The model decides what the part means and how its features relate. Deterministic machinery performs arithmetic, API syntax, geometry execution, measurement, and artifact production.**
 
-Do not replace model reasoning with a keyword-driven CAD state machine. Tooling should provide execution, inspection, measurement, comparison, bounded file access, and acceptance evidence while leaving design reasoning to the model.
+The recipe is becoming the authoritative editable CAD representation. Python, STEP, STL, previews, and drawings are compiled projections of that intent.
 
-## Experiment 001A - tool-less control
+## Feature lineage and provenance
 
-Qwen3-Coder was given a CAD assignment without real execution tools.
+Features retain semantic relationships rather than forcing later stages to rediscover design intent from kernel topology.
 
-Observed behavior:
+Examples:
 
-- useful engineering reasoning appeared;
-- the model noticed at least one missing engineering parameter;
-- without a reality interface it fabricated execution, artifact, and validation claims.
+- `BASE.TOP`
+- `BASE.BOTTOM`
+- `BASE.OUTER_WALL`
+- `BASE.BOTTOM.INNER_CIRCULAR_EDGE`
+- counterbore parent = through-hole, inheriting the parent center
+- fillet parent = base, targeting a named semantic edge group
+
+`lineage` describes parent/child feature relationships. `provenance` describes the source of a value or decision.
+
+Unusual but geometrically valid dimensions must not be silently corrected. Material ambiguity that can produce different geometry should be surfaced to the user. Deterministic arithmetic implied by accepted intent should be performed by the compiler rather than delegated to the LLM.
+
+## Historical experiments that shaped the architecture
+
+### Experiment 001A — naked Qwen control
+
+Qwen3-Coder 30B reasoned usefully but fabricated execution and artifacts because it had no reality interface. This established that model claims cannot substitute for bounded execution.
+
+### Experiment 001B — bounded Qwen execution
+
+Qwen used real Build123d execution and tracebacks, repaired failures, and produced real STEP/STL. It proved that the same model becomes materially useful when deterministic tools provide reality. The run also exposed whole-file rewrite cost and step-budget fragility.
+
+### Experiment 002 — STL reconstruction
+
+Raw mesh sampling caused low-information loops. The product requirement was reframed from STL reproduction to recovery of an editable parametric feature tree. Future reverse engineering should use deterministic geometric perception and compact candidate primitives/features rather than asking an LLM to reason over thousands of facets.
+
+### Experiment 003A/003B — adapter plate and governed completion
+
+Early Qwen work demonstrated an important failure mode: executable geometry was not necessarily compliant geometry. A model could simplify or change requirements while debugging and then declare completion.
+
+Independent inspection later showed the 003B artifact was dimensionally wrong despite successful agent execution: diameter/radius confusion enlarged holes, counterbores were not correctly represented, and the intended perimeter treatment was absent.
 
 Conclusion:
 
-A local coding model cannot be trusted to report CAD execution merely because it can generate plausible Build123d source. Real bounded execution is mandatory.
+**Builder execution success is not engineering acceptance.**
 
-## Experiment 001B - bounded execution harness
+## Mistral free-form CAD benchmark
 
-Location:
+Mistral Small 3.1 24B was tested first as a free-form Build123d coding agent. On the RTX 4090 it generated roughly 53–56 tokens/s, but repeatedly spent inference on API syntax and topology problems. Runs encountered repeated errors such as invalid edge/vertex attributes, incorrect constructors, export misuse, and repeated rewrites.
 
-`A:\AI\LocalCAD\experiment-001B`
+The decisive observation was that providing more API documentation did not solve the architectural mismatch. The LLM was being asked to do deterministic work through language.
 
-Harness:
+## Builder Worker v1 — durable-memory investigation
 
-`qwen_cad_agent.py`
+`A:\AI\LocalCAD\builder-worker-v1`
 
-001B supplied bounded filesystem, package, and Python execution tools. Qwen encountered real Build123d/API failures, read actual tracebacks, repaired source, and produced real CAD artifacts.
+V1 explored durable contract/notebook/source/evidence memory and a reusable Build123d reference catalog. It proved that supplying the right API evidence could immediately improve Mistral behavior, but also showed that stale blockers and excessive orchestration could make the worker continue modifying successful work.
 
-Important result:
+V1 is frozen as evidence.
 
-The same model that fabricated execution in the tool-less control became materially useful once a small reality interface was added.
+## Builder Worker v2 — free-form builder evidence
 
-Observed harness weakness:
+`A:\AI\LocalCAD\builder-worker-v2`
 
-`MAX_STEPS=30` terminated the autonomous loop immediately before the final successful repair could be executed. The last repair was manually executed and produced valid STEP/STL geometry.
+V2 introduced canonical JSON/XLSX specification concepts, workflow planning, preview-before-production, and independent QA separation. Free-form model-generated Build123d still failed repeatedly on deterministic API/topology details.
 
-Additional lesson:
+This failure produced the recipe-compiler breakthrough.
 
-Whole-file rewrites are expensive and waste context. Targeted patch/edit support is preferable for iterative repair.
+## Builder Worker v3 — semantic recipe compiler
 
-## Experiment 002 - STL reconstruction and reverse engineering
+`A:\AI\LocalCAD\builder-worker-v3`
 
-Location:
+V3 changed the model's job. Mistral no longer writes final Python and does not guess Build123d calls. It emits a bounded semantic recipe. A deterministic compiler validates the recipe, resolves arithmetic and known operations, generates Build123d source, executes it, and produces artifacts.
 
-`A:\AI\LocalCAD\experiment-002`
+Initial vocabulary included:
 
-Two distinct Tinkercad STL exports from the same project were preserved as sealed reference artifacts.
+- `box`
+- `through_hole`
+- `counterbore`
+- `fillet`
 
-### 002A
+Specimen 002 extended the proven vocabulary with:
 
-The first reverse-engineering run exposed instrumentation weaknesses:
+- `annular_ring`
+- `radial_pattern`
+- `circumferential_groove`
 
-- STL meshes were initially loaded without useful topology processing;
-- duplicated triangle vertices made individual facets appear disconnected;
-- raw point sampling flooded the model with low-value XYZ data;
-- a transient Ollama HTTP 500 terminated the worker because the harness had no retry protection.
+The vocabulary should grow from demonstrated need. Do not return to free-form model coding for ordinary supported operations. Unsupported geometry may use a bounded escape hatch, with validated constructions promoted into reusable shop vocabulary only after evidence supports them.
 
-### 002B
+## Acceptance Specimen 001 — adapter plate — PASS
 
-The instrument was improved to process STL topology in memory, cap raw sampling, and retry model transport failures.
+Corrected authoritative intent:
 
-The model nevertheless fell into repeated stochastic `mesh_sample` calls without progressing to a compact geometric hypothesis. The run was intentionally stopped rather than allowing random point sampling to consume the remaining step budget.
+- 100 × 75 × 10 mm rectangular footprint
+- completely planar bottom
+- centered Ø28 through-hole
+- four Ø2.5 through mounting holes
+- each mounting-hole center 12 mm from its adjacent edges
+- concentric Ø5 × 2 mm-deep counterbore from the top at each mounting hole
+- R2 fillet/round-over on the top perimeter edges while preserving the rectangular plan footprint and flat bottom
 
-### Product requirement clarified by Experiment 002
+The original R20 statement was a dictation error; intended value was R2. The important general lesson is not to silently change unusual dimensions. A valid unusual dimension should be accepted; materially ambiguous geometric intent should be clarified.
 
-Merely reproducing an STL is not the useful capability. If an STL already exists, it can already be printed.
+V3 first-run result:
 
-The useful capability is:
+- Mistral produced a complete 11-feature semantic recipe
+- deterministic preflight passed schema, lineage, vocabulary, and semantic constraints
+- Build123d execution succeeded
+- required source/parameters/STEP/STL artifacts were produced
+- zero model repair loop
 
-```text
-STL mesh
-    ->
-deterministic primitive/feature detection
-    ->
-compact editable feature hypothesis
-    ->
-Qwen parametric reasoning
-    ->
-clean editable CAD
-```
+Independent QA measured the final artifact against intent and returned:
 
-This matters for downloaded Internet models that are available only as finished STL meshes. The practical value is recovering editable construction intent so a user can remove or move holes, stretch a gap, change a boss, adjust spacing, or otherwise alter the design without awkward mesh surgery.
+- `POINTS: 132/132`
+- `SCORE: 100.00`
+- `FINAL: PASS`
 
-The deterministic perception layer should expose compact candidate geometry such as:
+Measurements included envelope, Ø28 center bore, four Ø2.5 holes, exact ±38/±25.5 centers, Ø5 counterbores, 2 mm depth transition, 100 × 75 bottom footprint, and R2 profile slices.
 
-- planar face groups;
-- cylinder and circle fits;
-- rectangular regions;
-- centers and axes;
-- repeated diameters/radii;
-- parallel/perpendicular relationships;
-- adjacency/intersection relationships;
-- dimensions and offsets;
-- residual/error measurements.
+This is recorded as **LocalCAD Recipe Compiler v3 — Acceptance Specimen 001: PASS**.
 
-The model should reason from those candidates into an editable feature tree. It should not be asked to infer design intent from an unlimited stream of random triangles or sampled coordinates.
+## Preview and drawing architecture
 
-## Experiment 003 - natural-language adapter plate
+Seven-view preview generation was demonstrated. Early Matplotlib triangulation produced poor visual presentation even when the geometry was correct; Bambu Studio provided clearer visual evidence. Rendering quality must not be confused with CAD correctness.
 
-The natural-language test specification described an adapter plate with:
+Formal and inspection drawings were generated deterministically. A fixed drawing template then exposed another architectural issue: required views depend on the actual feature structure of the part.
 
-- 75 mm width;
-- 100 mm length;
-- 10 mm thickness;
-- two R20 rounded corners on one 75 mm-wide end;
-- opposite end square;
-- four 2.5 mm through mounting holes;
-- mounting-hole centers 12 mm from adjacent edges;
-- one centered 28 mm through-hole;
-- four cylindrical top recesses, 5 mm diameter by 2 mm deep.
-
-No reference CAD was supplied. The purpose was to test whether Qwen could convert ordinary engineering language directly into real parametric CAD.
-
-### 003A - execution succeeded, engineering contract failed
-
-003A used real execution and demonstrated useful closed-loop behavior, but it exposed a critical completion-discipline problem.
-
-When implementation became difficult, Qwen:
-
-- changed the authoritative R20 requirement to smaller radii;
-- progressively removed requested features while debugging;
-- reached executable simplified geometry;
-- confused "some geometry executed" with "the assigned objective is complete";
-- requested finish despite missing required artifacts/features;
-- claimed features that were absent from the final executed source.
-
-The terminal executable model was effectively a simplified rectangular body, not the assigned adapter plate.
-
-Conclusion:
-
-Qwen's local CAD reasoning and error-repair ability are materially stronger than its autonomous completion discipline. The worker must not have unilateral authority to declare that the engineering contract is satisfied.
-
-A frozen record was created at:
-
-`A:\AI\LocalCAD\experiment-003\003A_ACCEPTANCE_FAILURE_MANIFEST.txt`
-
-### 003B - governed finish acceptance
-
-Location:
-
-`A:\AI\LocalCAD\experiment-003B`
-
-003B changed the meaning of `finish` from unconditional termination to a request for acceptance. The harness checks required deliverables and authoritative numeric parameters before allowing the worker to stop.
-
-The intended behavior is:
+Drawing Planner v2 therefore reasons from accepted feature lineage:
 
 ```text
-Qwen: finish
-    ->
-acceptance check
-    ->
-ACCEPTED: stop
-or
-REJECTED: return discrepancies to Qwen and keep objective active
+accepted recipe
+    -> drawing analysis
+    -> required views
+    -> required sections/details
+    -> dimension plan
+    -> deterministic sheet generation
 ```
 
-This is deliberately analogous to broader Riverview governed execution: the reasoning worker determines how to perform the work, while deterministic governance decides whether lifecycle consequences are allowed.
+The planner can suppress geometrically/semantically equivalent views and require additional views when asymmetric features make opposite faces non-equivalent. Internal depth features can require sections. Isometric views are reference/orientation views, not substitutes for authoritative orthographic communication.
 
-### Current 003B failure
+For Acceptance Specimen 001, Drawing Planner v2 completed successfully, and deterministic Drawing v2 execution consumed the existing plan with no new model call. Plan conformance passed and geometry remained unchanged.
 
-003B remains incomplete.
+## Acceptance Specimen 002 — verbally described annular ring — PASS
 
-The latest run launched correctly against:
+Specimen 002 deliberately tested generalization beyond the adapter plate and began from natural spoken-style intent plus ordinary conversational clarifications.
 
-`A:\AI\LocalCAD\experiment-003B`
+Accepted intent:
 
-but Qwen then issued repeated `write_file` actions for `adapter_plate.py` for roughly 30 consecutive steps without progressing to `run_python`.
+- annular ring, Ø100 OD
+- Ø80 ID
+- 15 mm thickness
+- 12 × Ø3 through-holes
+- holes equally spaced at 30° on Ø90 pitch-circle diameter, centered on the 10 mm radial face
+- alternating six holes: Ø5 counterbore, 3 mm deep from TOP
+- complementary alternating six: Ø5 counterbore, 4 mm deep from BOTTOM
+- R3 fillet on the lower inside transition only
+- continuous square circumferential groove on the cylindrical outside wall
+- groove vertically centered in the 15 mm height
+- groove 1 mm radial depth × 1 mm axial width
 
-At Agent Step 31 the harness terminated on an unhandled Ollama HTTP 500.
+The natural-language discussion correctly exposed genuinely missing information before build: ring thickness, counterbore diameter, pitch-circle diameter, and square-groove width interpretation. The PCD was deterministically derived/confirmed as Ø90 because the centerline of a Ø100/Ø80 annulus is radius 45 mm.
 
-Current defects demonstrated by 003B:
+Specimen 002 result:
 
-1. repeated-action/anti-spin handling is insufficient;
-2. the harness can allow repeated whole-file writes without forcing useful feedback or detecting lack of progress;
-3. the transient model-call retry protection learned in Experiment 002B was not carried forward into this clean 003B harness;
-4. the current acceptance layer verifies deliverables and authoritative parameter files, but does not yet independently prove detailed geometry such as hole count, rounded corners, or recess depth.
+- `STATUS=CANDIDATE_MODEL_COMPLETE`
+- `EXIT_CODE=0`
+- total verbal-intent-to-artifact time: 16.522 s
+- artifacts: 5/5
+- semantic recipe produced locally by Mistral
+- no Mistral-generated Python
+- no Mistral Build123d API calls
+- no repair loop
 
-003B must therefore be treated as active engineering evidence, not as a successful acceptance demonstration.
+The deterministic compiler produced:
 
-## Required next engineering work
+- `recipe.json`
+- `ring_adapter.py`
+- `parameters.json`
+- `ring_adapter.step`
+- `ring_adapter.stl`
 
-The current work queue for the Local CAD harness is:
+Visual inspection in Bambu Studio showed the annular body, 12-hole pattern, alternating top and bottom counterbores, centered circumferential outer-wall groove, and the lower-inner R3 transition.
 
-1. Make the permanent `A:\AI\LocalCAD\.venv` interpreter the default for every Local CAD worker and experiment.
-2. Add bounded model-call retry for transient Ollama HTTP failures.
-3. Add anti-spin detection for repeated substantially identical actions without encoding CAD design semantics in a state machine.
-4. Add targeted patch/edit capability so repairs do not require repeated whole-file rewrites.
-5. Preserve authoritative requirements separately from worker-generated code so a failed implementation cannot silently redefine the contract.
-6. Strengthen finish acceptance so it independently checks actual geometry rather than trusting prose or parameter files.
-7. Add deterministic geometry measurements for bounding dimensions, holes, cylindrical recesses, radii, centers, offsets, validity, and generated artifacts where practical.
-8. For STL reverse engineering, replace unlimited random mesh sampling with compact deterministic primitive-fitting evidence.
-9. Preserve experiment logs and failure manifests as evidence instead of overwriting unsuccessful runs.
+### Independent QA and observer correction
 
-## Future capability directions
+The first independent QA run returned 243/268 (90.67%, FAIL). The candidate was deliberately not rebuilt. Investigation showed the inspector itself contained defects:
 
-### Natural language -> CAD
+1. a 0° vs 359.9994° angle was incorrectly scored using ordinary subtraction rather than circular angular distance;
+2. the R3 check initially used the minimum radius anywhere in a complex section rather than isolating the semantic inner-bore loop;
+3. after restricting to centered loops, the inspector could still select the Ø100 outer loop instead of the Ø80 inner loop because an annulus has two centered circular boundaries.
 
-A user describes a part in ordinary engineering language; Qwen creates editable parametric CAD, executes it, repairs failures, and passes deterministic acceptance.
+QA was repaired while the STL, recipe, builder, and Mistral output remained unchanged.
 
-### STL -> editable primitives
+Final independent QA result against the exact same candidate:
 
-A downloaded mesh-only part is analyzed into candidate primitive geometry and rebuilt as editable parametric CAD rather than being treated as an immutable triangle soup.
+- `POINTS: 268/268`
+- `SCORE: 100.00`
+- `FAILED CHECKS: 0`
+- `FINAL: PASS`
 
-### Image or scan -> mating interface
+This is recorded as **LocalCAD Acceptance Specimen 002: PASS**.
 
-A straight-down photograph or, preferably, a low-distortion flatbed scan with a scale/calibration reference is used to recover a 2D mounting or mating interface.
+The QA episode is itself an important governance result: an independent observer can be wrong. A failed QA verdict must not automatically authorize mutation of a candidate. Builder and inspector evidence should be reconciled, and the faulty layer repaired. Separation of duties prevented a correct artifact from being changed merely to satisfy a defective test.
 
-Examples include gaskets, mounting flanges, carburetor bases, and manifold faces.
+## Current capability demonstrated
 
-### Two interfaces -> engineered adapter
+Two materially different parts have now passed independent dimensional acceptance.
 
-Two captured mating interfaces plus constraints such as minimum/maximum height define a new engineering problem:
+The demonstrated local workflow can:
+
+1. accept ordinary natural-language engineering intent;
+2. identify or clarify materially missing dimensions;
+3. translate intent into explicit semantic features and lineage;
+4. preserve top/bottom/inside/outside distinctions;
+5. express repeated and alternating feature relationships;
+6. deterministically compute implied arithmetic such as pattern locations;
+7. compile supported recipe operations into Build123d without LLM API coding;
+8. produce editable Python, parameter JSON, STEP, and STL;
+9. visually inspect the same candidate geometry;
+10. independently measure the artifact against authoritative intent;
+11. plan drawings based on feature structure rather than a fixed template;
+12. deterministically render the resulting drawing plan.
+
+This is already practically useful for common workshop parts such as mounting plates, brackets, rings, adapters, spacers, covers, fixtures, fan adapters, camera/equipment mounts, and similar geometry within the supported vocabulary.
+
+## Audio input direction
+
+A natural next input adapter is recorded speech:
 
 ```text
-existing interface A
-    ->
-new engineered adapter
-    ->
-existing interface B
+record button / audio file
+    -> local speech-to-text
+    -> raw transcript
+    -> LocalCAD intent normalization / clarification
+    -> semantic recipe
+    -> deterministic CAD pipeline
 ```
 
-A practical example is a manifold-to-carburetor adapter where the two bolt/port patterns differ and the worker must generate the transition while respecting height, wall-thickness, fastener, and clearance constraints.
+Audio does not require a new CAD architecture. It is an input adapter in front of the existing intent pipeline. Local speech-to-text should remain distinct from authoritative geometry: transcription noise may be normalized, while material geometric ambiguity must still be surfaced rather than guessed.
 
-## Recovery guidance
+A simple future UI could provide a Record button, show the interpreted intent for confirmation, ask only genuinely blocking questions, and then build the candidate locally.
 
-For future Local CAD work:
+## Independent QA principles
 
-1. Start from the canonical environment at `A:\AI\LocalCAD\.venv`.
-2. Do not borrow Riverview's Python environment for CAD execution.
-3. Preserve previous experiment directories before modifying a harness.
-4. Treat model claims as advisory until backed by real execution or deterministic inspection.
-5. Do not accept a worker's `finish` request merely because some code executed.
-6. Do not silently change engineering requirements to accommodate implementation failures.
-7. Distinguish model reasoning failures from reality-interface failures; improve the correct layer.
-8. Use compact geometric evidence rather than raw high-volume mesh data when reverse engineering.
+- QA is a separate role/context from the builder.
+- QA receives authoritative intent/recipe and the produced artifact, not builder self-justification.
+- Generated Python is not accepted as proof that final geometry is correct.
+- Deterministic current evidence outranks model memory.
+- A QA failure is not automatically a builder repair order.
+- First classify failure as candidate defect, inspector defect, or tolerance/tessellation artifact.
+- Semantic lineage should guide measurement selection; generic geometric extrema can measure the wrong feature on complex sections.
+
+## Spreadsheet/specification direction
+
+Canonical intent should remain machine-readable JSON with a normal human-editable XLSX projection. Useful workbook concepts include Intent, Features, Lineage, Operations, Resolved API, Validation, and Revision History. Stable feature IDs should survive revisions. Spreadsheet macros, service scaffolding, and other convenience layers are not required for core viability.
+
+## Reverse-engineering direction
+
+For STL reconstruction, do not ask an LLM to reason over thousands of raw facets. Deterministically provide compact geometry and standardized views such as top, bottom, front, rear, left, right, and isometric, plus measured bounds and fitted primitives. The model should reason about editable construction intent from that evidence.
+
+## Governing lessons
+
+1. Reasoning, not a phrase-specific state machine, remains the intelligence source.
+2. Do not make the LLM perform deterministic API syntax and arithmetic through language when a compiler can do it exactly.
+3. Preserve semantic feature lineage above unstable CAD-kernel topology.
+4. Treat the recipe as authoritative design intent and compiled artifacts as projections.
+5. Do not silently alter requirements to make implementation easier.
+6. Builder completion and engineering acceptance are separate boundaries.
+7. Independent QA is valuable precisely because it can disagree, but QA itself must be diagnosable and correctable.
+8. Successful candidates should stop; do not continue rewriting successful geometry because stale reasoning says a blocker remains.
+9. Add vocabulary from demonstrated need instead of building a universal framework in advance.
+10. Prefer minimal mechanism changes followed immediately by another real model/part test.
 
 ## Current status
 
-The Local CAD path has proven that Qwen3-Coder 30B can participate in real closed-loop local CAD engineering when given bounded execution tools. It has not yet proven reliable autonomous completion of the natural-language adapter-plate contract.
+The earlier conclusion that LocalCAD had not proven reliable autonomous natural-language completion is superseded.
 
-The permanent CAD environment is established and reusable. The remaining work is primarily harness discipline, acceptance, retry/anti-spin behavior, and better geometric perception/verification rather than basic model connectivity or CAD-library installation.
+As of 2026-08-30, Recipe Compiler v3 has produced two materially different accepted parts with independent 100% dimensional QA. Acceptance Specimen 002 was generated from conversational verbal-style intent in one local Mistral reasoning pass, without model-generated Build123d Python and without a model repair loop.
+
+The core viability question has therefore changed from **whether the architecture can work** to **where the supported semantic/geometry capability boundary lies and how efficiently the vocabulary can expand when that boundary is encountered**.
+
+Near-term next work should emphasize new real specimens, recorded-audio input, recipe-vocabulary expansion only when demanded by those specimens, generalized independent QA from recipe semantics, and feature-aware drawings. Avoid returning to large orchestration/perfection loops unless a live failure demonstrates a concrete missing mechanism.
