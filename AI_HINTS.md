@@ -375,6 +375,43 @@ hermes --help
 
 Do not assume Campaign Runner execution-budget settings are top-level Hermes CLI flags. The Riverview/Hermes Tranche 2 checkpoint records substantial Campaign Runner execution policy of expected duration 1,200 seconds, hard timeout 1,800 seconds, and per-run Hermes guidance of `--max-turns 300`, but the verified Hermes v0.20.5 top-level help did **not** advertise `--max-turns` or `--run-budget` as top-level CLI options. Re-check the installed command's help or the Campaign Runner adapter before using those values in a PowerShell Hermes launch command.
 
+<!-- LOCAL_AI_CHAT_WORKERS_BEGIN -->
+## LOCAL AI CHAT WORKERS / OCTOMINER1
+
+Search: `local AI chat workers`, `start local chat workers`, `Qwen 3060`, `Gemma P100`, `resident conversational model`, or `local VLM`.
+
+For the complete model-testing record, current provisional worker topology, measured GPU fit/performance, model-selection rationale, and recovery instructions, read:
+
+`docs/operations/LOCAL_AI_CHAT_WORKER_TESTING_AND_STARTUP.md`
+
+Current provisional workers:
+
+- **RTX 3060 Ti / fast text conversation:** Qwen3-VL 8B Uncensored HauhauCS Aggressive Q6_K, text-only, 16K context, Q8/Q8 KV cache.
+- **Tesla P100 16 GB / full vision and independent cross-check:** ADI Gemma 3 12B Abliterated GLM-5.2 Q4_K_M, full VL, 32K context, Q8/Q8 KV cache.
+
+Repository-owned startup templates:
+
+- Start both workers:
+  `tools/local-ai/Start-Octominer1-ChatWorkers.ps1`
+- Start only the RTX 3060 Ti Qwen conversational worker:
+  `tools/local-ai/Start-Octominer1-Qwen3060Chat.ps1`
+- Start only the P100 Gemma full-VL worker:
+  `tools/local-ai/Start-Octominer1-GemmaP100VL.ps1`
+
+For ordinary recovery when the Steward says something like **"start the local chat workers"**, **"start Qwen on the 3060"**, or **"start Gemma/VL on the P100"**, use the repository-owned startup template rather than reconstructing launch commands from conversation memory.
+
+The direct provisional endpoints after startup are:
+
+- Qwen health: `http://192.168.1.160:8094/health`
+- Qwen OpenAI-compatible chat: `http://192.168.1.160:8094/v1/chat/completions`
+- Gemma health: `http://192.168.1.160:8095/health`
+- Gemma OpenAI-compatible multimodal chat: `http://192.168.1.160:8095/v1/chat/completions`
+
+These models and endpoints are a **provisional operational baseline**, not a permanent architecture. Preserve stable startup/routing interfaces while allowing model checkpoints to be replaced as better local models become available.
+
+Do not consume the RTX 4090 for routine resident conversation merely because it is available; the current intent is to preserve it for heavier engineering, coding, reasoning, and overflow work.
+
+<!-- LOCAL_AI_CHAT_WORKERS_END -->
 ## STREAM DECK WORK
 
 For Stream Deck profile, button, navigation, Riverview Operator, Quest Dev, or Stream Deck plugin work, read before modifying or diagnosing:
