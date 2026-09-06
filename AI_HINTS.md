@@ -1,4 +1,4 @@
-<!-- Version: 0.6.6 -->
+<!-- Version: 0.6.7 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -6,6 +6,16 @@ Status: Canonical fast-recovery entry point.
 Pat is the Steward and final authority. Grace coordinates operational progression but is not the whole Estate at Riverview.
 
 Riverview is a separate successor/replacement system, not a subsystem of The Estate. The Estate remains the legacy operational system while Riverview replaces its capabilities incrementally. The accepted canonical local Riverview working root is `A:\Riverview\standalone`; historical/archive/hold trees are provenance or evidence, not development authority. Read `docs/operations/roadmap/evidence/RIVERVIEW_RUNTIME_REPOSITORY_PROVENANCE_MAP_PHASE0_2026-08-26.md` before changing runtime ownership or selecting a different repository root.
+
+## CHATGPT ARCHIVE FINAL EVACUATION / SEPTEMBER 14-15 CUTOFF
+
+Search: `ChatGPT archive`, `structured evacuation`, `C1 C2 C3 evacuation`, `final evacuation`, `September 14`, `September 15`, `account cutoff`, or `OctoChat`.
+
+For the completed C1/C2/C3 structured-preservation state and the canonical procedure for the final live inventory, delta capture, cross-seat deduplication, and cutoff reconciliation before the planned Business-to-free account transition, read completely:
+
+`docs/operations/hermes/CHATGPT_ARCHIVE_STRUCTURED_EVACUATION_COMPLETION_AND_CUTOFF_RUNBOOK.md`
+
+Historical structured evacuation completed on 2026-09-06 at the seat level: C1 `534/534`, C2 `155/155`, C3 `3/3`. Do not use the older C2 `128` / C3 `2` assumptions. Do not simply add seat populations to infer a unique corpus count because conversations can overlap across seats. The final cutoff operation is a live reconciliation/delta capture, not a blind rerun of the historical corpus. Large private archive bytes remain local under `A:\AI\Tools\ChatGPTConversationArchive`; GitHub holds the recovery/runbook material, not the preserved corpus bytes.
 
 ## MANDATORY RIVERVIEW CLEAN-STATE PREFLIGHT
 
