@@ -1,4 +1,4 @@
-<!-- Version: 0.6.7 -->
+<!-- Version: 0.6.8 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -437,6 +437,55 @@ The installed configuration under the Elgato StreamDeck AppData tree is runtime 
 For Octominer, OCTOMINER1/OCTOMINER2, Wake-on-LAN, WOL, SSH power control, fixed DHCP/IP allocation, AC-loss recovery, or Riverview compute-node remote-start work, read **`docs/operations/octominer/OCTOMINER_REMOTE_POWER_AND_WOL.md`** before modifying or diagnosing the node.
 
 That document records the verified OCTOMINER1 MAC/IP/SSH state, AT&T fixed DHCP allocation procedure, X12 Ultra AC-loss auto-power-on test, persistent systemd `.link` WOL configuration, real Magic Packet wake test, and the repeat procedure for OCTOMINER2.
+
+### OCTOMINER2 PASSWORDLESS SSH — VERIFIED CONNECTION
+
+Search: `Octo2 SSH`, `OCTOMINER2 SSH`, `passwordless SSH`, `ssh octo2`, `192.168.1.162`, or `octominer1_nopass`.
+
+OCTOMINER2 is configured for passwordless SSH from the Windows dev machine. The verified connection is:
+
+```text
+Host octo2
+    HostName 192.168.1.162
+    User root
+    IdentityFile C:/Users/wille/.ssh/octominer1_nopass
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+```
+
+The corresponding entry belongs in the Windows OpenSSH config at `C:\Users\wille\.ssh\config`. The key file is intentionally the already-provisioned `octominer1_nopass` identity; OCTOMINER2 accepted that public key after the Octo1 HiveOS SSD was transplanted and the host was reconfigured as OCTOMINER2.
+
+Normal passwordless connection from PowerShell:
+
+```powershell
+Clear-Host
+ssh octo2
+```
+
+Direct connection without relying on the alias:
+
+```powershell
+Clear-Host
+ssh -i C:\Users\wille\.ssh\octominer1_nopass root@192.168.1.162
+```
+
+Remote-job pattern:
+
+```powershell
+Clear-Host
+ssh octo2 "nvidia-smi"
+```
+
+Verified OCTOMINER2 identity/state when configured:
+
+- hostname: `OCTOMINER2`
+- IPv4: `192.168.1.162`
+- SSH user: `root`
+- passwordless key authentication: working
+- GPU layout: RTX 3060 Ti + 2x Tesla P100 16 GB
+
+Do not ask the Steward for an SSH password when operating from the configured dev machine. Use `ssh octo2` first; if the alias is unavailable, use the explicit identity-file command above. Do not copy or expose the private-key contents.
 
 ## QUEST / WEBXR / SPATIAL WORK
 
