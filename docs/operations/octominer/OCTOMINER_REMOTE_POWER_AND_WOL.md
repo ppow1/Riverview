@@ -108,6 +108,125 @@ When OCTOMINER2 is powered up:
 8. After boot, verify the reserved IP returned and `Wake-on: g` remains enabled.
 9. Record OCTOMINER2's final MAC, reserved IP, SSH target, and test results in this document.
 
+## Octominer fan controller and PSU telemetry
+
+The HiveOS Octominer controller utility is:
+
+`/hive/opt/octofan/fan_controller_cli`
+
+The controller was identified over USB as the Octominer `Fan-Controller` (`16c0:05dc`, manufacturer string `info@octominer.com`). On the tested controller, firmware reported as 2.7 and hardware as 1.2.
+
+### Read-only controller inspection
+
+Human-readable controller status:
+
+```bash
+/hive/opt/octofan/fan_controller_cli -h
+```
+
+Machine-readable controller status:
+
+```bash
+/hive/opt/octofan/fan_controller_cli -r
+```
+
+From the Windows dev machine, OCTOMINER2 can be queried over the established passwordless alias with:
+
+```powershell
+Clear-Host
+ssh octo2 "/hive/opt/octofan/fan_controller_cli -h"
+```
+
+### PSU / chassis AC-power telemetry
+
+Octofan writes recent PSU AC-input readings to files matching:
+
+`/tmp/octofan_psu_last_power_*`
+
+To sum all reported PSU AC-input values:
+
+```bash
+awk '{s+=$1} END {printf "Total AC power: %.0f W\n",s}' /tmp/octofan_psu_last_power_*
+```
+
+From the Windows dev machine:
+
+```powershell
+Clear-Host
+ssh octo2 "awk '{s+=\$1} END {printf \"Total AC power: %.0f W\\n\",s}' /tmp/octofan_psu_last_power_*"
+```
+
+This is controller/PSU-reported aggregate AC input telemetry for the chassis. Treat it as useful operational telemetry, not as a separately calibrated wall-meter measurement.
+
+### Direct fan PWM commands
+
+The verified controller syntax for setting the current PWM of one fan channel is:
+
+```text
+-f <fan_no> -v <pwm>
+```
+
+The PWM value is on a `0-255` scale. Examples:
+
+```bash
+# About 50 percent PWM on fan channel 1
+/hive/opt/octofan/fan_controller_cli -f 1 -v 128
+
+# About 35 percent PWM on fan channel 1
+/hive/opt/octofan/fan_controller_cli -f 1 -v 89
+```
+
+The verified syntax for changing a fan channel's startup PWM is:
+
+```text
+-d <fan_no> -v <pwm>
+```
+
+Example:
+
+```bash
+/hive/opt/octofan/fan_controller_cli -d 1 -v 89
+```
+
+The controller also exposes a maximum-RPM calibration/test operation:
+
+```text
+-t
+```
+
+and a target-RPM operation:
+
+```text
+-m <fan_no> -v <RPM>
+```
+
+### Other verified controller operations
+
+The controller help exposed these operations:
+
+```text
+-o <x,y,flag> -v <text>      OLED output
+-x                            Reset rig
+-p                            Power rig down / soft power action
+-b                            Enter bootloader
+-bx                           Exit bootloader
+-t                            Test maximum fan speed for percentage calculation
+-f <fan_no> -v <pwm>          Set fan PWM
+-d <fan_no> -v <pwm>          Set startup PWM
+-m <fan_no> -v <RPM>          Set target RPM
+-l <led_no> -v <value>        Set LED value
+-w <short timeout> -v <long timeout>  Set watchdog timeout values
+-s                            Watchdog reset
+```
+
+### Important fan-control behavior
+
+HiveOS normally runs Octominer control processes including `octofan`, `autofan`, and the Octominer watchdog. Therefore a one-shot direct `-f` PWM command may be overwritten by automatic fan control. Do not assume a manual PWM command establishes a persistent minimum fan floor.
+
+If the operational goal is "never let the chassis fans fall below X percent," inspect and modify the active HiveOS/Octofan automatic-fan policy rather than repeatedly issuing direct `-f` commands.
+
+On the tested chassis, fans run at failsafe/high speed before the Octominer software stack takes control. During normal HiveOS operation, software lowers them. If Linux shuts down while controller/PSU auxiliary power remains present, the fans may return to full failsafe speed and remain there. The controller `-p` operation was tested and behaved like a soft chassis power-button action; it did not by itself remove controller/fan power or solve the post-shutdown full-speed fan condition.
+
 ## Important lessons
 
 - A front-panel IP can be stale; verify the live address in the OS.
@@ -116,3 +235,5 @@ When OCTOMINER2 is powered up:
 - On this systemd 249 installation, `WakeOnLan=magic` belongs in a `.link` file under `[Link]`, not in the `.network` file.
 - Preserve `/etc/systemd/network/20-ethernet.network`; it is the active DHCP network definition.
 - AC-loss auto-power-on and WOL are independent mechanisms and were tested independently.
+- Direct fan PWM is not the same as a persistent automatic-fan minimum; distinguish controller commands from HiveOS `autofan` policy.
+- Controller-reported PSU AC input is useful chassis telemetry but should not be represented as a calibrated wall-meter measurement.
