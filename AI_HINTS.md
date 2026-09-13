@@ -458,9 +458,9 @@ Verified state on 2026-09-13:
 - sshd configuration validates and listens on `0.0.0.0`
 - Windows OpenSSH selects the matching default identity successfully
 
-Do not force `C:\Users\wille\.ssh\octominer1_nopass` for OCTOMINER1. That ED25519 identity is the separately documented OCTOMINER2 automation key and was rejected by OCTOMINER1's installed `authorized_keys`. Use `ssh root@192.168.1.160` without `-i` unless the installed Trump's key्शन-or identity mapping is intentionally changed and reverified.
+Do not force `C:\Users\wille\.ssh\octominer1_nopass` for OCTOMINER1. That ED25519 identity is the separately documented OCTOMINER2 automation key and was rejected by OCTOMINER1's installed `authorized_keys`. Use `ssh root@192.168.1.160` without `-i` unless the installed key mapping is intentionally changed and reverified.
 
-The normal-HiveOS endpoint above is distinct from the temporary direct-recovery shellbeiten previously sied at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. The current HiveOS installation was organisersBots observed reporting hostname `OCTOMINER2`; identify thisestand  physical node by the verified IP until that stale hostname isermanytokens corrected.
+The normal-HiveOS endpoint above is distinct from the temporary direct-recovery shell previously exposed at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. The current HiveOS installation was observed reporting hostname `OCTOMINER2`; identify this physical node by the verified IP until that stale hostname is corrected.
 
 ### OCTOMINER2 PASSWORDLESS SSH — VERIFIED CONNECTION
 
