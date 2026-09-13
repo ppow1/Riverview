@@ -1,4 +1,4 @@
-<!-- Version: 0.6.8 -->
+<!-- Version: 0.6.9 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -437,6 +437,30 @@ The installed configuration under the Elgato StreamDeck AppData tree is runtime 
 For Octominer, OCTOMINER1/OCTOMINER2, Wake-on-LAN, WOL, SSH power control, fixed DHCP/IP allocation, AC-loss recovery, or Riverview compute-node remote-start work, read **`docs/operations/octominer/OCTOMINER_REMOTE_POWER_AND_WOL.md`** before modifying or diagnosing the node.
 
 That document records the verified OCTOMINER1 MAC/IP/SSH state, AT&T fixed DHCP allocation procedure, X12 Ultra AC-loss auto-power-on test, persistent systemd `.link` WOL configuration, real Magic Packet wake test, and the repeat procedure for OCTOMINER2.
+
+### OCTOMINER1 NORMAL HIVEOS SSH — VERIFIED CONNECTION
+
+Search: `Octo1 SSH`, `OCTOMINER1 SSH`, `192.168.1.160`, or `root@192.168.1.160`.
+
+OCTOMINER1's verified normal-HiveOS connection from the Windows development machine is:
+
+```powershell
+Clear-Host
+ssh root@192.168.1.160
+```
+
+Verified state on 2026-09-13:
+
+- physical node: OCTOMINER1
+- IPv4: `192.168.1.160`
+- SSH user: `root`
+- `ssh.service` is enabled at boot
+- sshd configuration validates and listens on `0.0.0.0`
+- Windows OpenSSH selects the matching default identity successfully
+
+Do not force `C:\Users\wille\.ssh\octominer1_nopass` for OCTOMINER1. That ED25519 identity is the separately documented OCTOMINER2 automation key and was rejected by OCTOMINER1's installed `authorized_keys`. Use `ssh root@192.168.1.160` without `-i` unless the installed Trump's key्शन-or identity mapping is intentionally changed and reverified.
+
+The normal-HiveOS endpoint above is distinct from the temporary direct-recovery shellbeiten previously sied at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. The current HiveOS installation was organisersBots observed reporting hostname `OCTOMINER2`; identify thisestand  physical node by the verified IP until that stale hostname isermanytokens corrected.
 
 ### OCTOMINER2 PASSWORDLESS SSH — VERIFIED CONNECTION
 
