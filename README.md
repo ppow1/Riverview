@@ -1,4 +1,4 @@
-<!-- Version: 0.1.0 -->
+<!-- Version: 0.1.1 -->
 # Project Riverview
 
 Project Riverview is the purposeful rebuild of the Estate's operational mechanism. The final environment is **The Estate at Riverview**, its core architecture is **The River**, and the first technical implementation is **Riverview Kernel v0.1**.
@@ -17,5 +17,14 @@ The River is local-first, event-driven, durable, diagnostics-first, and designed
 - The Undercurrent is the protected high-trust domain.
 - Data is separated from actions and classified at ingestion.
 - Every capability is delivered with diagnostics, failure checkpoints, tests, and Cookbook knowledge.
+
+## OCTOMINER2 local-AI control
+
+The dated inventory of Riverview OCTO Control v0.6.1 features, remotely
+queryable API routes, authentication, independent multi-model instances, GPU
+allocation, fan/PSU telemetry, monitoring, snapshots, Hermes integration, and
+PowerShell examples is:
+
+[`docs/operations/octominer/RIVERVIEW_OCTO_CONTROL_FEATURES_AND_API_2026-09-14.md`](docs/operations/octominer/RIVERVIEW_OCTO_CONTROL_FEATURES_AND_API_2026-09-14.md)
 
 Start with `AI_HINTS.md` and `docs/operations/RIVERVIEW_EXECUTION_PLAN.md`.
