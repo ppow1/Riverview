@@ -1,4 +1,4 @@
-<!-- Version: 0.6.9 -->
+<!-- Version: 0.6.10 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -437,6 +437,10 @@ The installed configuration under the Elgato StreamDeck AppData tree is runtime 
 For Octominer, OCTOMINER1/OCTOMINER2, Wake-on-LAN, WOL, SSH power control, fixed DHCP/IP allocation, AC-loss recovery, or Riverview compute-node remote-start work, read **`docs/operations/octominer/OCTOMINER_REMOTE_POWER_AND_WOL.md`** before modifying or diagnosing the node.
 
 That document records the verified OCTOMINER1 MAC/IP/SSH state, AT&T fixed DHCP allocation procedure, X12 Ultra AC-loss auto-power-on test, persistent systemd `.link` WOL configuration, real Magic Packet wake test, and the repeat procedure for OCTOMINER2.
+
+For OCTOMINER1 BIOS recovery, Intel EFI FPT, SPI/BIOS-region hashes, stock rollback, failed AFU/Secure Flash paths, MMIO aperture experiments, P100 BAR allocation, or work intended to move beyond two P100s, read **`docs/operations/octominer/OCTOMINER1_FPT_EFI_BIOS_RECOVERY_AND_MULTI_P100_MMIO_PLAN_2026-09-14.md`** before changing firmware or GPU population.
+
+For physical node identity, MAC/IP mapping, CPU/RAM/DIMM configuration, board revisions, stale hostname diagnosis, or the post-recovery OCTOMINER1-versus-OCTOMINER2 performance control baseline, read **`docs/operations/octominer/OCTOMINER1_OCTOMINER2_HARDWARE_SCAN_2026-09-14.md`**. Physical identity is MAC-authoritative when hostname state is stale or duplicated.
 
 ### OCTOMINER1 NORMAL HIVEOS SSH — VERIFIED CONNECTION
 
