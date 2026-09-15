@@ -1,4 +1,4 @@
-<!-- Version: 0.6.10 -->
+<!-- Version: 0.6.11 -->
 # Riverview AI Hints
 
 Status: Canonical fast-recovery entry point.
@@ -437,6 +437,10 @@ The installed configuration under the Elgato StreamDeck AppData tree is runtime 
 For Octominer, OCTOMINER1/OCTOMINER2, Wake-on-LAN, WOL, SSH power control, fixed DHCP/IP allocation, AC-loss recovery, or Riverview compute-node remote-start work, read **`docs/operations/octominer/OCTOMINER_REMOTE_POWER_AND_WOL.md`** before modifying or diagnosing the node.
 
 That document records the verified OCTOMINER1 MAC/IP/SSH state, AT&T fixed DHCP allocation procedure, X12 Ultra AC-loss auto-power-on test, persistent systemd `.link` WOL configuration, real Magic Packet wake test, and the repeat procedure for OCTOMINER2.
+
+For **Riverview OCTO Control**, **OCTO2 Control**, the OCTO dashboard, port **8180**, model deployment, independent model instances, GPU allocation, chassis-fan control, monitoring, Hermes status, troubleshooting snapshots, control-token provisioning, or an `unauthorized` dashboard response, read **`docs/operations/octominer/RIVERVIEW_OCTO_CONTROL_FEATURES_AND_API_2026-09-14.md`** before investigating or modifying the service.
+
+That document records the authoritative OCTOMINER2 dashboard/API address, authenticated API routes, persistent server-token location, safe Windows client-provisioning procedure, per-browser dashboard authorization behavior, snapshot procedure, model-instance controls, fan controls, and troubleshooting guidance. The API never returns its own control token; never place the real token in documentation, snapshots, logs, Git, or chat.
 
 For OCTOMINER1 BIOS recovery, Intel EFI FPT, SPI/BIOS-region hashes, stock rollback, failed AFU/Secure Flash paths, MMIO aperture experiments, P100 BAR allocation, or work intended to move beyond two P100s, read **`docs/operations/octominer/OCTOMINER1_FPT_EFI_BIOS_RECOVERY_AND_MULTI_P100_MMIO_PLAN_2026-09-14.md`** before changing firmware or GPU population.
 
