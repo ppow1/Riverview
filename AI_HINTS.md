@@ -466,9 +466,9 @@ Verified state on 2026-09-13:
 - sshd configuration validates and listens on `0.0.0.0`
 - Windows OpenSSH selects the matching default identity successfully
 
-Do not force `C:\Users\wille\.ssh\octominer1_nopass` for OCTOMINER1. That ED25519 identity is the separately documented OCTOMINER2 automation key and was rejected by OCTOMINER1's installed `authorized_keys`. Use `ssh root@192.168.1.160` without `-i` unless the installed key mapping is intentionally changed and reverified.
+**SSH standard (2026-09-21): both nodes use the same pattern.** Use `ssh octo1` and `ssh octo2`; each resolves through `C:\Users\wille\.ssh\config` to `root@<reserved IP>` with `IdentityFile C:/Users/wille/.ssh/octominer1_nopass` and `IdentitiesOnly yes`. The `octominer1_nopass` public key was installed in OCTOMINER1's `authorized_keys` on 2026-09-21, so the earlier note that OCTOMINER1 rejects it no longer applies. If `ssh octo1` is rejected after a HiveOS reflash, reinstall that public key. The private key has no passphrase and grants root on both nodes: never place it in Git, docs, logs, snapshots, cloud backups, or chat.
 
-The normal-HiveOS endpoint above is distinct from the temporary direct-recovery shell previously exposed at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. The current HiveOS installation was observed reporting hostname `OCTOMINER2`; identify this physical node by the verified IP until that stale hostname is corrected.
+The normal-HiveOS endpoint above is distinct from the temporary direct-recovery shell previously exposed at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. The stale `OCTOMINER2` hostname previously reported by this node has been corrected; verified 2026-09-21, it now reports `OCTOMINER1`. Physical identity remains MAC-authoritative (`00:e0:4c:6b:05:a9`).
 
 ### OCTOMINER2 PASSWORDLESS SSH — VERIFIED CONNECTION
 
