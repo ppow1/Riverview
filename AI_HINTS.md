@@ -446,31 +446,7 @@ For OCTOMINER1 BIOS recovery, Intel EFI FPT, SPI/BIOS-region hashes, stock rollb
 
 For physical node identity, MAC/IP mapping, CPU/RAM/DIMM configuration, board revisions, stale hostname diagnosis, or the post-recovery OCTOMINER1-versus-OCTOMINER2 performance control baseline, read **`docs/operations/octominer/OCTOMINER1_OCTOMINER2_HARDWARE_SCAN_2026-09-14.md`**. Physical identity is MAC-authoritative when hostname state is stale or duplicated.
 
-### OCTOMINER1 NORMAL HIVEOS SSH — VERIFIED CONNECTION
-
-Search: `Octo1 SSH`, `OCTOMINER1 SSH`, `192.168.1.160`, or `root@192.168.1.160`.
-
-OCTOMINER1's verified normal-HiveOS connection from the Windows development machine is:
-
-```powershell
-Clear-Host
-ssh root@192.168.1.160
-```
-
-Verified state on 2026-09-13:
-
-- physical node: OCTOMINER1
-- IPv4: `192.168.1.160`
-- SSH user: `root`
-- `ssh.service` is enabled at boot
-- sshd configuration validates and listens on `0.0.0.0`
-- Windows OpenSSH selects the matching default identity successfully
-
-Do not force `C:\Users\wille\.ssh\octominer1_nopass` for OCTOMINER1. That ED25519 identity is the separately documented OCTOMINER2 automation key and was rejected by OCTOMINER1's installed `authorized_keys`. Use `ssh root@192.168.1.160` without `-i` unless the installed key mapping is intentionally changed and reverified.
-
-The normal-HiveOS endpoint above is distinct from the temporary direct-recovery shell previously exposed at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. The current HiveOS installation was observed reporting hostname `OCTOMINER2`; identify this physical node by the verified IP until that stale hostname is corrected.
-
-### OCTOMINER2 PASSWORDLESS SSH — VERIFIED CONNECTION
+### OCTOMINER SSH STANDARD — CURRENT VERIFIED CONNECTION\n\nSearch: Octo1 SSH, Octo2 SSH, OCTOMINER1 SSH, OCTOMINER2 SSH, passwordless SSH, ssh octo1, ssh octo2, or octominer1_nopass.\n\nThe canonical SSH convention for both OctoMiners is now documented in:\n\n`docs/operations/network/RIVERVIEW_SSH_STANDARD.md`\n\nBoth hosts use named Windows OpenSSH aliases with the same explicit identity-file pattern:\n\n```text\nHost octo1\n    HostName 192.168.1.160\n    User root\n    IdentityFile C:/Users/wille/.ssh/octominer1_nopass\n    IdentitiesOnly yes\n    ServerAliveInterval 30\n    ServerAliveCountMax 3\n\nHost octo2\n    HostName 192.168.1.162\n    User root\n    IdentityFile C:/Users/wille/.ssh/octominer1_nopass\n    IdentitiesOnly yes\n    ServerAliveInterval 30\n    ServerAliveCountMax 3\n```\n\nOCTOMINER1 was explicitly re-tested on 2026-09-21. The Windows private key was accepted by 192.168.1.160, authentication succeeded using publickey, and the remote command ran as root on OCTOMINER1. Therefore the older recovery note claiming that this key was rejected by OCTOMINER1 is superseded.\n\nNormal connections:\n\n```powershell\nClear-Host\nssh octo1\n```\n\n```powershell\nClear-Host\nssh octo2\n```\n\nDo not change the OctoMiner SSH configuration merely to make the two hosts look different. They already use the same working client-side convention.\n\nThe normal-HiveOS OCTOMINER1 endpoint is distinct from the temporary direct-recovery shell previously exposed at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. Physical identity remains MAC-authoritative when hostname state is stale.\n\nFor the broader standard and the required Camrui/PiKVM/PiCam/dev-machine setup, read `docs/operations/network/RIVERVIEW_SSH_STANDARD.md`.\n\n### OCTOMINER2 PASSWORDLESS SSH — VERIFIED CONNECTION
 
 Search: `Octo2 SSH`, `OCTOMINER2 SSH`, `passwordless SSH`, `ssh octo2`, `192.168.1.162`, or `octominer1_nopass`.
 
