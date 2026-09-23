@@ -1,0 +1,23 @@
+RIVERVIEW HERMES MULTIMODAL KNOWN-GOOD
+Frozen: 2026-09-22
+
+Gateway:
+  SHA256: A101B547E065BCDFA763BD1098ED347087ABB2B387F1F8EF4946FD10E226D68C
+
+Self-test:
+  SHA256: C23F08F6B3AC2B9705CC9B2FA3FF5BDD1984D094C27D3B91B0412A1B057CB589
+
+Vision proof image:
+  SHA256: 2A719F00A78F3BEFDE9107570BA874FEFA91843E9CC09B99244C329F3D8FDDB3
+
+Scheduled task:
+  Riverview Hermes Multimodal Gateway
+
+Validated capabilities:
+  Scheduled-task startup: PASS
+  /v1/models: PASS
+  Text routing: PASS
+  SSE termination: PASS
+  Vision routing: PASS
+  Hermes terminal tool loop: PASS
+  Complete self-test: 11 PASS / 0 FAIL
