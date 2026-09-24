@@ -84,3 +84,40 @@ Created September 2026 after a storage-reclamation session in which old disks we
 The central historical conclusion from that work is simple:
 
 **The technical work predates the AI era, and the material recovered during the storage cleanup represents only incidental surviving evidence of a much larger history.**
+
+
+## Earlier computing history: before the surviving project files
+
+The surviving disks described above represent only a comparatively recent and accidental layer of a much longer technical history.
+
+Technology-related work extends back roughly two and a half to three decades before the material recovered in the 2026 storage cleanup, while direct experience with computers reaches earlier still.
+
+The first personal computer was a **Timex Sinclair 1000**. Even before that, programming involved **feeding punched cards into a card reader**. The Timex represented a dramatic change: programs could be created personally and interactively, then recorded to and reloaded from an ordinary cassette recorder through the computer's audio connections.
+
+Early programming experience included:
+
+- RCOBOL / COBOL.
+- BASIC.
+- FORTRAN.
+- Assembly language.
+- Actual binary-level machine code.
+
+This was the practical coding education of the period: experience ranged from higher-level languages down through assembler to instructions represented at the machine level.
+
+The hardware experience was similarly direct. Examples include:
+
+- **Hand-soldering DIP-style memory ICs onto motherboards** to perform memory upgrades.
+- **Adjusting disk-drive rotational timing with a strobe light** to compensate for changes caused by wear and slack in rubber drive belts.
+- **Building an early Hayes-era 150-baud modem from a kit at board level**, assembling the individual electronic components rather than installing a finished communications device.
+
+These details are important because they describe more than longevity. They show experience with computing when many layers that are now hidden behind standardized hardware, operating systems, device drivers, networks, APIs, and high-level software still had to be understood, assembled, adjusted, or programmed directly.
+
+The historical arc therefore includes direct experience across multiple generations:
+
+**punched-card computing → personal microcomputers and cassette program storage → machine code and assembly → higher-level languages → board-level computer construction and repair → disk and communications hardware → PCs and networking → web systems → embedded systems and microcontrollers → robotics → computer vision and machine learning → digital fabrication and 3D printing → locally operated generative-AI systems.**
+
+This should inform AI collaboration. Modern terminology, workflows, and abstractions may be new while the underlying engineering concepts are not. When a current problem is approached from the hardware layer, the software layer, the mechanical layer, or several at once, that approach reflects decades of working across those boundaries.
+
+The recovered ROS, Arduino, Raspberry Pi, DeepFace, web-development, and fabrication files are therefore **not the beginning of the technical history**. They are simply some of the surviving artifacts close enough to the present to have remained on spare storage.
+
+The larger history substantially predates them.
