@@ -510,3 +510,32 @@ operations, ask the Steward before gated promotion unless explicit standing
 authorization exists, and use `comms5_seed_lineage` to follow authoritative
 progress. Comms5 client identity is provenance, not authority; never mutate
 PostgreSQL directly or invent objective/work state.
+---
+
+## OCTOMINER BIOS CAMPAIGN REGROUND
+
+If work involves OCTOMINER1 BIOS automation, Multi-P100 qualification,
+PiKVM control, independent video1 observation, the BIOS campaign test rig,
+or the associated Hermes/80B orchestration, do not reconstruct the project
+from conversational memory.
+
+Start here:
+
+`docs/operations/octominer/campaign/START_HERE.md`
+
+The active local campaign working repository on DEV is:
+
+`T:\OctoMiner_BIOS_Campaign\repo`
+
+Before designing or executing the next campaign test, rebuild and read:
+
+`T:\OctoMiner_BIOS_Campaign\repo\REGROUND_PACKET.md`
+
+using:
+
+`python controller\build_reground_packet.py`
+
+The durable campaign records, approved proposal, evidence, proven facts,
+known failures, lessons learned, and reground contract are authoritative.
+Chat context is not a substitute for campaign grounding.
+
