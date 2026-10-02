@@ -23,7 +23,8 @@ A new result should record, when known:
 - execution status
 - task-quality assessment
 - limitations / anomalies
-- disposition: retain, retest/tune, or not useful for this workload
+- setup/compatibility work required to make the model execute, or the blocker if it never executed
+- disposition: retain, retest/tune, not useful for this workload, or not qualified
 
 ## Current results
 
@@ -31,6 +32,8 @@ A new result should record, when known:
 |---|---|---|---|---|---|---|---|
 | 2026-10-02 | GOT-OCR2 | downloaded safetensors model | RTX 3060 Ti 8 GB | OCR / high-confidence interpretation of frozen OctoMiner screen | PASS | FAIL — severely corrupted/incomplete transcription | `results/2026-10-02-got-ocr2-3060ti-octominer-screen.md` |
 | 2026-10-02 | DeepSeek-OCR | Small 640x640, no crop, eager attention | RTX 3060 Ti 8 GB | OCR / high-confidence interpretation of frozen OctoMiner screen | PASS | FAIL for tested configuration — recognized terminal context but hallucinated substantial content; 113.5 s inference | `results/2026-10-02-deepseek-ocr-3060ti-octominer-screen.md` |
+| 2026-10-02 | Qwen3-VL-8B-Instruct | Q4_K_M + Q8_0 mmproj; llama.cpp b11193/Vulkan | RTX 3060 Ti 8 GB | Vision / high-confidence interpretation of frozen OctoMiner screen | PASS | UNQUALIFIED for BIOS authority — 1080p improved transcription substantially, but not exact/complete/dependable enough | `results/2026-10-02-qwen3-vl-8b-q4km-3060ti-octominer-screen.md` |
+| 2026-10-02 | Penguin-VL-8B | BF16 upstream safetensors + separate Penguin-Encoder; attempted CPU/GPU offload | RTX 3060 Ti 8 GB | Vision / high-confidence interpretation of frozen OctoMiner screen | FAIL before inference | NOT TESTED for quality — incompatible Transformers APIs blocked model loading after dependency and encoder recovery | `results/2026-10-02-penguin-vl-8b-3060ti-octominer-screen.md` |
 
 ## Design intent
 
