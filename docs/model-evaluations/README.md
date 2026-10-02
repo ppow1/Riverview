@@ -32,8 +32,14 @@ A new result should record, when known:
 |---|---|---|---|---|---|---|---|
 | 2026-10-02 | GOT-OCR2 | downloaded safetensors model | RTX 3060 Ti 8 GB | OCR / high-confidence interpretation of frozen OctoMiner screen | PASS | FAIL — severely corrupted/incomplete transcription | `results/2026-10-02-got-ocr2-3060ti-octominer-screen.md` |
 | 2026-10-02 | DeepSeek-OCR | Small 640x640, no crop, eager attention | RTX 3060 Ti 8 GB | OCR / high-confidence interpretation of frozen OctoMiner screen | PASS | FAIL for tested configuration — recognized terminal context but hallucinated substantial content; 113.5 s inference | `results/2026-10-02-deepseek-ocr-3060ti-octominer-screen.md` |
-| 2026-10-02 | Qwen3-VL-8B-Instruct | Q4_K_M + Q8_0 mmproj; llama.cpp b11193/Vulkan | RTX 3060 Ti 8 GB | Vision / high-confidence interpretation of frozen OctoMiner screen | PASS | UNQUALIFIED for BIOS authority — 1080p improved transcription substantially, but not exact/complete/dependable enough | `results/2026-10-02-qwen3-vl-8b-q4km-3060ti-octominer-screen.md` |
+| 2026-10-02 | Qwen3-VL-8B-Instruct | Q4_K_M + Q8_0 mmproj; llama.cpp b11193/Vulkan | RTX 3060 Ti 8 GB | Vision / screenshot OCR + OctoMiner screen-state extraction | PASS | **QUALIFIED — strong screenshot OCR + screen-state extraction; selected Model 3 working vision configuration; 124.79 s** | `results/2026-10-02-qwen3-vl-8b-q4km-3060ti-octominer-screen.md` |
 | 2026-10-02 | Penguin-VL-8B | BF16 upstream safetensors + separate Penguin-Encoder; attempted CPU/GPU offload | RTX 3060 Ti 8 GB | Vision / high-confidence interpretation of frozen OctoMiner screen | FAIL before inference | NOT TESTED for quality — incompatible Transformers APIs blocked model loading after dependency and encoder recovery | `results/2026-10-02-penguin-vl-8b-3060ti-octominer-screen.md` |
+
+### Current campaign vision selection
+
+**Qwen3-VL-8B-Instruct Q4_K_M is the qualified Model 3 selection for the current OctoMiner campaign.** The qualifying configuration used llama.cpp b11193/Vulkan with the Q8_0 mmproj on the RTX 3060 Ti. The run completed successfully in 124.79 seconds and recovered substantial, correct screen state from the frozen HiveOS/OctoMiner benchmark.
+
+Optimization remains available: llama.cpp recommended `--image-min-tokens 1024` for Qwen-VL grounding accuracy. This was not required for the qualification decision and should not block the BIOS campaign.
 
 ## Design intent
 
