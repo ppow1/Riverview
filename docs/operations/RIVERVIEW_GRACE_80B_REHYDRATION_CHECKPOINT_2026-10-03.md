@@ -291,3 +291,50 @@ The master checkpoint should remain intact.
 
 **Checkpoint status:** Durable engineering handoff prepared.
 **Current stopping point:** authenticated live Grace request is blocked at `RIV-UI-0009` by missing `request_id`; provider dispatch and successful Octo2 80B inference remain to be proven.
+
+## 2026-10-03 Single-Pass Grace Restoration
+
+Grace home cognition is now operational on the Qwen3-Next 80B llama.cpp runtime on Octo2.
+
+Investigation showed that the major latency and normal-chat failure were not caused by VNext, the legacy Operator UI, authentication, Octo2 health, or the Grace implementation binding. Riverview's occupational reasoning path was deliberately performing multiple model passes around a single conversational turn, including scope adjudication, repair, second-pass synthesis, and epistemic repair.
+
+The epistemic machinery had originally been introduced to distinguish deterministic/state-machine behavior from model-generated reasoning. Direct provider-call telemetry now independently identifies the cognition provider, model, resource, phase, timing, and status. Therefore epistemic metadata is no longer allowed to block an otherwise valid normal conversational response.
+
+The legacy multipass/capability machinery remains in source for later reconsideration. Ordinary first-pass answers now return immediately. Capability requests continue into the existing bounded capability path.
+
+### Acceptance Test 004R
+
+A live authenticated Grace request completed successfully with:
+
+- HTTP status: 200
+- Provider calls: 1
+- Phase: first
+- Provider: llama_cpp
+- Model: /root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf
+- Resource: RTX 4090
+- Provider status: success
+- Provider duration: 10451.29 ms
+- End-to-end duration: 10794.02 ms
+- One-provider-call acceptance: true
+- Qwen3-Next 80B acceptance: true
+- Overall acceptance: true
+
+Grace responded as Grace from Riverview's Office of Operations. No action was authorized or executed.
+
+The approximately 10.8-second remaining latency is now overwhelmingly provider inference time: approximately 10.45 seconds occurred inside the single 80B provider call, leaving roughly 0.34 seconds of Riverview/API overhead.
+
+### Current Working Architecture
+
+Normal conversational path:
+
+User request -> Riverview -> Grace first-pass cognition -> llama.cpp -> Octo2 Qwen3-Next 80B -> response
+
+The desired one-request / one-inference / one-response behavior is therefore proven.
+
+### Follow-up
+
+Do not reintroduce mandatory epistemic repair into ordinary conversation without reevaluating its current value and latency cost.
+
+Future latency optimization should treat the Qwen3-Next 80B inference runtime separately from Riverview orchestration.
+
+The broader model-selection architecture should also be simplified later so changing a resident's home cognition model does not require coordinated changes across multiple configuration and runtime seams.

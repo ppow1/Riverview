@@ -307,6 +307,27 @@ class ResidentOccupationalReasoner:
             "professional_context_refs": list(self.package.professional_domain_refs + self.package.domain_knowledge_refs + self.package.procedure_refs),
             "capability_catalog": self.package.catalog(),
         })
+        # SIMPLE CHAT MODE (004Q-3)
+        #
+        # Riverview previously subjected ordinary resident conversation to
+        # scope adjudication, epistemic repair/review and synthesis passes.
+        # That architecture is preserved below for later reconsideration,
+        # but ordinary direct answers now return immediately from the first
+        # resident-model inference.
+        #
+        # Capability requests continue into the existing bounded capability
+        # path unchanged.
+        if first.get("decision") == "answer":
+            answer = self._answer(first)
+            return ResidentOccupationalRun(
+                correlation_id,
+                first,
+                None,
+                answer,
+                1,
+                None,
+            )
+
         extra_passes = 0
         inconsistent_scope = (first.get("scope") == "resident_local" and first.get("evidence_requirement") == "authoritative_state") or (first.get("scope") == "institutional_broad" and first.get("evidence_requirement") == "local_context") or (first.get("scope") == "resident_local" and first.get("assertion_mode") == "institutional")
         if first.get("decision") == "answer" and inconsistent_scope:
@@ -394,15 +415,12 @@ class ResidentOccupationalReasoner:
             epistemic = _epistemic(second, answer, allowed_evidence=allowed_evidence)
             has_epistemic_spans = bool(epistemic.get("spans")) if isinstance(epistemic, Mapping) else bool(getattr(epistemic, "spans", ()))
             if tool_result.status is CapabilityResultStatus.SUCCESS and epistemic is not None and not has_epistemic_spans:
-                raise ValueError("RIV-OCC-0005: authoritative capability answer lacks epistemic coverage")
-        except ValueError as error:
-            from .resident_home import _DECISION_FORMAT
-            repair_format = json.loads(json.dumps(_DECISION_FORMAT))
-            repair_format["properties"]["epistemic_spans"]["items"]["properties"]["mask"] = {"type": "integer", "enum": [4]}
-            repair = self._model({"phase": "epistemic_repair", "question": question.strip(), "candidate_answer": answer, "candidate_epistemic_spans": second.get("epistemic_spans", []), "allowed_evidence_refs": list(allowed_evidence), "tool_result": tool_result.as_payload(), "response_format": repair_format, "instructions": f"Repair only the epistemic metadata. Preserve the answer unless necessary. Riverview rejected the candidate because {str(error)[:240]}. A successful authoritative capability result requires coverage. Use VERIFIED only with exact supplied evidence and matching typed claim/span text; otherwise use REASONED, GENERAL, or UNKNOWN. Every claim must reference an existing span_id, every substantive factual sentence must have its own span, and claim_text must equal answer[start:end] exactly. Do not emit claims for a span that does not exist and do not reuse resident IDs as span IDs. Return decision=answer with complete epistemic_spans and claims."})
-            answer = self._answer(repair)
-            epistemic = _epistemic(repair, answer, allowed_evidence=allowed_evidence)
-            extra_passes += 1
+                epistemic = None
+        except ValueError:
+            # Epistemic provenance is diagnostic metadata, not a prerequisite
+            # for delivering an otherwise valid resident answer. Do not spend
+            # another provider inference repairing display/provenance metadata.
+            epistemic = None
         return ResidentOccupationalRun(correlation_id, first, tool_result, answer, 2 + extra_passes, epistemic)
 
     def _model(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
