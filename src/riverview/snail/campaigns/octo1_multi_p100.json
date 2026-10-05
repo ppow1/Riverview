@@ -1,0 +1,20 @@
+{
+  "campaign_id": "octo1-multi-p100-bios",
+  "name": "Octo1 Multi-P100 BIOS",
+  "target": "OCTO1",
+  "objective": "Develop an evidence-backed multi-P100 BIOS candidate without crossing the mutation gate",
+  "initial_task": "Generate the C1 BIOS planning proposal for Steward/external review",
+  "worker": {"name": "Qwen3-Next-80B-A3B-Instruct-Q4_K_M", "endpoint": "http://192.168.1.162:8080/v1/chat/completions"},
+  "allowed_operations": ["observe", "reason", "write_harmless_marker", "planning_proposal"],
+  "prohibited_operations": ["bios_flash", "bios_mutation", "stock_recovery", "power_cycle", "reset"],
+  "frame_freshness_seconds": 10,
+  "max_identical_failures": 3,
+  "minimum_confidence": 0.7,
+  "poll_seconds": 2,
+  "infrastructure": {
+    "octo1": {"host": "192.168.1.160", "ports": [22], "timeout": 0.75},
+    "pikvm": {"host": "192.168.1.169", "ports": [22, 80, 443], "timeout": 0.75},
+    "videokvm": {"host": "192.168.1.101", "ports": [22], "timeout": 0.75}
+  },
+  "hardware_qualification": {"bios_mutation": "HARDWARE-UNQUALIFIED", "physical_reset": "HARDWARE-UNQUALIFIED", "bios_grade_vision": "HARDWARE-UNQUALIFIED"}
+}
