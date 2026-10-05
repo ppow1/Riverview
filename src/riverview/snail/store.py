@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -107,13 +108,18 @@ class DurableStore:
         return record
 
     def enqueue_control(self, command: str, value: str | None = None) -> dict[str, Any]:
+        timestamp = utcnow()
         request = {
             "request_id": str(uuid.uuid4()),
-            "timestamp": utcnow(),
+            "timestamp": timestamp,
             "command": command.upper().replace(" ", "_"),
             "value": value,
         }
-        self._write_json(self.controls / f"{request['timestamp']}-{request['request_id']}.json", request)
+        # ISO-8601 timestamps remain authoritative inside the record, but their
+        # colons are illegal in Windows filenames. A fixed-width nanosecond UTC
+        # epoch keeps lexical queue order while the UUID prevents collisions.
+        queue_key = f"{time.time_ns():020d}-{request['request_id']}"
+        self._write_json(self.controls / f"{queue_key}.json", request)
         return request
 
     def pending_controls(self) -> list[dict[str, Any]]:

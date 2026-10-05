@@ -2,6 +2,7 @@ import json
 import os
 import time
 import zipfile
+from pathlib import PureWindowsPath
 import pytest
 
 from riverview.snail.runtime import SnailRuntime
@@ -90,6 +91,22 @@ def test_stop_is_checkpointed_and_resumable(snail):
     recovered.command("RESUME")
     assert recovered.state["snail_state"] == "RECOVERING"
     assert recovered.state["reconciliation_required"]
+
+
+def test_control_queue_names_are_windows_safe_and_preserve_timestamp(snail):
+    pause = snail.store.enqueue_control("PAUSE")
+    stop = snail.store.enqueue_control("STOP")
+    queued = snail.store.pending_controls()
+
+    assert [request["command"] for request in queued] == ["PAUSE", "STOP"]
+    assert queued[0]["timestamp"] == pause["timestamp"]
+    assert queued[1]["timestamp"] == stop["timestamp"]
+    assert ":" in pause["timestamp"] and ":" in stop["timestamp"]
+    for request in queued:
+        name = PureWindowsPath(request["_path"]).name
+        assert not set('<>:"/\\|?*').intersection(name)
+        assert name.endswith(f"-{request['request_id']}.json")
+    assert not list(snail.store.controls.glob(".*"))
 
 
 def test_worker_loss_boot_change_pid_replacement_and_packet_rebuild(snail):
