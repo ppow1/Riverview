@@ -1,5 +1,8 @@
 # OctoMiner BIOS Campaign — Current State
 
+> **Authoritative continuation:** See `SNAIL_HANDOFF_2026-10-04.md`. This file is retained as
+> historical campaign evidence and is not the authority for post-handoff SNAIL state.
+
 ## Checkpoint
 
 Timestamp: 2026-10-01
