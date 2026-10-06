@@ -1,0 +1,68 @@
+{
+  "assistant": {
+    "name": "Interim Assistant",
+    "version": "0.1",
+    "model": "qwen3:8b"
+  },
+  "today": [
+    "Build and prove PiKVM control for OctoMiner BIOS work",
+    "Capture OctoMiner 2 reboot evidence before changing BIOS",
+    "If OctoMiner work reaches a clean stopping point, diagnose BOT2 drive/encoder issue"
+  ],
+  "projects": {
+    "CueMastery": {
+      "status": "Active",
+      "focus": "Restore integrated robot, vision, AI and demo capability"
+    },
+    "Riverview": {
+      "status": "Active",
+      "focus": "AI engineering and coaching infrastructure"
+    },
+    "Estate": {
+      "status": "Active",
+      "focus": "Dependent partly on stable local AI infrastructure"
+    },
+    "Chemistry": {
+      "status": "Needs organization",
+      "focus": "Separate and organize material currently mixed with Riverview"
+    }
+  },
+  "waiting": [
+    "Contact CPA regarding CueMastery entity, accounting and crowdfunding structure",
+    "Attorney review for business structure, naming, IP and liability",
+    "Determine bookkeeping platform after CPA consultation"
+  ],
+  "money": {
+    "available_now": 100,
+    "expected_oct_3": 100,
+    "expected_oct_15": 200,
+    "optional_financing": 2000,
+    "future_items": [
+      "CueMastery cellular service before external demo: $82/year",
+      "AuraHalo lighting module: approximately $100",
+      "CPA: approximately $300-$500",
+      "Attorney: approximately $500-$700",
+      "Entity formation: approximately $150-$450",
+      "Accounting/bookkeeping setup: approximately $150",
+      "Video/demo reserve: approximately $500"
+    ],
+    "deferred": [
+      "Server cabinet cabling: $140",
+      "Additional bulk storage"
+    ]
+  },
+  "capture": [
+    {
+      "time": "2026-09-30T09:18:05",
+      "text": "Need to check whether BOT2 encoder pin assignments changed during the ESP32-P4 migration."
+    },
+    {
+      "time": "2026-09-30T09:27:29",
+      "text": "Testing captured  from my phone"
+    },
+    {
+      "time": "2026-09-30T13:17:14",
+      "text": "Testing captured  from my phone location now exactly how does this work"
+    }
+  ]
+}
