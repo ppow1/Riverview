@@ -252,7 +252,6 @@ class SnailCoordinator:
 
     def _continue(self) -> bool:
         state = self.runtime.state
-        last_operation = state["last_verified_machine_state"].get("operation_id")
         last_type = next(
             (
                 event.get("details", {}).get("operation_type")
@@ -261,12 +260,21 @@ class SnailCoordinator:
             ),
             None,
         )
-        if state["phase"] == "C1 PLANNING" and last_operation and last_type == "planning_proposal":
-            snapshot = self.runtime.snapshot("C1 planning proposal ready for Steward/external review")
-            state = self.runtime.state
-            state["next_proposed_action"] = "Steward/external review of C1 planning proposal"
-            self.runtime.store.save_state(state)
-            self._intervene("AUTHORITY_BOUNDARY_REACHED", "The permitted C1 planning artifact is verified; mutation is prohibited.", state["evidence_refs"], f"Review {snapshot.name}; authorize only a later separately controlled step.")
+        if last_type == "request_physical_work":
+            self._intervene(
+                "PHYSICAL_WORK_REQUIRED",
+                "The approved campaign has reached a physical configuration change that automation cannot perform.",
+                state["evidence_refs"],
+                "Perform the requested physical work and report PHYSICAL WORK COMPLETE; SNAIL will independently reconcile before continuing.",
+            )
+            return True
+        if last_type == "stock_recovery":
+            self._intervene(
+                "STOCK_RECOVERY_DECISION_REQUIRED",
+                "Stock recovery is the campaign's explicit Steward-gated contingency operation.",
+                state["evidence_refs"],
+                "Authorize or reject stock recovery based on the preserved failure evidence.",
+            )
             return True
         self._save_stage("OBSERVE")
         return True
