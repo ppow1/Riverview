@@ -130,8 +130,8 @@ def test_autonomous_end_to_end_and_fresh_process_recovery(tmp_path: Path):
     second.run(max_cycles=30)
 
     state = recovered.state
-    assert state["snail_state"] == "WAITING_FOR_STEWARD"
-    assert state["intervention"]["code"] == "AUTHORITY_BOUNDARY_REACHED"
+    assert state["snail_state"] != "WAITING_FOR_STEWARD"
+    assert not state["steward_intervention_required"]
     assert state["last_known_worker_boot_id"] == "boot-b"
     assert executions == ["qualified-marker", "c1-planning-proposal"]
     assert len(second_worker.packets) == 2
