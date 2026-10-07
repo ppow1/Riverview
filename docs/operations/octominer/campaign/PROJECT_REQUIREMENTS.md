@@ -89,15 +89,18 @@ Every SNAIL snapshot/review packet must include copies of, or immutable referenc
 
 ## Current known campaign position
 
-As of the durable state recovered after the 2026-10-06 DEV Windows reboot:
+The campaign has advanced beyond the recovered 2026-10-06 planning checkpoint:
 
 - Campaign: Octo1 Multi-P100 BIOS
 - Campaign status: ACTIVE
-- Phase: C1 PLANNING
-- SNAIL state: WAITING_FOR_STEWARD
-- Last verified baseline: C0
-- BIOS mutations recorded by SNAIL: 0
-- Current task: Generate the C1 BIOS planning proposal for Steward/external review.
-- Current direction: Preserve C0; no C1 mutation without later Steward/external-review authorization.
+- Last verified physical baseline: C0
+- BIOS mutations recorded by the recovered SNAIL runtime before C1 physical qualification: 0
+- C1 candidate: `OCTOMINER1-C1-128G-UNFLASHED.bin`
+- C1 full-image SHA-256: `1aa985e185a5eb2dbfcd732d38e75788244752565236f419e9c42860cae37741`
+- C1 offline validation: PASSED
+- C1 physical validation: PENDING
+- Current software phase: C1 PHYSICAL QUALIFICATION PREP
+- Standing campaign GO remains in force for routine in-scope candidate writing, verification, rebooting, testing, rejection, and iterative progression.
+- Steward intervention is reserved for the explicit campaign boundaries: physical work, stock recovery, scope expansion, or genuinely unresolved conditions that automation cannot reconcile.
 
-This section is informational. The live SNAIL state is authoritative if it has advanced beyond this document.
+This section is informational. The live SNAIL state is authoritative after the updated runtime migrates and reconciles the recovered checkpoint.
