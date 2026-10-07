@@ -57,7 +57,8 @@ def test_absolute_powershell_else_rejection(snail, script):
 
 def test_validator_scope_authority_evidence_and_syntax(snail):
     assert not snail.validate(action(target="OCTO2")).accepted
-    assert not snail.validate(action(operation_type="bios_flash")).accepted
+    assert not snail.validate(action(operation_type="descriptor_write")).accepted
+    assert snail.validate(action(operation_type="bios_region_write", destructive=True)).accepted
     assert not snail.validate(action(evidence_ids=[])).accepted
     assert not snail.validate(action(destructive=True)).accepted
 
