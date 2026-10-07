@@ -212,14 +212,14 @@ The Steward Status site must provide visible links to the requirements and proce
 
 ## Current recovery point
 
-Recovered durable state after the 2026-10-06 DEV Windows reboot:
+The recovered 2026-10-06 planning checkpoint has been superseded by the validated C1 engineering result.
 
 - ACTIVE campaign.
-- C1 PLANNING.
-- WAITING_FOR_STEWARD.
-- C0 is last verified baseline.
-- zero SNAIL-recorded BIOS mutations.
-- next task: generate C1 BIOS planning proposal for Steward/external review.
-- preserve C0; no C1 mutation without later Steward/external-review authorization.
+- C0 remains the last physically verified baseline.
+- C1 128-GiB candidate is offline validated and awaiting physical qualification.
+- SNAIL standing campaign GO authorizes routine in-scope BIOS-region writing, read-back, reboot, observation, testing, rejection, and iterative progression without repeated permission prompts.
+- Physical GPU changes and stock recovery retain the explicit Steward boundaries from the approved proposal.
+- Updated runtime migration removes the obsolete planning-only `WAITING_FOR_STEWARD` fence and reconciles before execution.
+- Missing or unqualified deterministic hardware adapters are implementation/qualification work, not permission boundaries and not justification to reduce the campaign to planning-only behavior.
 
-The live SNAIL state supersedes this informational recovery-point section after the campaign advances.
+The live SNAIL state supersedes this informational recovery-point section after migration and reconciliation.
