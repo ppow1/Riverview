@@ -39,8 +39,14 @@ def validate_action(action: dict[str, Any], state: dict[str, Any], config: dict[
         return Validation(False, "EVIDENCE_UNKNOWN", "operation cites evidence outside durable state")
     if action["operation_id"] in state.get("verified_operation_ids", []):
         return Validation(False, "DUPLICATE_OPERATION_REJECTED", "operation already verified")
-    if action.get("destructive") and not state.get("steward_authorization"):
-        return Validation(False, "STEWARD_GATE_REQUIRED", "destructive operation lacks authority")
+    operation_type = action["operation_type"]
+    if operation_type in config.get("steward_gated_operations", []):
+        if not state.get("steward_authorization"):
+            return Validation(False, "STEWARD_GATE_REQUIRED", "operation requires the specific Steward decision defined by the campaign contract")
+    if action.get("destructive"):
+        standing = config.get("campaign_go_authorized", False) and operation_type in config.get("standing_authorization_operations", [])
+        if not standing and not state.get("steward_authorization"):
+            return Validation(False, "STEWARD_GATE_REQUIRED", "operation is outside standing campaign authority")
     return Validation(True, "ACCEPTED", "deterministic validation passed")
 
 
