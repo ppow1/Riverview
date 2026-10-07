@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .adapters import LocalPlanningAdapter, StewardEnvironmentObserver
+from .adapters import CampaignOperationAdapter, LocalPlanningAdapter, Octo1HardwareAdapter, StewardEnvironmentObserver
 from .coordinator import SnailCoordinator
 from .runtime import SnailRuntime
 from .worker import ReasoningWorker
@@ -21,7 +21,10 @@ def run_service(
         runtime,
         ReasoningWorker(runtime.config["worker"]["endpoint"]),
         StewardEnvironmentObserver(monitor_state, latest_frame, runtime.config.get("infrastructure")),
-        LocalPlanningAdapter(runtime.store),
+        CampaignOperationAdapter(
+            LocalPlanningAdapter(runtime.store),
+            Octo1HardwareAdapter(runtime.store, runtime.config),
+        ),
         poll_seconds=float(runtime.config.get("poll_seconds", 2)),
     )
     coordinator.run()
