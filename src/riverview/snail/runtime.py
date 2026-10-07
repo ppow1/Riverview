@@ -27,14 +27,14 @@ class SnailRuntime:
     def _initial_state(self) -> dict[str, Any]:
         return {
             "version": "1.0", "campaign_id": self.config["campaign_id"], "campaign_name": self.config["name"],
-            "phase": "C1 PLANNING", "objective": self.config["objective"], "task": self.config["initial_task"],
-            "direction": "Preserve C0; no C1 mutation without later Steward/external-review authorization.",
+            "phase": "C1 PHYSICAL QUALIFICATION PREP", "objective": self.config["objective"], "task": self.config["initial_task"],
+            "direction": self.config.get("authority_model", "Execute the approved campaign toward the objective using qualified paths and durable verification."),
             "snail_state": "STOPPED", "event_sequence": 0, "current_event_id": None, "last_event_id": None,
             "hypothesis": None, "evidence_refs": [], "pending_reasoning": None, "pending_operation": None,
-            "next_proposed_action": "Generate C1 planning proposal for review", "verified_operation_ids": [],
+            "next_proposed_action": "Stage and verify the validated C1 candidate, then continue the approved physical qualification sequence", "verified_operation_ids": [],
             "worker": {"state": "UNKNOWN", "boot_id": None, "pid": None}, "last_verified_machine_state": {"baseline": "C0", "bios_mutations": 0},
             "pause_requested": False, "checkpoint_time": None, "steward_intervention_required": False,
-            "qualification": "QUALIFIED FOR OCTO1 BIOS CAMPAIGN PLANNING",
+            "qualification": "C1 OFFLINE VALIDATED; PHYSICAL QUALIFICATION PENDING",
             "coordinator_stage": "OBSERVE", "pending_execution": None,
             "reconciliation_required": True, "last_reconciled_at": None,
             "failure_counts": {}, "intervention": None, "latest_evidence_id": None,
@@ -50,6 +50,24 @@ class SnailRuntime:
             if key not in state:
                 state[key] = value
                 changed = True
+        legacy_planning = (
+            state.get("phase") == "C1 PLANNING"
+            and state.get("task") == "Generate the C1 BIOS planning proposal for Steward/external review"
+            and "no C1 mutation without later Steward/external-review authorization" in str(state.get("direction", ""))
+        )
+        if legacy_planning and self.config.get("campaign_go_authorized"):
+            state["phase"] = "C1 PHYSICAL QUALIFICATION PREP"
+            state["objective"] = self.config["objective"]
+            state["task"] = self.config["initial_task"]
+            state["direction"] = self.config["authority_model"]
+            state["qualification"] = "C1 OFFLINE VALIDATED; PHYSICAL QUALIFICATION PENDING"
+            state["next_proposed_action"] = "Stage and verify the validated C1 candidate, then continue the approved physical qualification sequence"
+            state["steward_intervention_required"] = False
+            state["intervention"] = None
+            if state.get("snail_state") == "WAITING_FOR_STEWARD":
+                state["snail_state"] = "RECOVERING"
+                state["reconciliation_required"] = True
+            changed = True
         if changed:
             self.store.save_state(state)
 
@@ -199,7 +217,7 @@ class SnailRuntime:
                 or str(uuid.uuid4())
             ),
             "campaign": state["campaign_name"], "objective": state["objective"], "phase": state["phase"],
-            "task": state["task"], "state": state["snail_state"], "hard_constraints": [state["direction"], "No autonomous C1 mutation", "PowerShell must contain no else token"],
+            "task": state["task"], "state": state["snail_state"], "hard_constraints": [state["direction"], "PowerShell must contain no else token", "Descriptor and ME writes are outside campaign scope", "Stock recovery requires Steward authorization"],
             "steward_direction": state["direction"], "proven_facts": ["C0 is the booting baseline", "PiKVM HID and independent video1 observation are proven", "BIOS-grade vision is unqualified"],
             "known_failures": ["KVMD API acceptance alone does not prove physical delivery", "Reachability loss alone does not prove reboot"],
             "evidence": state["evidence_refs"], "hypothesis": state["hypothesis"], "recent_events": [{k: e.get(k) for k in ("event_id", "type", "status", "evidence")} for e in events],
