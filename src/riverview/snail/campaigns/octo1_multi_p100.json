@@ -2,19 +2,96 @@
   "campaign_id": "octo1-multi-p100-bios",
   "name": "Octo1 Multi-P100 BIOS",
   "target": "OCTO1",
-  "objective": "Develop an evidence-backed multi-P100 BIOS candidate without crossing the mutation gate",
-  "initial_task": "Generate the C1 BIOS planning proposal for Steward/external review",
-  "worker": {"name": "Qwen3-Next-80B-A3B-Instruct-Q4_K_M", "endpoint": "http://192.168.1.162:8080/v1/chat/completions"},
-  "allowed_operations": ["observe", "reason", "write_harmless_marker", "planning_proposal"],
-  "prohibited_operations": ["bios_flash", "bios_mutation", "stock_recovery", "power_cycle", "reset"],
+  "objective": "Achieve stable operation of OctoMiner 1 with 10 or more Tesla P100 16 GB GPUs through evidence-backed iterative BIOS experimentation and physical qualification.",
+  "initial_task": "Integrate the offline-validated C1 128-GiB candidate into SNAIL and execute the approved campaign test sequence from the durable C0 baseline.",
+  "campaign_go_authorized": true,
+  "authority_model": "Standing campaign GO authorizes routine BIOS-region candidate creation, writing, verification, rebooting, testing, rejection, and iterative candidate progression. Do not request repeated Steward permission for those operations. Steward intervention is reserved for physical work, stock recovery, scope expansion, unresolved ambiguity, or exhausted recovery.",
+  "allowed_operations": [
+    "observe",
+    "reason",
+    "write_harmless_marker",
+    "planning_proposal",
+    "candidate_stage",
+    "bios_region_write",
+    "bios_readback_verify",
+    "reboot_octo1",
+    "pikvm_hid",
+    "video_capture",
+    "octo1_diagnostic",
+    "workload_test",
+    "stability_test",
+    "request_physical_work",
+    "stock_recovery"
+  ],
+  "standing_authorization_operations": [
+    "candidate_stage",
+    "bios_region_write",
+    "bios_readback_verify",
+    "reboot_octo1",
+    "pikvm_hid",
+    "video_capture",
+    "octo1_diagnostic",
+    "workload_test",
+    "stability_test"
+  ],
+  "steward_gated_operations": [
+    "request_physical_work",
+    "stock_recovery"
+  ],
+  "prohibited_operations": [
+    "descriptor_write",
+    "me_write",
+    "pikvm_power_cycle",
+    "pikvm_reboot"
+  ],
+  "current_candidate": {
+    "candidate_id": "C1-128G",
+    "filename": "OCTOMINER1-C1-128G-UNFLASHED.bin",
+    "full_image_sha256": "1aa985e185a5eb2dbfcd732d38e75788244752565236f419e9c42860cae37741",
+    "bios_region_sha256": "84406c847c5c2027217db2df81751c8e497887a7628e19935e02f2e602e55b21",
+    "source_full_image_sha256": "52418f6a0de6fd6a6c1c5ce90dc4fa9d6c4bba910e09b79f2377b740ca857014",
+    "high_mmio_base_gib": 128,
+    "high_mmio_length_gib": 128,
+    "high_mmio_interval": "[128,256) GiB",
+    "semantic_patch_bytes": 3,
+    "offline_validation": "PASSED",
+    "physical_validation": "PENDING"
+  },
   "frame_freshness_seconds": 10,
   "max_identical_failures": 3,
   "minimum_confidence": 0.7,
   "poll_seconds": 2,
   "infrastructure": {
-    "octo1": {"host": "192.168.1.160", "ports": [22], "timeout": 0.75},
-    "pikvm": {"host": "192.168.1.169", "ports": [22, 80, 443], "timeout": 0.75},
-    "videokvm": {"host": "192.168.1.101", "ports": [22], "timeout": 0.75}
+    "octo1": {
+      "host": "192.168.1.160",
+      "ports": [
+        22
+      ],
+      "timeout": 0.75
+    },
+    "pikvm": {
+      "host": "192.168.1.169",
+      "ports": [
+        22,
+        80,
+        443
+      ],
+      "timeout": 0.75
+    },
+    "videokvm": {
+      "host": "192.168.1.101",
+      "ports": [
+        22
+      ],
+      "timeout": 0.75
+    }
   },
-  "hardware_qualification": {"bios_mutation": "HARDWARE-UNQUALIFIED", "physical_reset": "HARDWARE-UNQUALIFIED", "bios_grade_vision": "HARDWARE-UNQUALIFIED"}
+  "hardware_qualification": {
+    "pikvm_hid": "QUALIFIED",
+    "independent_video_observation": "QUALIFIED",
+    "bios_region_recovery": "QUALIFIED",
+    "bios_mutation": "IMPLEMENTATION_REQUIRED",
+    "physical_reset": "STEWARD_ASSISTED",
+    "bios_grade_vision": "UNQUALIFIED"
+  }
 }
