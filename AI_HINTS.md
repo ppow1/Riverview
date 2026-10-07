@@ -155,6 +155,85 @@ Rules:
 - Do not route work through an OpenAI API model.
 - Do not expose Undercurrent or sensitive data through ordinary River paths.
 
+## MANDATORY DOCUMENTATION-FIRST / NO-REDISCOVERY POLICY
+
+This is a standing Riverview engineering policy, not a session preference.
+
+The purpose is cumulative engineering: each solved problem must become durable knowledge so later work starts from the highest established state instead of relearning prior lessons. Conversation memory is not an authority and must never be the only place required operational knowledge exists.
+
+### Required retrieval order
+
+Before probing, searching the live filesystem, reverse-engineering, rebuilding, or asking the Steward to reproduce previously established information, use this order:
+
+1. campaign-local canonical records and current checkpoint material;
+2. authoritative project repository documentation, runbooks, decisions, tests, and known-good artifacts;
+3. documented installed/local implementation and documented exact paths;
+4. live runtime verification of the documented state;
+5. new discovery only when the preceding durable sources genuinely do not answer the question or conflict with current reality.
+
+Do not skip directly to filesystem searches, live probes, exploratory commands, web research, or reconstruction merely because those actions are easy. Discovery is a fallback after durable knowledge, not the default retrieval mechanism.
+
+### Definition of complete operational documentation
+
+When the Steward requests full documentation, or when work reaches a qualified/reusable checkpoint, documentation is complete only when a future session with no useful conversational memory can resume the work without rediscovering already-established information.
+
+As applicable, record:
+
+- objective, current phase, exact continuation point, and next action;
+- machine/device roles and the physical/logical data path;
+- hostnames, SSH aliases, addresses when operationally required, ports, endpoints, sockets, and interfaces;
+- exact repository, local, runtime, evidence, executable, script, configuration, artifact, recovery, and staging paths;
+- exact commands or invocation forms needed to reproduce/use the qualified mechanism;
+- versions, sizes, hashes, identifiers, offsets, labels, mappings, and other identity evidence needed to distinguish qualified artifacts;
+- dependencies and where each dependency is obtained from or durably stored;
+- preconditions and expected observable results;
+- independent verification path and evidence location;
+- known-good behavior and qualification status;
+- known failures, failed approaches, misleading signals, and methods that must not be repeated;
+- recovery/rollback procedure and the preserved recovery artifacts;
+- temporary limitations and the evidence required to remove them;
+- physical/manual steps that cannot be automated and exactly where they occur;
+- any intentionally unavailable/restricted operation as an explicit boundary rather than an undocumented gap.
+
+A statement such as QUALIFIED, PASS, WORKS, or READY is not sufficient documentation by itself. If the operational details required to reuse the result are absent, the documentation is incomplete.
+
+### Promotion rule
+
+Newly learned or newly qualified information must be promoted into the appropriate durable canonical record before advancing beyond the checkpoint when losing that information would force rediscovery. Do not postpone essential operational documentation until the end of a long campaign.
+
+When a gap is found, correct the durable record. Do not merely solve the immediate problem in chat and continue.
+
+### Verification rule
+
+After materially updating canonical documentation, independently read the persisted repository version back and verify that the required information is actually present. A successful write/API response is not proof that the durable record contains the intended material.
+
+For critical continuation/recovery documentation, verify the persisted content itself before declaring documentation complete.
+
+### No Steward-paid rediscovery
+
+Do not ask the Steward to repeat a physical operation, reconnect hardware, rerun discovery, locate a file, restate an architecture, or reproduce evidence merely because the AI failed to consult or fully record established knowledge. First exhaust the durable record in the required order.
+
+If information truly was never documented and cannot be recovered from authoritative records, identify the documentation gap explicitly, perform the minimum necessary recovery/discovery, then immediately promote the recovered information into durable documentation so the cost is paid once.
+
+### Documentation audit trigger
+
+A rediscovery of an already-solved fact, an unnecessary exploratory probe, or discovery that a qualified procedure lacks the paths/commands/dependencies needed to reuse it is a process defect. On detection:
+
+1. stop the affected forward work at a safe checkpoint;
+2. audit the relevant durable documentation for reproducibility gaps;
+3. correct those gaps;
+4. independently verify the persisted corrections;
+5. record the lesson where appropriate;
+6. resume from the documented continuation point.
+
+Do not treat this corrective sequence as permission to add unrelated approval gates or planning-only behavior. Its purpose is to preserve accumulated engineering knowledge and accelerate execution.
+
+### Governing principle
+
+DOCUMENT COMPLETELY -> READ BEFORE DISCOVERY -> VERIFY REALITY -> EXTEND KNOWLEDGE -> DOCUMENT THE EXTENSION.
+
+The system must build on prior engineering rather than repeatedly relearning it.
+
 ## HERMES OBJECTIVE CONTINUITY AND TASK SUBMISSION
 
 Search: `objective continuity`, `Hermes task submission`, or `Hermes submission template`.
