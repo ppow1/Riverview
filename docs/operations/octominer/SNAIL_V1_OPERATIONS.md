@@ -84,11 +84,20 @@ reboot evidence. Once genuinely `80B_READY`, SNAIL reconstructs the pending pack
 Verified operation IDs are replay fences, so recovery cannot repeat an already verified state
 change. The worker response is rejected unless every structured contract field is present.
 
-The production coordinator is `SnailCoordinator`; it is the sole state-machine driver. The current
-authorized executor is `LocalPlanningAdapter`. It writes only a fixed C1 review-proposal path or
-the harmless qualification marker—never a model-selected filesystem path—and verifies by
-independent byte-for-byte read-back before preserving effect evidence. Hardware mutation, reset,
-power, and stock-recovery operations have no executable adapter and remain prohibited.
+The production coordinator is `SnailCoordinator`; it is the sole state-machine driver. The original
+`LocalPlanningAdapter` remains available for harmless artifact qualification, but it is not the
+campaign authority model and must not be treated as the campaign's execution boundary.
+
+The canonical campaign configuration now carries the standing campaign GO defined by
+`campaign/APPROVED_PROPOSAL.md`: routine BIOS-region candidate staging/writing/read-back,
+OCTO1 rebooting, PiKVM HID, video observation, diagnostics, workload testing, stability testing,
+rejection, and iterative candidate progression do not require repeated Steward permission.
+Descriptor/ME writes and PiKVM reboot/power-cycle remain outside scope. Physical GPU work and
+stock recovery retain the explicit Steward boundaries defined by the approved proposal.
+
+Named deterministic hardware adapters still must be present and qualified before the controller can
+execute their corresponding operation. Missing implementation is an implementation gap to close,
+not authority to redefine SNAIL as planning-only.
 
 ## Evidence and safety
 
@@ -97,9 +106,11 @@ use. The dashboard marks frames **STALE** and shows actual age after the configu
 Every model action passes deterministic scope, target, type, authority, state, evidence, syntax,
 and replay checks. A PowerShell `else` token rejects the complete script before execution.
 
-Hardware paths for BIOS mutation, physical reset, and BIOS-grade vision are implemented as
-policy gates but remain **HARDWARE-UNQUALIFIED**. They require later controlled qualification;
-this release does not authorize C1 mutation.
+Qualification is capability-specific. PiKVM HID, independent video observation, and the documented
+BIOS-region recovery procedure are established campaign capabilities. BIOS-region mutation remains
+an implementation/qualification task for its deterministic execution adapter; this is not a new
+Steward permission gate. BIOS-grade machine vision remains unqualified. Physical reset remains
+Steward-assisted until an automated reset mechanism is installed and qualified.
 
 ## Recovery and inspection
 
@@ -107,6 +118,7 @@ Reasoning requests/responses are under `var/snail/reasoning/`; the current envir
 is `var/snail/observations/latest-environment.json`; generated review artifacts are under
 `var/snail/artifacts/`. Before execution, SNAIL records `AUTHORIZED_NOT_EXECUTED`, then records
 `EXECUTION_UNCERTAIN` durably before calling an adapter. After a crash in either execution window,
-recovery verifies the effect first. It never blindly replays an uncertain state change. A verified
-C1 planning proposal causes a Snapshot and a durable `WAITING_FOR_STEWARD` authority-boundary
-event rather than firmware mutation.
+recovery verifies the effect first. It never blindly replays an uncertain state change. A verified planning artifact does not create an authority boundary. After verification SNAIL returns
+to observation/reasoning and continues toward the campaign objective. It enters
+`WAITING_FOR_STEWARD` only for the explicit boundaries in the approved campaign contract or when
+automation genuinely cannot resolve a required physical/recovery decision.
