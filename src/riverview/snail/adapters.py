@@ -140,6 +140,25 @@ class SubprocessRunner:
         }
 
 
+class CampaignOperationAdapter:
+    """Dispatch campaign operations to the harmless/local or deterministic hardware path."""
+
+    def __init__(self, planning: LocalPlanningAdapter, hardware: "Octo1HardwareAdapter"):
+        self.planning = planning
+        self.hardware = hardware
+
+    def _adapter(self, action: dict[str, Any]):
+        if action["operation_type"] in {"planning_proposal", "write_harmless_marker"}:
+            return self.planning
+        return self.hardware
+
+    def execute(self, action: dict[str, Any]) -> dict[str, Any]:
+        return self._adapter(action).execute(action)
+
+    def verify(self, action: dict[str, Any]) -> dict[str, Any]:
+        return self._adapter(action).verify(action)
+
+
 class Octo1HardwareAdapter:
     """Deterministic OCTO1 campaign adapter.
 
