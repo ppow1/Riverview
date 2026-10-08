@@ -163,3 +163,26 @@ Historical OCTO1 PiKVM HID:
 Read canonical requirements and process map, OCTO1 incident, stock recovery, this dossier, current SNAIL state/evidence, and most recent machine boot ID. Distinguish **verified** vs **reported** vs **hypothesized**. Never overwrite original firmware backups or forensic dumps. Before any new firmware write, independently validate hardware identity, full-image and BIOS-region hashes, module semantics, authorized rollback, and stable power. After every test preserve timestamped raw logs and promote facts into durable campaign state; don't treat chat context as durable authority.
 
 **Checkpoint as of 2026-10-08 ~19:31 EDT:** OCTO2 C1 + 4090 + 3 P100: high root MMIO 128 GiB, four GPU BARs allocated, NVIDIA driver OK, Qwen 80B API READY and two completions PASS, one prior unexplained reboot, persistent journal enabled. Steward preparing physical installation of fourth P100 (fifth GPU total). **Await next physical observation.**
+
+
+## 15. OCTO2 five-GPU qualification — 2026-10-08 19:49 EDT (new observation)
+**Physical population:** RTX 4090 + **4× Tesla P100 16 GiB**; five total GPUs, nominal 88 GiB aggregate. This supersedes the previous four-GPU checkpoint for population status only; the unresolved earlier reboot and OCTO1 incident remain.
+- Operator ran read-only PowerShell/SSH five-GPU inspection at `2026-10-08T19:49:42-04:00`. SSH exit 0.
+- OCTO2 booted at `2026-10-08 19:41:57`; boot ID `7af99978-b8d0-48df-8dd8-241e63b772d3`; up ~7 minutes at audit.
+- NVIDIA driver `550.144.03`, CUDA reported `12.4`. `nvidia-smi -L` listed five GPUs with expected identities, including newly added P100 GPU4 UUID `GPU-ace423ce-ae61-803e-0734-a907283efe54`.
+- NVIDIA `llama-server` PID 782 had memory allocations on all five (GPU0 9374 MiB; GPU1 14804 MiB; GPU2 9490 MiB; GPU3 9374 MiB; GPU4 8352 MiB). API `/health` HTTP 200 `{"status":"ok"}`. Model command: `/opt/llama.cpp/build-octo1-0.4.1-dev/bin/llama-server -m /root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf -ngl 999 -c 65536 --host 0.0.0.0 --port 8080`.
+- GPU temperatures at inspection: P100 46/48/48/46°C, RTX4090 38°C; idle utilization 0%. Filtered kernel search for PCIe BAR failure/NVIDIA Xid showed no matching output. This does **not** prove long-term stability.
+- Root bus high MMIO window remained `0x2000000000–0x3fffffffff`, 128 GiB.
+- Five high-BAR allocations:
+  | BDF | Device | BAR1 | BAR3 | Link |
+  |---|---|---|---|---|
+  | 0000:01:00.0 | P100 | `0x3800000000` 16 GiB | `0x3c00000000` 32 MiB | Gen1 x16 |
+  | 0000:02:00.0 | RTX4090 | `0x3c20000000` 256 MiB | `0x3c30000000` 32 MiB | Gen1 x1 |
+  | 0000:04:00.0 | P100 | `0x3000000000` 16 GiB | `0x3400000000` 32 MiB | Gen1 x1 |
+  | 0000:05:00.0 | P100 | `0x2800000000` 16 GiB | `0x2c00000000` 32 MiB | Gen1 x1 |
+  | 0000:06:00.0 | **new P100** | `0x2000000000` 16 GiB | `0x2400000000` 32 MiB | Gen1 x1 |
+- Sum of five GPU BAR1 sizes = **64.25 GiB**; five BAR3 sizes = **0.15625 GiB**; total GPU high BAR = **64.40625 GiB**, or ~50.32% of 128 GiB. Arithmetic remainder = **63.59375 GiB**, **NOT** a measured contiguous usable window; bridge reservations/alignment are unaccounted.
+- Current journal list showed only boot 0, despite previously enabling persistent journaling. `journalctl -b -1` reported no previous boot ID. Determine why journal persistence did not survive the physical shutdown before relying on it for crash forensics.
+- Steward dashboard at 19:49 showed OCTO2 READY, `80B_READY`, same boot ID, but **stale campaign workflow**: `C1 PLANNING`, `WAITING_FOR_STEWARD`, BIOS updates 0, objective infrastructure qualification. This dashboard state does not reflect observed C1 firmware and five-GPU testing. Its displayed 133 reboot counter is not equivalent to validated unexpected reboot count.
+- **Five-GPU status:** firmware boot PASS, PCIe enumeration PASS, NVIDIA initialization PASS, five GPU high BARs PASS, 80B model loaded/health PASS. **Five-GPU inference NOT YET TESTED. Stability NOT YET QUALIFIED.**
+- **Immediate next action:** run same two-pass inference payload in section 9, preserve exact speed/output and boot ID, then investigate journaling and perform bounded stability testing. Do not classify five-GPU inference as passed merely from `/health`.
