@@ -186,3 +186,12 @@ Read canonical requirements and process map, OCTO1 incident, stock recovery, thi
 - Steward dashboard at 19:49 showed OCTO2 READY, `80B_READY`, same boot ID, but **stale campaign workflow**: `C1 PLANNING`, `WAITING_FOR_STEWARD`, BIOS updates 0, objective infrastructure qualification. This dashboard state does not reflect observed C1 firmware and five-GPU testing. Its displayed 133 reboot counter is not equivalent to validated unexpected reboot count.
 - **Five-GPU status:** firmware boot PASS, PCIe enumeration PASS, NVIDIA initialization PASS, five GPU high BARs PASS, 80B model loaded/health PASS. **Five-GPU inference NOT YET TESTED. Stability NOT YET QUALIFIED.**
 - **Immediate next action:** run same two-pass inference payload in section 9, preserve exact speed/output and boot ID, then investigate journaling and perform bounded stability testing. Do not classify five-GPU inference as passed merely from `/health`.
+
+
+## 16. Five-GPU inference passed — 2026-10-08 19:52:40 EDT
+Operator-provided exact two-pass benchmark, same POST `/completion` payload as sections 7–9, with **RTX 4090 + 4× P100**:
+- Run 1: wall 6.068 s; generated 196 tokens; generation **37.57094405763498 tok/s**; prompt **26.3978523625504 tok/s**; coherent response.
+- Run 2: wall 6.046 s; generated 196 tokens; generation **38.456373019718654 tok/s**; prompt **39.49589500273895 tok/s**; coherent response.
+- SSH_EXIT=0. **FIVE_GPU_INFERENCE=PASS**; long-term stability still unproven.
+- Second-run comparison: 3 GPUs 44.69880740143483 tok/s, 4 GPUs 40.81094486755279 tok/s, 5 GPUs 38.456373019718654 tok/s. These are short smoke tests, not statistically controlled performance qualification.
+- Operator subsequently reported installing RTX 3060 Ti as sixth GPU, **but not enumerating**. At this point no six-GPU PCIe/driver diagnostic output has been supplied. Do **not** classify reason as MMIO exhaustion or BIOS limitation until `lspci`, GPU BARs, bridge topology and NVIDIA logs are inspected. The five-GPU inference output is from 19:52 and does not itself establish any six-GPU functionality.
