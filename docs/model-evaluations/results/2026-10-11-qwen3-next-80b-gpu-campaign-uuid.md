@@ -70,3 +70,25 @@ ssh octo1 "tail -n 25 /root/80b-gpu-campaign/run-20261011-170737/monitor.txt"
 | D2 | LOAD TIMEOUT | — | — |
 
 D1 per-request speeds at concurrency 4: [16.57,16.57,16.57,16.57]. B3 per-request speeds at concurrency 4: [21.87,21.87,21.87,21.87].
+
+## Individual concurrent-request generation speeds (tok/s)
+
+**Important:** These are `timings.predicted_per_second` reported separately by each request, not the group aggregate. Never divide the aggregate by concurrency to present an invented per-request measurement. B1/B2 individual-request arrays are not present in the retained summary; retrieve them from the original host `results.jsonl` before completing those cells.
+
+| Configuration | 1 request (warm2) | 2 requests (individual) | 3 requests (individual) | 4 requests (individual) |
+|---|---:|---|---|---|
+| B3 — 4090 + 2 P100 | 44.58 | 34.42 / 34.41 | 26.30 / 26.30 / 26.30 | 21.87 / 21.87 / 21.87 / 21.87 |
+| B2 — 4090 + 3 P100 | 40.92 | **Not recovered** (aggregate 57.719) | **Not recovered** (aggregate 62.815) | **Not recovered** (aggregate 65.348) |
+| B1 — 4090 + 4 P100 | 38.61 | **Not recovered** (aggregate 53.439) | **Not recovered** (aggregate 57.718) | **Not recovered** (aggregate 64.136) |
+| D1 — 4 P100 | 32.25 | 24.96 / 25.93 | 19.91 / 19.91 / 19.91 | 16.57 / 16.57 / 16.57 / 16.57 |
+
+### Measured aggregate throughput, for context (tok/s)
+
+| Configuration | 2 requests | 3 requests | 4 requests |
+|---|---:|---:|---:|
+| B3 | 61.887 | 64.911 | 70.419 |
+| B2 | 57.719 | 62.815 | 65.348 |
+| B1 | 53.439 | 57.718 | 64.136 |
+| D1 | 46.429 | 50.441 | 54.820 |
+
+The distinction matters: single-request speed drops as the model is distributed across more GPUs in B3→B2→B1, and the observed **four-request aggregate also decreases** (70.419→65.348→64.136). Adding P100s did not improve throughput in these measured configurations. The RTX 3060 Ti configurations all failed at concurrency 2 and are not competitive as concurrent workers in this campaign.
