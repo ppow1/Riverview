@@ -34,6 +34,17 @@ A new result should record, when known:
 | 2026-10-02 | DeepSeek-OCR | Small 640x640, no crop, eager attention | RTX 3060 Ti 8 GB | OCR / high-confidence interpretation of frozen OctoMiner screen | PASS | FAIL for tested configuration — recognized terminal context but hallucinated substantial content; 113.5 s inference | `results/2026-10-02-deepseek-ocr-3060ti-octominer-screen.md` |
 | 2026-10-02 | Qwen3-VL-8B-Instruct | Q4_K_M + Q8_0 mmproj; llama.cpp b11193/Vulkan | RTX 3060 Ti 8 GB | Vision / screenshot OCR + OctoMiner screen-state extraction | PASS | **QUALIFIED — strong screenshot OCR + screen-state extraction; selected Model 3 working vision configuration; 124.79 s** | `results/2026-10-02-qwen3-vl-8b-q4km-3060ti-octominer-screen.md` |
 | 2026-10-02 | Penguin-VL-8B | BF16 upstream safetensors + separate Penguin-Encoder; attempted CPU/GPU offload | RTX 3060 Ti 8 GB | Vision / high-confidence interpretation of frozen OctoMiner screen | FAIL before inference | NOT TESTED for quality — incompatible Transformers APIs blocked model loading after dependency and encoder recovery | `results/2026-10-02-penguin-vl-8b-3060ti-octominer-screen.md` |
+| 2026-10-11 | Qwen3-Next-80B-A3B-Instruct | Q4_K_M GGUF | RTX 4090 / RTX 3060 Ti / 4× P100 (11 GPU subsets) | Inference generation throughput, loading, 1–4 request concurrency | 9 load PASS; 2 load timeouts | **Performance baseline, not task-quality qualification**; B3 44.58 tok/s single and 70.419 aggregate four-way; D1 32.25 single and 54.82 four-way | [initial A-series](results/2026-10-11-qwen3-next-80b-gpu-campaign-initial.md), [UUID-corrected B/C/D](results/2026-10-11-qwen3-next-80b-gpu-campaign-uuid.md) |
+
+### October 11, 2026 — 80B GPU performance campaign
+
+- [Interactive performance visual](assets/2026-10-11-80b-benchmark-visual.html) (HTML source; open in a browser to view)
+- [Generation-sorted results CSV](assets/2026-10-11-80b-results-sorted.csv)
+- [Exact observed launch commands, methodology and evidence capture gaps](2026-10-11-80b-reproducibility.md)
+- [Original A-series run record](results/2026-10-11-qwen3-next-80b-gpu-campaign-initial.md)
+- [UUID-corrected B/C/D run record](results/2026-10-11-qwen3-next-80b-gpu-campaign-uuid.md)
+
+**Best measured single-request generation:** A3 45.86 tok/s (concurrency 2 failed). **Best four-way aggregate:** B3 70.419 tok/s (4090 + 2 P100). **P100-only four-way:** D1 54.82 tok/s (4 P100). The tests do not qualify reasoning quality. The original binary ZIP and full host logs still require transfer; this registry does not falsely represent those uncollected bytes as committed.
 
 ### Current campaign vision selection
 
