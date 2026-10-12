@@ -8,7 +8,7 @@
 - Original run directory: `/root/qwen30b-gpu-campaign/run-20261012-175106`.
 - Monitor: 726 events; 19 GPU subsets × two slot counts (4 and 8) = 38 configurations.
 - Hardware: RTX 4090 24GB, RTX 3060 Ti 8GB, four Tesla P100 16GB.
-- Model identified by campaign as Qwen3-VL-30B, used in **text-only** mode. Exact model filename, quantization, hash, runtime build, prompt, and full controller source are **not established by the monitor** and must be collected from host.
+- Model identified by campaign as Qwen3-VL-30B, used in **text-only** mode. The original launcher supplied in the conversation identifies model file `/opt/model-library/vision/Qwen3-VL-30B-A3B/Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated.i1-IQ3_XS.gguf`, projector `Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated.mmproj-Q8_0.gguf`, and binary `/opt/llama.cpp/build-octo1-0.4.1-dev/bin/llama-server`; model hash, runtime build revision, exact deployed controller source, and full raw logs still require collection from the host.
 - Results: 36 load-ready, two load failures (3060 Ti alone at both slot counts). Completion does not mean all concurrency tests passed.
 
 ## Representative measurements
@@ -35,7 +35,7 @@ Numbers are observed approximate generation speed per request at N=1, and aggreg
 2. A single P100 showed unusually low reported `load_ready` time (~6–7s). This is **not proof** of process-cold model load from storage or of full GPU residency. Confirm quantization, mmap/page cache, CPU offload, GPU VRAM allocation, service restart and readiness criteria.
 3. Many eight-slot configurations involving the 3060 Ti fail when simultaneous requests rise to five or eight. Four-slot configurations can queue eight requests and often succeed. Root cause is **unknown**; do not label it OOM without server/journal evidence.
 4. This test does not measure prompt ingestion, time-to-first-token, real conversational latency, memory isolation, retrieval quality, customer-support accuracy or vision performance.
-5. No source log files, controller scripts, original results.jsonl, runtime binary version, service configuration, or model hash were provided in the monitor snapshot. They remain on the source host until separately collected. This document does **not** claim their archival.
+5. The launcher source is available in the conversation, but original results.jsonl, server logs, runtime binary version, service configuration, and model hash have not been collected from the host. They remain on the source host until separately collected. This document does **not** claim their archival.
 
 ## Follow-up: single-P100 retest (discuss before executing)
 
