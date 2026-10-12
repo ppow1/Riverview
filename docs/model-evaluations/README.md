@@ -34,7 +34,15 @@ A new result should record, when known:
 | 2026-10-02 | DeepSeek-OCR | Small 640x640, no crop, eager attention | RTX 3060 Ti 8 GB | OCR / high-confidence interpretation of frozen OctoMiner screen | PASS | FAIL for tested configuration — recognized terminal context but hallucinated substantial content; 113.5 s inference | `results/2026-10-02-deepseek-ocr-3060ti-octominer-screen.md` |
 | 2026-10-02 | Qwen3-VL-8B-Instruct | Q4_K_M + Q8_0 mmproj; llama.cpp b11193/Vulkan | RTX 3060 Ti 8 GB | Vision / screenshot OCR + OctoMiner screen-state extraction | PASS | **QUALIFIED — strong screenshot OCR + screen-state extraction; selected Model 3 working vision configuration; 124.79 s** | `results/2026-10-02-qwen3-vl-8b-q4km-3060ti-octominer-screen.md` |
 | 2026-10-02 | Penguin-VL-8B | BF16 upstream safetensors + separate Penguin-Encoder; attempted CPU/GPU offload | RTX 3060 Ti 8 GB | Vision / high-confidence interpretation of frozen OctoMiner screen | FAIL before inference | NOT TESTED for quality — incompatible Transformers APIs blocked model loading after dependency and encoder recovery | `results/2026-10-02-penguin-vl-8b-3060ti-octominer-screen.md` |
+| 2026-10-12 | Qwen3-VL-30B | Exact quantization/hash not captured in monitor | RTX 4090 / RTX 3060 Ti / 1–4× P100 (19 subsets × 4/8 slots) | Text-only inference speed, startup and 1–8 request concurrency | 36 load PASS; 2 load FAIL | **Performance baseline only; not customer-support or vision qualified**. 4090 alone ~107 single / ~192 eight-way aggregate; single P100 ~50 single and 6.45–7.01s reported load; 3060 Ti alone failed to load; 8-slot 3060 Ti mixtures fail at N≥5 | [38-config campaign](results/2026-10-12-qwen3-vl-30b-gpu-campaign.md) |
 | 2026-10-11 | Qwen3-Next-80B-A3B-Instruct | Q4_K_M GGUF | RTX 4090 / RTX 3060 Ti / 4× P100 (11 GPU subsets) | Inference generation throughput, loading, 1–4 request concurrency | 9 load PASS; 2 load timeouts | **Performance baseline, not task-quality qualification**; B3 44.58 tok/s single and 70.419 aggregate four-way; D1 32.25 single and 54.82 four-way | [initial A-series](results/2026-10-11-qwen3-next-80b-gpu-campaign-initial.md), [UUID-corrected B/C/D](results/2026-10-11-qwen3-next-80b-gpu-campaign-uuid.md) |
+
+### October 12, 2026 — Qwen3-VL-30B text-only GPU campaign
+
+- [Full campaign performance record](results/2026-10-12-qwen3-vl-30b-gpu-campaign.md)
+- Source host evidence: `/root/qwen30b-gpu-campaign/run-20261012-175106` (not yet transferred to GitHub).
+- **Next investigation:** repeat single-P100 startup with actual process cold starts, cache control, VRAM/CPU-offload capture and realistic multi-turn support sessions.
+
 
 ### October 11, 2026 — 80B GPU performance campaign
 
