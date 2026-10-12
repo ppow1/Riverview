@@ -36,6 +36,8 @@ A new result should record, when known:
 | 2026-10-02 | Penguin-VL-8B | BF16 upstream safetensors + separate Penguin-Encoder; attempted CPU/GPU offload | RTX 3060 Ti 8 GB | Vision / high-confidence interpretation of frozen OctoMiner screen | FAIL before inference | NOT TESTED for quality — incompatible Transformers APIs blocked model loading after dependency and encoder recovery | `results/2026-10-02-penguin-vl-8b-3060ti-octominer-screen.md` |
 | 2026-10-11 | Qwen3-Next-80B-A3B-Instruct | Q4_K_M GGUF | RTX 4090 / RTX 3060 Ti / 4× P100 (11 GPU subsets) | Inference generation throughput, loading, 1–4 request concurrency | 9 load PASS; 2 load timeouts | **Performance baseline, not task-quality qualification**; B3 44.58 tok/s single and 70.419 aggregate four-way; D1 32.25 single and 54.82 four-way | [initial A-series](results/2026-10-11-qwen3-next-80b-gpu-campaign-initial.md), [UUID-corrected B/C/D](results/2026-10-11-qwen3-next-80b-gpu-campaign-uuid.md) |
 
+| 2026-10-12 | InternVL3-78B | Q4_K_M + Q8_0 mmproj; llama.cpp CUDA | 4× P100 + RTX 4090 + RTX 3060 Ti | Engineering drawing + visual-canon proportions | PASS at 4K; 16K vision OOM | **FAIL / NOT QUALIFIED — did not perform requested five-part proportional analysis; 4K context truncates conversations** | [result](results/2026-10-12-internvl3-78b-q4km-six-gpu-vision.md) |
+
 ### October 11, 2026 — 80B GPU performance campaign
 
 - [Interactive performance visual](assets/2026-10-11-80b-benchmark-visual.html) (HTML source; open in a browser to view)
