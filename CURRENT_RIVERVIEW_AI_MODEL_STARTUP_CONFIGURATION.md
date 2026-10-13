@@ -6,8 +6,8 @@
 
 | Role | Model / precision | GPU allocation | Service / port | Status |
 |---|---|---|---|---|
-| Grace vision / multimodal | Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated **i1-IQ3_XS**; mmproj **Q8_0** | GPU0 Tesla P100 16GB, UUID `GPU-ace423ce-ae61-803e-0734-a907283efe54` | `grace-vision.service`, `/usr/local/bin/grace-vision-fast`, `127.0.0.1:18080` | **Validated target:** `-c 32768 -np 8`; **DEPLOYED AND VERIFIED 2026-10-13 10:13 local:** `-c 32768 -np 8`. |
-| Large text/reasoning worker | `/root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf` | GPUs 2–5, as observed in October 13 tests; inspect live placement before any change | `llama-server.service`, `127.0.0.1:8080` | Running during tests; **do not restart, reallocate, or modify** as part of vision changes |
+| Grace vision / multimodal | Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated **i1-IQ3_XS**; mmproj **Q8_0** | GPU0 Tesla P100 16GB, UUID `GPU-ace423ce-ae61-803e-0734-a907283efe54` | `grace-vision.service`, `/usr/local/bin/grace-vision-fast`, `0.0.0.0:18080` | **Validated target:** `-c 32768 -np 8`; **DEPLOYED AND VERIFIED 2026-10-13 10:13 local:** `-c 32768 -np 8`. |
+| Large text/reasoning worker | `/root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf` | GPUs 2–5, as observed in October 13 tests; inspect live placement before any change | `llama-server.service`, `0.0.0.0:8080` | Running during tests; **do not restart, reallocate, or modify** as part of vision changes |
 | Reserved / not part of vision worker | RTX 4090, GPU1 | GPU1 | — | Remained idle during validation; not a license to assign it elsewhere without separate decision |
 
 The machine's enumerated GPUs during the test: 0=P100, 1=RTX4090, 2=RTX3060Ti, 3–5=P100. GPU indices may change after hardware/driver changes: pin the vision worker by UUID and verify actual assignments.
@@ -23,7 +23,7 @@ exec /opt/llama.cpp/build-octo1-0.4.1-dev/bin/llama-server \
   -m /mnt/model-storage/vision/Qwen3-VL-30B-A3B/Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated.i1-IQ3_XS.gguf \
   --mmproj /mnt/model-storage/vision/Qwen3-VL-30B-A3B/Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated.mmproj-Q8_0.gguf \
   -ngl all -c 32768 -np 8 \
-  --host 127.0.0.1 --port 18080 --no-warmup
+  --host 0.0.0.0 --port 18080 --no-warmup
 ```
 
 Total context **32768** is shared among **8 slots**, so each slot reports **4096 tokens**. It is **not** 32K tokens per user. F16/default KV was used for the successful 32K tests. Do not add Q8 KV flags from the failed 64K experiment.
@@ -66,3 +66,18 @@ If `/slots` shows eight `n_ctx=4096` slots and health is OK, the running vision 
 **Runbook:** [GRACE_OPEN_EYES_FAST_LOAD.md](docs/operations/GRACE_OPEN_EYES_FAST_LOAD.md). **Deployable script:** [scripts/grace-open-eyes.sh](scripts/grace-open-eyes.sh). This GitHub script is a version-controlled deployment artifact; it does **not** become installed on OCTO1 until copied there. The live systemd service and launcher are authoritative.
 
 For a permitted operator/service account after installing the script on OCTO1: `sudo /usr/local/sbin/grace-open-eyes`. The script is idempotent, checks the live launcher for the approved context/slot flags and GPU UUID, verifies GPU0 is free before starting an unloaded service, waits for health and eight 4096-token slots, and does not touch the 80B service. The existing running vision service is checked rather than restarted. **Grace must not claim eyes are open until the command succeeds.** GPU0 handoff must be authorized by the resource scheduler; the script does not seize another worker's GPU.
+
+
+## 2026-10-13 LAN binding repair — operator verified
+
+**Operator-provided completed deployment output (14:51 EDT):** the network-only change was applied on `OCTOMINER1` (`eth0=192.168.1.160/24`), with timestamped backups, to the effective 80B systemd drop-in `/etc/systemd/system/llama-server.service.d/99-grace-brain.conf` and the vision launcher `/usr/local/bin/grace-vision-fast`. In each file, `--host 127.0.0.1` was replaced with `--host 0.0.0.0`, preserving all other arguments. Systemd was reloaded and both services restarted successfully.
+
+**80B effective configuration:** `llama-server.service`, wrapper `/usr/local/bin/llama-server-octo1-known-good`, model `/root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf`, `-ngl 999 -c 16384 -np 1 --fit off --host 0.0.0.0 --port 8080`; `CUDA_DEVICE_ORDER=PCI_BUS_ID`; `CUDA_VISIBLE_DEVICES=GPU-c2f0fffc-1e63-d3c5-bdb3-f103ec44d5b9,GPU-6785b322-899d-8eec-e817-31d83279a414,GPU-c0c253d2-ff9e-3121-f1f1-ba4990420a8c,GPU-7b1a4d4b-8593-d3b7-6cf9-480ff81ea013`. **Do not use the base unit's stale 65,536 context or 90-drop-in GPU0 assignment; the 99 drop-in wins.**
+
+**Vision effective configuration:** `grace-vision.service`, `/usr/local/bin/grace-vision-fast`, pinned to `GPU-ace423ce-ae61-803e-0734-a907283efe54`, same Huihui i1-IQ3_XS GGUF and Q8 projector as above, `-ngl all -c 32768 -np 8 --host 0.0.0.0 --port 18080 --no-warmup`.
+
+**Observed post-restart results:** `80B_LAN_READY: True`; `80B_CONTEXTS: [16384]`; `VISION_CONTEXTS: [4096,4096,4096,4096,4096,4096,4096,4096]`; `VISION_LAN_READY: True`; `ss -ltn` reported `0.0.0.0:8080` and `0.0.0.0:18080`; both services `active`. GPU0 P100 vision 16022 MiB used; GPU1 RTX4090 14 MiB; GPU2 RTX3060Ti 7425 MiB; GPU3/4/5 P100 13722/13564/13606 MiB used. Thus no observed GPU reassignment. The validation emitted unrelated snapd `RestartMode` and IPv6 warnings but completed.
+
+**Still unverified:** HTTP requests from *Camrui* (`192.168.1.155`) or another LAN host, host firewall/router isolation, post-reboot survival, API authentication, Grace/Codex provider wiring. Next acceptance from Camrui: `Invoke-RestMethod http://192.168.1.160:8080/health` and `Invoke-RestMethod http://192.168.1.160:18080/health`; also verify `/v1/models` and actual inference. These inference ports are intended for trusted LAN access only; future internet traffic must use an authenticated gateway/reverse proxy, not public port forwarding.
+
+**Backup filenames:** `/etc/systemd/system/llama-server.service.d/99-grace-brain.conf.pre-lan-20261013-145109`; `/usr/local/bin/grace-vision-fast.pre-lan-20261013-145109`.
