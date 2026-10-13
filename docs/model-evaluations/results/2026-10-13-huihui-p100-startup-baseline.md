@@ -62,3 +62,16 @@ exec /opt/llama.cpp/build-octo1-0.4.1-dev/bin/llama-server \
 The 80B `systemctl is-active` command was malformed by a Windows CR (`llama-server.service\\x0d`); the resulting `inactive` line does not establish an 80B failure. The restored `grace-vision.service` reported `active`.
 
 **Next:** Read the 64K server log; optionally benchmark 32K/8-slot with real context and concurrency. If validated, promote it to the persistent service command and update this reference with measured results.
+
+
+### 64K failure root cause (2026-10-13 log inspected)
+
+The host log `/tmp/huihui-context-65536.log` confirms **CUDA out of memory during KV-cache initialization**, not an unidentified startup failure:
+
+```text
+ggml_backend_cuda_buffer_type_alloc_buffer: allocating 6144.00 MiB on device 0: cudaMalloc failed: out of memory
+alloc_tensor_range: failed to allocate CUDA0 buffer of size 6442450944
+llama_init_from_model: failed to initialize the context: failed to allocate buffer for kv cache
+```
+
+Next controlled candidate: retry `-c 65536 -np 8` with `--cache-type-k q8_0 --cache-type-v q8_0`, **only after confirming the binary accepts these flags**, and keep production launcher unchanged until load and inference are verified. KV quantization is a hypothesis to test, not yet a passing configuration.
