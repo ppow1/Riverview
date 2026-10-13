@@ -1,0 +1,48 @@
+# OCTO1 Huihui 30B single-P100 startup baseline — 2026-10-13
+
+**Status:** Selected **verified text-generation performance baseline**, pending deployment/vision/context qualification. This is the reference for the fast launcher and persistent systemd service, **not proof that production was switched to 8 slots**.
+
+## Why this configuration
+
+The 2026-10-12 38-configuration campaign compared 19 GPU subsets with 4 and 8 slots. The single P100 had the fastest reported model readiness (~6–7 seconds) among tested subsets and leaves the 4090 and four other occupied GPUs available for other workers. The original single-P100 retest on 2026-10-12 reported 7.16 seconds (4 slots) and eight-way aggregate 110.655–143.018 generated tokens/sec (8 slots), zero request failures. On 2026-10-13 after correcting the cloned SSD's UUID and mount, the original retest script was rerun with production vision temporarily stopped; the model reached readiness in **7.333 s** (4 slots, process restart), **8.017 s** (4 slots, OS-cache warm) and **7.106 s** (8 slots), using the actual model files on /mnt/model-storage. The benchmark did **not** clear the OS page cache. GPU0 consumed ~13,714–13,746 MiB. The 80B worker was not intentionally stopped.
+
+**Context vs concurrency tradeoff:** `-c 8192 -np 8` means **8,192 total context tokens** divided among 8 parallel slots (~1,024 per slot when evenly allocated), **not 8K per client**. For longer individual contexts use the separately verified `-np 4` (~2,048 per slot). A true 8K context for each of eight simultaneous clients would require substantially larger total context, not qualified here. No 16K/32K single-P100 context claim is made.
+
+**Scope:** Synthetic text-only prompt, max 160 generated tokens/request; not yet qualified for actual images, accuracy, realistic multi-turn prompts, 16K/32K context, or cold storage read. The 2026-10-13 eight-slot concurrency run should be retained with its raw JSONL before citing new exact aggregate measurements.
+
+## Exact fast-load reference command (8-slot throughput profile)
+
+```bash
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+export CUDA_VISIBLE_DEVICES=GPU-ace423ce-ae61-803e-0734-a907283efe54
+export LD_LIBRARY_PATH=/opt/llama.cpp/build-octo1-0.4.1-dev/bin:${LD_LIBRARY_PATH:-}
+
+exec /opt/llama.cpp/build-octo1-0.4.1-dev/bin/llama-server \
+  -m /mnt/model-storage/vision/Qwen3-VL-30B-A3B/Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated.i1-IQ3_XS.gguf \
+  --mmproj /mnt/model-storage/vision/Qwen3-VL-30B-A3B/Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated.mmproj-Q8_0.gguf \
+  -ngl all \
+  -c 8192 \
+  -np 8 \
+  --host 127.0.0.1 \
+  --port 18080 \
+  --no-warmup
+```
+
+**4-slot longer-per-client-context variant:** Change **only** `-np 8` to `-np 4`. All other flags, paths, GPU UUID and context total remain the same. The benchmark used port 18083, while persistent production uses port 18080.
+
+## Persistent service integration (planned; do not silently replace active configuration)
+
+- Launcher: `/usr/local/bin/grace-vision-fast`. The last inspected deployed launcher had `-np 4`. Switching to this eight-slot profile requires an intentional launcher update and service restart.
+- Unit: `grace-vision.service` with `ExecStart=/usr/local/bin/grace-vision-fast`.
+- Ensure `/mnt/model-storage` is mounted **before** service startup. Suggested systemd drop-in: `[Unit]\nRequiresMountsFor=/mnt/model-storage`. Inspect existing unit and drop-ins before applying.
+- SSD `/dev/sdb4` has UUID `a88d8af7-02e6-4aa6-8101-6370dc13fa21` and is configured in `/etc/fstab` at `/mnt/model-storage`; boot persistence has not been reboot-tested.
+- To validate: `systemctl is-active grace-vision.service`; `curl -fsS http://127.0.0.1:18080/health`; `curl -fsS http://127.0.0.1:18080/props` (verify `total_slots=8`); `nvidia-smi --query-compute-apps=pid,gpu_uuid,used_gpu_memory --format=csv`. Verify 80B independently without altering its service.
+
+## Provenance
+
+- [38-config campaign](2026-10-12-qwen3-vl-30b-gpu-campaign.md)
+- [2026-10-12 single-P100 retest](2026-10-12-qwen3-vl-30b-single-p100-retest.md)
+- 2026-10-13 host run: `/root/qwen30b-p100-retest/run-20261013-093852` (original Python retest: `/tmp/riverview_qwen30b_p100_retest.py`, model paths updated to mounted SSD). Raw evidence currently on host, not claimed committed to GitHub.
+- Production launcher's inspected paths and flags as of 2026-10-13: single P100, `-ngl all -c 8192 -np 4 --no-warmup`, port 18080.
+
+**Decision dated 2026-10-13:** Use eight-slot command above as the documented **fast/concurrency reference**; retain four-slot alternative for larger per-request context. Do not represent either as proven image-quality qualification.
