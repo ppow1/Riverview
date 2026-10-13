@@ -1,6 +1,6 @@
 # OCTO1 Huihui 30B single-P100 startup baseline — 2026-10-13
 
-**Status:** Verified 8K and 32K startup on one P100; 64K/8-slot startup failed. Production change pending; long-context workload and vision qualification pending. This is the reference for the fast launcher and persistent systemd service, **not proof that production was switched to 8 slots**.
+**FINAL STATUS (2026-10-13):** **32K/8 slots PASSED** startup, eight concurrent long-context text requests, and eight concurrent small-image vision requests. Both 64K variants FAILED CUDA OOM. **Production deployment remains unconfirmed**; last inspected launcher was 8K/4 slots. Start with [the canonical startup reference](../../../CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md). This chronological record preserves earlier provisional assessments below; final results supersede them.
 
 ## Why this configuration
 
@@ -8,7 +8,7 @@ The 2026-10-12 38-configuration campaign compared 19 GPU subsets with 4 and 8 sl
 
 **Context vs concurrency tradeoff:** `-c 8192 -np 8` means **8,192 total context tokens** divided among 8 parallel slots (~1,024 per slot when evenly allocated), **not 8K per client**. For longer individual contexts use the separately verified `-np 4` (~2,048 per slot). A true 8K context for each of eight simultaneous clients would require substantially larger total context, not qualified here. On 2026-10-13, a dedicated **32K/8-slot** load test passed; 64K/8-slot failed. See addendum below.
 
-**Scope:** Synthetic text-only prompt, max 160 generated tokens/request; not yet qualified for actual images, accuracy, realistic multi-turn prompts, 16K/32K context, or cold storage read. The 2026-10-13 eight-slot concurrency run should be retained with its raw JSONL before citing new exact aggregate measurements.
+**Historical scope of the initial 8K retest:** Synthetic text-only prompt, max 160 generated tokens/request. Later 32K text and simple-image tests passed (see final sections); realistic multi-turn workloads, high-resolution images, and storage-cold reads remain unqualified. The 2026-10-13 eight-slot concurrency run should be retained with its raw JSONL before citing new exact aggregate measurements.
 
 ## Exact fast-load reference command (8-slot throughput profile)
 
@@ -86,7 +86,7 @@ A controlled run with `-c 65536 -np 8 --cache-type-k q8_0 --cache-type-v q8_0` o
 
 ### 32K eight-slot long-context stress test — inconclusive (2026-10-13)
 
-With `-c 32768 -np 8` and default F16 KV, server became ready in 5.88 s; `/slots` reported eight 4096-token contexts. GPU0 used 16022 MiB with 248 MiB free. The test submitted eight concurrent, highly repetitive text-only prompts (175 repeats of a technical passage; `max_tokens=96`). **All eight returned HTTP 400 within 0.057 s**; no inference completed, no CUDA memory error was observed. The harness failed to capture HTTP response bodies, so the precise rejection cause is **unknown**; overlong prompts relative to 4096-token slots are a hypothesis only. `grace-vision.service` and `llama-server.service` both reported `active` after cleanup. This test does **not** establish that eight long-context inferences work or fail. Next: obtain HTTP 400 response body with a single bounded probe, verify server-reported prompt-token count, then repeat concurrent test with confirmed fitting prompts and output headroom.
+With `-c 32768 -np 8` and default F16 KV, server became ready in 5.88 s; `/slots` reported eight 4096-token contexts. GPU0 used 16022 MiB with 248 MiB free. The test submitted eight concurrent, highly repetitive text-only prompts (175 repeats of a technical passage; `max_tokens=96`). **All eight returned HTTP 400 within 0.057 s**; no inference completed, no CUDA memory error was observed. The harness initially failed to capture HTTP response bodies; **subsequent server-log inspection established the exact cause:** each request was **6847 tokens**, exceeding the **4096-token** slot limit. This was a test-harness prompt-size error, not an inference OOM. `grace-vision.service` and `llama-server.service` both reported `active` after cleanup. This test does **not** establish that eight long-context inferences work or fail. Next: obtain HTTP 400 response body with a single bounded probe, verify server-reported prompt-token count, then repeat concurrent test with confirmed fitting prompts and output headroom.
 
 
 ### 32K / eight-slot corrected concurrent text inference — PASS (2026-10-13)
@@ -99,3 +99,12 @@ Controlled run on GPU0 Tesla P100 16 GB with Huihui Qwen3-VL-30B-A3B IQ3_XS and 
 Controlled Huihui Qwen3-VL-30B-A3B IQ3_XS on single GPU0 Tesla P100 with multimodal projector, `-c 32768 -np 8`, F16 KV. READY in **5.865 s**; eight slots each reported `n_ctx=4096`. Eight concurrent requests each contained a separately generated 128×128 PNG with a central colored rectangle and text instructions; **all eight correctly identified** red, green, blue, yellow, magenta, cyan, black, and orange. Each request used **1405 prompt tokens**, generated **2–3 completion tokens**, and ended with `finish_reason=stop`. Individual latencies **21.87–31.76 s**; batch wall time **31.77 s**. GPU0 sampled **59 times** at ~0.5 s intervals: peak used **16126 MiB**, minimum free **144 MiB**. No CUDA errors found in test server log. `VISION_CONCURRENCY_PASS: True`. Cleanup confirmed `grace-vision.service=active` and `llama-server.service=active`.
 
 **Decision: GO for this tested 32K/8-slot configuration on GPU0**, covering successful eight-way text inference and eight-way simple-image recognition. **Qualification boundary:** only small 128×128 synthetic images and ~1405-token multimodal prompts were tested; does not establish high-resolution, 4K-per-slot simultaneous image workloads or long-term reliability. VRAM headroom only 144 MiB at sampled peak. Keep existing production launcher unchanged until a deliberate deployment decision; do not assert it has already been promoted. 64K configurations failed earlier and remain NO-GO. Campaign validation closed per user request; no additional tests planned.
+
+
+## Canonical configuration and disposition
+
+**Current canonical target:** [CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md](../../../CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md). The older `-c 8192 -np 8` command in this historical report is **not** the newly validated default target. The target is `-c 32768 -np 8` with unchanged GPU UUID, model, mmproj, binary, and port. **Do not claim deployment until production `/slots` and launcher are checked.**
+
+### Raw evidence still to archive
+
+The detailed numeric results and selected error lines are documented in this file. Raw `/tmp/huihui-context-32768.log`, `/tmp/huihui-context-65536.log`, `/tmp/huihui-64k-q8.log`, `/tmp/huihui-32k-concurrency-server.log`, `/tmp/huihui-32k-corrected-server.log`, `/tmp/huihui-final-32k-vision-server.log`, and October 12 host campaign JSONL and tar archives have **not** been verified as present in GitHub. Do not represent this Markdown report as a byte-for-byte archive of every test log.
