@@ -56,3 +56,18 @@
 - Do not reclaim GPU0 from a different owner without the resource manager's allocation decision.
 - Idempotent Open Eyes when already healthy; bounded timeout, explicit failure, no blind restart loop.
 - Persist both code and evidence in GitHub, and update the root startup configuration after any verified changes.
+
+
+## 2026-10-13 operator installation verification
+
+The operator transferred a PowerShell-embedded implementation of Grace Open Eyes over SSH to `/usr/local/sbin/grace-open-eyes` (after raw GitHub URL returned 404 and private Git clone required credentials). Installed script syntax check passed and execution returned:
+
+```text
+APPROVED_LAUNCHER: yes
+VISION_SERVICE: already active; verifying
+OPEN_EYES_READY: true; slots=8; context_each=4096
+active
+active
+```
+
+**Verified:** installed host helper correctly validates an *already-running* vision service, 8 slots x 4096, and both services remain active. **Not verified:** stopped-service reload, GPU-busy behavior, Grace dispatcher integration, or exact byte-for-byte equality between the manually transferred helper and the GitHub `scripts/grace-open-eyes.sh` (the transferred helper was an in-chat adaptation). Codex should reconcile/version the installed script with the repository before integration. Do not claim end-to-end Grace integration complete.
