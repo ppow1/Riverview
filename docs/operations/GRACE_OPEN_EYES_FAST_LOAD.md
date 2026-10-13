@@ -68,3 +68,18 @@ sudo systemctl is-active llama-server.service
 Last confirmed pre-deployment backup: `/usr/local/bin/grace-vision-fast.pre-32k-20261013-101303`. Restore it only as an explicit rollback decision, not as part of normal Open Eyes operation.
 
 **Documentation status:** The GitHub helper is written but its installation and Grace's integration with a privileged executor are **not yet verified**. The existing `grace-vision.service` and launcher are deployed and healthy. Do not claim Grace has an automated Open Eyes action until the helper is installed and the orchestrator actually invokes it.
+
+
+## 2026-10-13 operator installation verification
+
+The operator transferred a PowerShell-embedded implementation of Grace Open Eyes over SSH to `/usr/local/sbin/grace-open-eyes` (after raw GitHub URL returned 404 and private Git clone required credentials). Installed script syntax check passed and execution returned:
+
+```text
+APPROVED_LAUNCHER: yes
+VISION_SERVICE: already active; verifying
+OPEN_EYES_READY: true; slots=8; context_each=4096
+active
+active
+```
+
+**Verified:** installed host helper correctly validates an *already-running* vision service, 8 slots x 4096, and both services remain active. **Not verified:** stopped-service reload, GPU-busy behavior, Grace dispatcher integration, or exact byte-for-byte equality between the manually transferred helper and the GitHub `scripts/grace-open-eyes.sh` (the transferred helper was an in-chat adaptation). Codex should reconcile/version the installed script with the repository before integration. Do not claim end-to-end Grace integration complete.
