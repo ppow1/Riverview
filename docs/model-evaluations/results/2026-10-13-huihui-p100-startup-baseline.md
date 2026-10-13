@@ -75,3 +75,10 @@ llama_init_from_model: failed to initialize the context: failed to allocate buff
 ```
 
 Next controlled candidate: retry `-c 65536 -np 8` with `--cache-type-k q8_0 --cache-type-v q8_0`, **only after confirming the binary accepts these flags**, and keep production launcher unchanged until load and inference are verified. KV quantization is a hypothesis to test, not yet a passing configuration.
+
+
+### 64K / eight slots with Q8 K/V — measured failure
+
+A controlled run with `-c 65536 -np 8 --cache-type-k q8_0 --cache-type-v q8_0` on the same single P100 failed. `READY: False` after 120.398 s of polling; server process PID 441850 aborted around 5.955 s during initialization. The multimodal projector loaded, followed by `ggml_cuda_compute_forward: PAD failed` and `CUDA error: out of memory` on device 0. After abort, GPU0 memory was 8 MiB used / 16263 MiB free. Log: `/tmp/huihui-64k-q8.log`. The cleanup trap restarted `grace-vision.service`, which reported `active`. Other GPU allocations stayed unchanged; no final independent 80B service health check was captured. This is **not** a passing 64K configuration. The 120-second polling loop did not exit early on child-process death; fix in future harnesses.
+
+**Decision:** Do not promote 64K Q8. Keep existing production settings pending a realistic 32K eight-slot inference/vision stability test and explicit approval for a launcher change.
