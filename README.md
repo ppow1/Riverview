@@ -1,6 +1,9 @@
 <!-- Version: 0.1.1 -->
 # Project Riverview
 
+> **CURRENT AI MODEL DEFAULTS / STARTUP:** [CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md](CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md) — read this first before changing models, GPU assignments, or services. Includes tested 32K/8-slot Huihui vision profile, 80B isolation, deployment-verification requirement, and [model registry](docs/model-evaluations/README.md).
+
+
 Project Riverview is the purposeful rebuild of the Estate's operational mechanism. The final environment is **The Estate at Riverview**, its core architecture is **The River**, and the first technical implementation is **Riverview Kernel v0.1**.
 
 The River is local-first, event-driven, durable, diagnostics-first, and designed to sustain momentum without making the Steward the routine router.
