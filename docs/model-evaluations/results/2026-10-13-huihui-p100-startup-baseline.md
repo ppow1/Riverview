@@ -1,12 +1,12 @@
 # OCTO1 Huihui 30B single-P100 startup baseline — 2026-10-13
 
-**Status:** Selected **verified text-generation performance baseline**, pending deployment/vision/context qualification. This is the reference for the fast launcher and persistent systemd service, **not proof that production was switched to 8 slots**.
+**Status:** Verified 8K and 32K startup on one P100; 64K/8-slot startup failed. Production change pending; long-context workload and vision qualification pending. This is the reference for the fast launcher and persistent systemd service, **not proof that production was switched to 8 slots**.
 
 ## Why this configuration
 
 The 2026-10-12 38-configuration campaign compared 19 GPU subsets with 4 and 8 slots. The single P100 had the fastest reported model readiness (~6–7 seconds) among tested subsets and leaves the 4090 and four other occupied GPUs available for other workers. The original single-P100 retest on 2026-10-12 reported 7.16 seconds (4 slots) and eight-way aggregate 110.655–143.018 generated tokens/sec (8 slots), zero request failures. On 2026-10-13 after correcting the cloned SSD's UUID and mount, the original retest script was rerun with production vision temporarily stopped; the model reached readiness in **7.333 s** (4 slots, process restart), **8.017 s** (4 slots, OS-cache warm) and **7.106 s** (8 slots), using the actual model files on /mnt/model-storage. The benchmark did **not** clear the OS page cache. GPU0 consumed ~13,714–13,746 MiB. The 80B worker was not intentionally stopped.
 
-**Context vs concurrency tradeoff:** `-c 8192 -np 8` means **8,192 total context tokens** divided among 8 parallel slots (~1,024 per slot when evenly allocated), **not 8K per client**. For longer individual contexts use the separately verified `-np 4` (~2,048 per slot). A true 8K context for each of eight simultaneous clients would require substantially larger total context, not qualified here. No 16K/32K single-P100 context claim is made.
+**Context vs concurrency tradeoff:** `-c 8192 -np 8` means **8,192 total context tokens** divided among 8 parallel slots (~1,024 per slot when evenly allocated), **not 8K per client**. For longer individual contexts use the separately verified `-np 4` (~2,048 per slot). A true 8K context for each of eight simultaneous clients would require substantially larger total context, not qualified here. On 2026-10-13, a dedicated **32K/8-slot** load test passed; 64K/8-slot failed. See addendum below.
 
 **Scope:** Synthetic text-only prompt, max 160 generated tokens/request; not yet qualified for actual images, accuracy, realistic multi-turn prompts, 16K/32K context, or cold storage read. The 2026-10-13 eight-slot concurrency run should be retained with its raw JSONL before citing new exact aggregate measurements.
 
@@ -46,3 +46,19 @@ exec /opt/llama.cpp/build-octo1-0.4.1-dev/bin/llama-server \
 - Production launcher's inspected paths and flags as of 2026-10-13: single P100, `-ngl all -c 8192 -np 4 --no-warmup`, port 18080.
 
 **Decision dated 2026-10-13:** Use eight-slot command above as the documented **fast/concurrency reference**; retain four-slot alternative for larger per-request context. Do not represent either as proven image-quality qualification.
+
+
+## 2026-10-13 context extension test — decisive update
+
+**Procedure:** Temporarily stop `grace-vision.service`; start exact Huihui IQ3_XS weights and Q8 projector on GPU UUID `GPU-ace423ce-ae61-803e-0734-a907283efe54`, port 18083, with `-ngl all -np 8 --no-warmup`; vary only `-c` between 32768 and 65536; restore production service on exit. 80B GPUs 2–5 remained allocated. Test was a **load/health/slot-allocation** test, not a long-prompt or vision benchmark.
+
+| Total context | Slots | Ready | Startup | Per-slot context | GPU0 used/free | Server log |
+|---|---:|---|---:|---:|---|---|
+| 32768 | 8 | **YES** | **5.908 s** | 4096 each (all eight reported) | 16022 / 248 MiB | `/tmp/huihui-context-32768.log` |
+| 65536 | 8 | **NO**, exit 1 | 5.670 s until observed exit | N/A | 8 / 16263 MiB after exit | `/tmp/huihui-context-65536.log` |
+
+**Interpretation:** 32K/8-slot startup is verified, leaving only 248 MiB free on the P100. 64K/8-slot startup fails; do not assert OOM until its log is inspected. 32K at 8 slots is a **candidate** persistent profile, but 8 concurrent long-context requests, sustained generation, actual images, and restart reliability are not yet tested. The earlier 8K/8-slot profile remains the proven concurrency-throughput baseline. `-c 32768` should **not** be substituted into the production launcher until load tests and operator approval.
+
+The 80B `systemctl is-active` command was malformed by a Windows CR (`llama-server.service\\x0d`); the resulting `inactive` line does not establish an 80B failure. The restored `grace-vision.service` reported `active`.
+
+**Next:** Read the 64K server log; optionally benchmark 32K/8-slot with real context and concurrency. If validated, promote it to the persistent service command and update this reference with measured results.
