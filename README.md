@@ -1,6 +1,8 @@
 <!-- Version: 0.1.1 -->
 # Project Riverview
 
+> **AI MODEL EXECUTIVE HANDOFF / CODEX:** [2026-10-13 runtime inventory and handoff](docs/handoffs/RIVERVIEW_AI_MODELS_EXECUTIVE_HANDOFF_2026-10-13.md) · [Grace Open Eyes Codex work order](docs/operations/GRACE_OPEN_EYES_CODEX_IMPLEMENTATION.md).
+
 > **CURRENT AI MODEL DEFAULTS / STARTUP:** [CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md](CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md) — read this first before changing models, GPU assignments, or services. Includes **deployed and verified** 32K/8-slot Huihui vision profile, 80B isolation, [Grace Open Eyes reload runbook](docs/operations/GRACE_OPEN_EYES_FAST_LOAD.md), and [model registry](docs/model-evaluations/README.md).
 
 
