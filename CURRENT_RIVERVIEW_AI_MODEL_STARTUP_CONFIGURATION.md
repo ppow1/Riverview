@@ -6,13 +6,13 @@
 
 | Role | Model / precision | GPU allocation | Service / port | Status |
 |---|---|---|---|---|
-| Grace vision / multimodal | Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated **i1-IQ3_XS**; mmproj **Q8_0** | GPU0 Tesla P100 16GB, UUID `GPU-ace423ce-ae61-803e-0734-a907283efe54` | `grace-vision.service`, `/usr/local/bin/grace-vision-fast`, `127.0.0.1:18080` | **Validated target:** `-c 32768 -np 8`; **deployment unconfirmed**. Last inspected production launcher: `-c 8192 -np 4`. |
+| Grace vision / multimodal | Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated **i1-IQ3_XS**; mmproj **Q8_0** | GPU0 Tesla P100 16GB, UUID `GPU-ace423ce-ae61-803e-0734-a907283efe54` | `grace-vision.service`, `/usr/local/bin/grace-vision-fast`, `127.0.0.1:18080` | **Validated target:** `-c 32768 -np 8`; **DEPLOYED AND VERIFIED 2026-10-13 10:13 local:** `-c 32768 -np 8`. |
 | Large text/reasoning worker | `/root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf` | GPUs 2–5, as observed in October 13 tests; inspect live placement before any change | `llama-server.service`, `127.0.0.1:8080` | Running during tests; **do not restart, reallocate, or modify** as part of vision changes |
 | Reserved / not part of vision worker | RTX 4090, GPU1 | GPU1 | — | Remained idle during validation; not a license to assign it elsewhere without separate decision |
 
 The machine's enumerated GPUs during the test: 0=P100, 1=RTX4090, 2=RTX3060Ti, 3–5=P100. GPU indices may change after hardware/driver changes: pin the vision worker by UUID and verify actual assignments.
 
-## Validated vision startup (target, NOT independently verified as deployed)
+## Validated vision startup (deployed and verified 2026-10-13)
 
 ```bash
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
@@ -49,13 +49,20 @@ curl -fsS http://127.0.0.1:18080/slots
 nvidia-smi --query-gpu=index,name,uuid,memory.used,memory.free --format=csv
 ```
 
-If `/slots` shows eight `n_ctx=4096` slots and health is OK, the running vision server matches the validated context profile. Verify launcher persistence separately. A documented rollout command was provided but **no deployment result was supplied** as of this update.
+If `/slots` shows eight `n_ctx=4096` slots and health is OK, the running vision server matches the validated context profile. Verify launcher persistence separately. **Deployment confirmed by operator output 2026-10-13:** backup `/usr/local/bin/grace-vision-fast.pre-32k-20261013-101303`; launcher changed to `-c 32768 -np 8`; `bash -n` passed; `grace-vision.service` restarted; `/health` returned `ok`; `/slots` reported eight `n_ctx=4096`; `PRODUCTION_32K_PASS: True`; both `grace-vision.service` and `llama-server.service` active; GPU0 16022 MiB used / 248 MiB free after restart.
 
 ## Source of truth / change discipline
 
 1. Read **this root file** and [model registry](docs/model-evaluations/README.md) first.
 2. Consult [October 12 GPU campaign](docs/model-evaluations/results/2026-10-12-qwen3-vl-30b-gpu-campaign.md), [single-P100 retest](docs/model-evaluations/results/2026-10-12-qwen3-vl-30b-single-p100-retest.md), and [October 13 detailed baseline and failure log summaries](docs/model-evaluations/results/2026-10-13-huihui-p100-startup-baseline.md).
 3. Preserve the 80B service and model/GPU allocation; back up launchers before edits, restart vision only, check service health and slots, and roll back on failure.
-4. When live production deployment is **confirmed**, update this file's status with actual command, slot output, date and host evidence. Do not silently rewrite measured results or imply that uncommitted raw host logs are archived in GitHub.
+4. Production deployment was confirmed on 2026-10-13 as above. Future changes must update this file with the actual command, slot output, date and host evidence. Do not silently rewrite measured results or imply that uncommitted raw host logs are archived in GitHub.
 
 **Raw-evidence caveat:** Some October 12 source archives and October 13 `/tmp` server logs are still on the host or were supplied in conversation, not committed as raw artifacts. GitHub records contain measured results and representative error excerpts, not every raw byte.
+
+
+## Grace 'Open Eyes' on-demand loading
+
+**Runbook:** [GRACE_OPEN_EYES_FAST_LOAD.md](docs/operations/GRACE_OPEN_EYES_FAST_LOAD.md). **Deployable script:** [scripts/grace-open-eyes.sh](scripts/grace-open-eyes.sh). This GitHub script is a version-controlled deployment artifact; it does **not** become installed on OCTO1 until copied there. The live systemd service and launcher are authoritative.
+
+For a permitted operator/service account after installing the script on OCTO1: `sudo /usr/local/sbin/grace-open-eyes`. The script is idempotent, checks the live launcher for the approved context/slot flags and GPU UUID, verifies GPU0 is free before starting an unloaded service, waits for health and eight 4096-token slots, and does not touch the 80B service. The existing running vision service is checked rather than restarted. **Grace must not claim eyes are open until the command succeeds.** GPU0 handoff must be authorized by the resource scheduler; the script does not seize another worker's GPU.
