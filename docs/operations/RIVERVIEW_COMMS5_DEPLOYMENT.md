@@ -1,5 +1,8 @@
 # Riverview Comms5 external deployment
 
+> **CURRENT CAMRUI/IONOGE CONNECTIONS (verified 2026-10-17):** Start with [Riverview machine connections and Comms5 recovery](RIVERVIEW_MACHINE_CONNECTIONS_AND_COMMS5_RECOVERY_2026-10-17.md). The Windows reverse-tunnel instructions below are historical and **not** the currently verified deployment. The active tunnel is the Camrui Ubuntu `riverview-comms5-tunnel.service` with a systemd host-key credential drop-in. Ionoge loopback `127.0.0.1:11826/healthz` returned HTTP 200 through the tunnel. Public Caddy/OAuth/MCP end-to-end status must be reverified separately.
+
+
 Comms5 has two distinct transports:
 
 - local STDIO: `python -m riverview.mcp.comms5_server`
