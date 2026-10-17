@@ -362,7 +362,7 @@ def comms5_revalidate_and_queue_work(
     protocol_version: str = CONTRACT_VERSION,
     correlation_id: str = "",
     classification: str = "river",
-    infrastructure_repair_evidence: list[str] = [],
+    infrastructure_repair_evidence: list[str] = (),  # type: ignore[assignment]
 ) -> Any:
     """Revalidate one stale approved base and queue one bounded successor.
 
@@ -395,13 +395,17 @@ def comms5_cancel_draft(
     client_id: str,
     client_type: str,
     client_name: str,
-    authenticated_principal: str,
+    authenticated_principal: Annotated[str, Field(description="Client-provided provenance only; Steward authority comes from authenticated transport.")],
+    ctx: Context,
     client_version: str = "",
     protocol_version: str = CONTRACT_VERSION,
     correlation_id: str = "",
     classification: str = "river",
 ) -> Any:
-    """Append-only cancel of a draft; never cancels an objective or work order."""
+    """Append-only cancel with transport-attested Steward authority.
+
+    The body principal is provenance only; it cannot authorize cancellation.
+    """
     return _invoke(service.cancel_draft, _request(
         seed_id=seed_id, reason=reason, idempotency_key=idempotency_key,
         explicit_steward_confirmation=explicit_steward_confirmation,
@@ -409,7 +413,7 @@ def comms5_cancel_draft(
         authenticated_principal=authenticated_principal, client_version=client_version,
         protocol_version=protocol_version, correlation_id=correlation_id,
         classification=classification,
-    ))
+    ), transport_principal=_transport_principal(ctx))
 
 
 @mcp.tool(title="Supersede draft with Steward confirmation", annotations=_GOVERNED_MUTATION_HINTS)
@@ -422,13 +426,17 @@ def comms5_supersede_seed(
     client_id: str,
     client_type: str,
     client_name: str,
-    authenticated_principal: str,
+    authenticated_principal: Annotated[str, Field(description="Client-provided provenance only; Steward authority comes from authenticated transport.")],
+    ctx: Context,
     client_version: str = "",
     protocol_version: str = CONTRACT_VERSION,
     correlation_id: str = "",
     classification: str = "river",
 ) -> Any:
-    """Append an old-draft-to-new-draft replacement relation."""
+    """Append a replacement relation with transport-attested Steward authority.
+
+    The body principal is provenance only; it cannot authorize supersession.
+    """
     return _invoke(service.supersede_seed, _request(
         seed_id=seed_id, replacement_seed_id=replacement_seed_id, reason=reason,
         idempotency_key=idempotency_key,
@@ -437,7 +445,7 @@ def comms5_supersede_seed(
         authenticated_principal=authenticated_principal, client_version=client_version,
         protocol_version=protocol_version, correlation_id=correlation_id,
         classification=classification,
-    ))
+    ), transport_principal=_transport_principal(ctx))
 
 
 @mcp._mcp_server.list_tools()
