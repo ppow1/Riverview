@@ -16,7 +16,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 import pytest
 
 from riverview.mcp.comms5_oauth import SCOPE, OAuthConfig, OAuthError, OAuthService
-from riverview.mcp.comms5_oauth_server import create_handler
+from riverview.mcp.comms5_oauth_server import COOKIE_NAME, create_handler
 from riverview.mcp.comms5_server import _list_tools_with_oauth_security_schemes
 
 STABLE_REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect"
@@ -249,7 +249,7 @@ def test_real_http_metadata_registration_and_forward_auth_boundary(tmp_path) -> 
         thread.join(timeout=2)
 
 
-def test_real_http_chatgpt_oauth_pkce_browser_exchange(tmp_path, monkeypatch) -> None:
+def test_real_http_chatgpt_oauth_pkce_browser_exchange(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("RIVERVIEW_COMMS5_CLIENT_SECRET", STEWARD_CREDENTIAL)
     monkeypatch.setenv("RIVERVIEW_COMMS5_OAUTH_PROXY_KEY", "test-caddy-proxy-key")
     service = OAuthService(OAuthConfig(ISSUER, RESOURCE, str(tmp_path / "oauth.sqlite3")))
@@ -314,10 +314,98 @@ def test_real_http_chatgpt_oauth_pkce_browser_exchange(tmp_path, monkeypatch) ->
         with urlopen(verified) as response:
             assert response.headers["X-Riverview-Comms5-Principal"] == "steward"
 
+        captured = capsys.readouterr().out
+        diagnostic = next(line for line in captured.splitlines() if "authorization_fields" in line)
+        assert diagnostic == (
+            "comms5-oauth authorization_fields transaction_present=True csrf_present=True "
+            "expected_credential_present=True transaction_cookie_parsed=True"
+        )
+        assert STEWARD_CREDENTIAL not in captured
+        assert transaction_cookie.split("=", 1)[1] not in captured
+        assert csrf_match.group(1) not in captured
+
         direct_authorize = Request(authorize_url)
         with pytest.raises(HTTPError) as denied:
             urlopen(direct_authorize)
         assert denied.value.code == 403
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_authorization_missing_transaction_and_csrf_are_diagnosed_without_values(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    monkeypatch.setenv("RIVERVIEW_COMMS5_CLIENT_SECRET", STEWARD_CREDENTIAL)
+    monkeypatch.setenv("RIVERVIEW_COMMS5_OAUTH_PROXY_KEY", "test-caddy-proxy-key")
+    service = OAuthService(OAuthConfig(ISSUER, RESOURCE, str(tmp_path / "oauth.sqlite3")))
+    client = service.register_client({"redirect_uris": [STABLE_REDIRECT]})
+    verifier = "m6FjZYXBh2kA3-4.wSTed8h0EgzXfK9rR1tYUQwP6Dc"
+    transaction, csrf, _ = service.begin_authorization({
+        "client_id": client["client_id"], "redirect_uri": STABLE_REDIRECT,
+        "response_type": "code", "state": "diagnostic-state",
+        "code_challenge": _challenge(verifier), "code_challenge_method": "S256",
+        "scope": SCOPE, "resource": RESOURCE,
+    })
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(service))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    class CaptureRedirect(HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    try:
+        root = f"http://127.0.0.1:{server.server_port}"
+        opener = build_opener(CaptureRedirect)
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Riverview-OAuth-Proxy-Key": "test-caddy-proxy-key",
+        }
+        missing_transaction = Request(
+            root + "/oauth/authorize", data=urlencode({"csrf": csrf}).encode(), headers=headers
+        )
+        with pytest.raises(HTTPError) as no_cookie:
+            urlopen(missing_transaction)
+        assert no_cookie.value.code == 503
+
+        cookie_header = {**headers, "Cookie": f"{COOKIE_NAME}={transaction}"}
+        missing_csrf = Request(
+            root + "/oauth/authorize", data=urlencode({}).encode(), headers=cookie_header
+        )
+        with pytest.raises(HTTPError) as no_csrf:
+            urlopen(missing_csrf)
+        assert no_csrf.value.code == 503
+
+        successful = Request(
+            root + "/oauth/authorize",
+            data=urlencode({"csrf": csrf, "credential": STEWARD_CREDENTIAL}).encode(),
+            headers=cookie_header,
+        )
+        with pytest.raises(HTTPError) as completed:
+            opener.open(successful)
+        assert completed.value.code == 302
+
+        lines = [line for line in capsys.readouterr().out.splitlines() if "authorization_fields" in line]
+        assert lines == [
+            (
+                "comms5-oauth authorization_fields transaction_present=False csrf_present=True "
+                "expected_credential_present=True transaction_cookie_parsed=False"
+            ),
+            (
+                "comms5-oauth authorization_fields transaction_present=True csrf_present=False "
+                "expected_credential_present=True transaction_cookie_parsed=True"
+            ),
+            (
+                "comms5-oauth authorization_fields transaction_present=True csrf_present=True "
+                "expected_credential_present=True transaction_cookie_parsed=True"
+            ),
+        ]
+        output = "\n".join(lines)
+        assert transaction not in output
+        assert csrf not in output
+        assert STEWARD_CREDENTIAL not in output
     finally:
         server.shutdown()
         server.server_close()
