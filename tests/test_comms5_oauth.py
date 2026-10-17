@@ -281,7 +281,19 @@ def test_real_http_chatgpt_oauth_pkce_browser_exchange(tmp_path, monkeypatch, ca
         authorize = Request(authorize_url, headers={"X-Riverview-OAuth-Proxy-Key": "test-caddy-proxy-key"})
         with urlopen(authorize) as response:
             page = response.read().decode()
+            cookie_header_value = response.headers["Set-Cookie"]
             transaction_cookie = response.headers["Set-Cookie"].split(";", 1)[0]
+            csp = response.headers["Content-Security-Policy"]
+        assert f'action="{ISSUER}/oauth/authorize"' in page
+        assert csp == (
+            "default-src 'none'; form-action https://riverview-comms.ionoge.com; "
+            "base-uri 'none'; frame-ancestors 'none'"
+        )
+        assert "Path=/oauth/authorize" in cookie_header_value
+        assert "Max-Age=600" in cookie_header_value
+        assert "Secure" in cookie_header_value
+        assert "HttpOnly" in cookie_header_value
+        assert "SameSite=None" in cookie_header_value
         csrf_match = re.search(r'name="csrf" value="([A-Za-z0-9_-]+)"', page)
         assert csrf_match is not None
         login = Request(
@@ -291,6 +303,7 @@ def test_real_http_chatgpt_oauth_pkce_browser_exchange(tmp_path, monkeypatch, ca
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Cookie": transaction_cookie,
                 "X-Riverview-OAuth-Proxy-Key": "test-caddy-proxy-key",
+                "Origin": "https://chatgpt.com",
             },
         )
         with pytest.raises(HTTPError) as redirect:

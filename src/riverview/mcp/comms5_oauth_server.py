@@ -138,8 +138,12 @@ def create_handler(service: OAuthService) -> type[BaseHTTPRequestHandler]:
                     self._error(exc)
                     return
                 headers = {
-                    "Set-Cookie": f"{COOKIE_NAME}={transaction}; Path=/oauth/authorize; Max-Age=600; Secure; HttpOnly; SameSite=Lax",
-                    "Content-Security-Policy": "default-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+                    "Set-Cookie": f"{COOKIE_NAME}={transaction}; Path=/oauth/authorize; Max-Age=600; Secure; HttpOnly; SameSite=None",
+                    "Content-Security-Policy": (
+                        "default-src 'none'; form-action "
+                        f"{urlsplit(service.config.issuer).scheme}://{urlsplit(service.config.issuer).netloc}; "
+                        "base-uri 'none'; frame-ancestors 'none'"
+                    ),
                 }
                 self._send(200, page.encode(), "text/html; charset=utf-8", headers)
                 return
