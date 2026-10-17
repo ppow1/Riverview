@@ -61,6 +61,7 @@ digraph riverview {
   "operator_service" [label="Operator service 127.0.0.1:18082"];
   "spatial_service" [label="Spatial service 192.168.1.88:18443 (deferred/experimental)"];
   "comms5_http_service" [label="Comms5 loopback Streamable HTTP 127.0.0.1:11826"];
+  "comms5_oauth_service" [label="Comms5 OAuth loopback issuer 127.0.0.1:11827"];
   "comms5_external_route" [label="Approved Caddy route /comms5/mcp (deployment boundary)"];
   "external_ai_clients" [label="Authorized external AI clients"];
   "comms4" [label="Riverview Comms4 (legacy versioned surface)"];
@@ -222,6 +223,9 @@ digraph riverview {
   "comms5" -> "cme_status_projection" [label="reads bounded CME status projection"];
   "comms5_http_service" -> "comms5" [label="hosts versioned MCP tools"];
   "comms5_external_route" -> "comms5_http_service" [label="authenticated HTTPS reverse proxy to loopback"];
+  "comms5_external_route" -> "comms5_oauth_service" [label="serves OAuth discovery and authorization through Caddy"];
+  "comms5_external_route" -> "comms5_oauth_service" [label="validates OAuth bearer before injecting Steward transport principal"];
+  "comms5_oauth_service" -> "comms5" [label="maps existing Steward credential proof to Comms5 principal; tool policy remains authoritative"];
   "external_ai_clients" -> "comms5_external_route" [label="connects through approved public MCP URL"];
   "comms4" -> "river" [label="legacy bounded Comms4 reads and seed draft"];
   "comms5" -> "comms4" [label="versioned migration guidance only"];
