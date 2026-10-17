@@ -266,7 +266,7 @@ class OAuthService:
             "<!doctype html><html><head><meta charset=\"utf-8\"><title>Riverview Comms5 authorization</title></head>"
             "<body><main><h1>Connect Riverview Comms5</h1>"
             "<p>Enter the existing Steward-controlled Comms5 connector credential to authorize this connection.</p>"
-            "<form method=\"post\" action=\"/oauth/authorize\">"
+            f"<form method=\"post\" action=\"{html.escape(self.config.issuer + '/oauth/authorize', quote=True)}\">"
             f"<input type=\"hidden\" name=\"csrf\" value=\"{html.escape(csrf, quote=True)}\">"
             "<label for=\"credential\">Steward credential</label>"
             "<input id=\"credential\" name=\"credential\" type=\"password\" autocomplete=\"current-password\" required>"

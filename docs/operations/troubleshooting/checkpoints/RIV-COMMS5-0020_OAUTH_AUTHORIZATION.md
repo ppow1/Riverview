@@ -37,6 +37,17 @@ no trusted Steward principal after the OAuth rollout.
    endpoint. Verify a governed write only with an already-authorized operation
    and its existing explicit confirmation contract.
 
+8. If Chrome blocks the Steward form with a `form-action 'self'` violation,
+   inspect the generated form action, the final document URL/origin, and all
+   response CSP headers. A `self` source is evaluated against the document's
+   effective origin (which may be opaque in an embedded authorization view),
+   not the server that generated the HTML. The form must post to the absolute
+   configured issuer endpoint and the CSP must allow only that issuer origin.
+   For cross-origin authorization POSTs, the short-lived transaction cookie
+   must retain `Secure` and `HttpOnly` and use `SameSite=None`; the server must
+   continue requiring both the transaction cookie and CSRF form token. Do not
+   disable CSP or remove the CSRF comparison.
+
 Never print bearer tokens, OAuth codes, cookie values, client secrets, submitted
 MCP bodies, or private tool results to logs or evidence.
 
