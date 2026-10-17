@@ -184,11 +184,22 @@ def create_handler(service: OAuthService) -> type[BaseHTTPRequestHandler]:
                         return
                     form = parse_oauth_form(raw, content_type)
                     cookie = SimpleCookie(self.headers.get("Cookie", ""))
-                    transaction = cookie.get(COOKIE_NAME).value if cookie.get(COOKIE_NAME) else ""
+                    transaction_cookie = cookie.get(COOKIE_NAME)
+                    transaction_cookie_parsed = transaction_cookie is not None
+                    transaction = transaction_cookie.value if transaction_cookie_parsed else ""
                     expected, _ = trusted
+                    csrf = form.get("csrf", "")
+                    print(
+                        "comms5-oauth authorization_fields "
+                        f"transaction_present={bool(transaction)} "
+                        f"csrf_present={bool(csrf)} "
+                        f"expected_credential_present={bool(expected)} "
+                        f"transaction_cookie_parsed={transaction_cookie_parsed}",
+                        flush=True,
+                    )
                     try:
                         location, _ = service.complete_authorization(
-                            transaction, form.get("csrf", ""), form.get("credential", ""), expected
+                            transaction, csrf, form.get("credential", ""), expected
                         )
                     except OAuthError as exc:
                         page = (
