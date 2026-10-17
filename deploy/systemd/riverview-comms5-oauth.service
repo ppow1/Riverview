@@ -1,0 +1,37 @@
+[Unit]
+Description=Riverview Comms5 OAuth Authorization Service
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=true
+WorkingDirectory=/opt/riverview-comms5-oauth/current
+Environment=PYTHONPATH=/opt/riverview-comms5-oauth/current/src
+Environment=RIVERVIEW_COMMS5_OAUTH_HOST=127.0.0.1
+Environment=RIVERVIEW_COMMS5_OAUTH_PORT=11827
+Environment=RIVERVIEW_COMMS5_OAUTH_ISSUER=https://riverview-comms.ionoge.com
+Environment=RIVERVIEW_COMMS5_OAUTH_RESOURCE=https://riverview-comms.ionoge.com/comms5/mcp
+Environment=RIVERVIEW_COMMS5_OAUTH_DATABASE=/var/lib/riverview-comms5-oauth/oauth.sqlite3
+# This OAuth-only protected file contains the existing Comms5 login credential
+# and the shared proxy-hop key. Caddy loads the proxy key through its existing
+# protected environment source; do not copy the upstream service credential
+# into this file.
+EnvironmentFile=/etc/riverview/comms5-oauth.env
+StateDirectory=riverview-comms5-oauth
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 -m riverview.mcp.comms5_oauth_server
+Restart=on-failure
+RestartSec=2s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

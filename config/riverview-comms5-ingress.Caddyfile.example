@@ -1,33 +1,72 @@
-# Riverview Comms5 external ingress.
-# Add this route beside the unchanged Riverview Comms4 route on the approved
-# Caddy host. Keep both bearer values in the Caddy service environment.
+# Riverview Comms5 OAuth-compatible ingress.
+# Keep the existing Comms4 route unchanged. The OAuth authorization service is
+# loopback-only on Ionoge :11827; the existing Comms5 backend remains reachable
+# through the approved loopback reverse tunnel on :11826.
 
 riverview-comms.ionoge.com {
-    @comms5 {
-        path /comms5/mcp
-        method GET POST OPTIONS DELETE
-    }
+	@comms5_oauth_authorize path /oauth/authorize
+	handle @comms5_oauth_authorize {
+		reverse_proxy 127.0.0.1:11827 {
+			# Reuse the existing Steward-controlled Comms5 credential only as
+			# the login verifier. It is never sent to Camrui or logged. The
+			# separate proxy key authenticates this loopback hop to the OAuth app.
+			header_up X-Riverview-OAuth-Proxy-Key {env.RIVERVIEW_COMMS5_OAUTH_PROXY_KEY}
+		}
+	}
 
-    handle @comms5 {
-        @authorized header Authorization "Bearer {env.RIVERVIEW_COMMS5_CLIENT_SECRET}"
-        handle @authorized {
-            uri replace /comms5/mcp /mcp
-            request_body {
-                max_size 256KB
-            }
-            reverse_proxy 127.0.0.1:11826 {
-                header_up Authorization "Bearer {env.RIVERVIEW_COMMS5_UPSTREAM_AUTH}"
-                header_up X-Riverview-Comms5 1
-                # This marker is injected only after the authenticated
-                # Steward-controlled Comms5 connector bearer is accepted.
-                header_up X-Riverview-Comms5-Principal steward
-                header_up Host 127.0.0.1:11826
-                transport http {
-                    read_timeout 20s
-                    write_timeout 20s
-                }
-            }
-        }
-        respond "unauthorized" 401
-    }
+	@comms5_oauth_public path /.well-known/oauth-protected-resource /.well-known/oauth-authorization-server /oauth/register /oauth/token /oauth/revoke
+	handle @comms5_oauth_public {
+		reverse_proxy 127.0.0.1:11827
+	}
+
+	@comms5 {
+		path /comms5/mcp
+		method GET POST OPTIONS DELETE
+	}
+
+	handle @comms5 {
+		@authorized header Authorization "Bearer {env.RIVERVIEW_COMMS5_CLIENT_SECRET}"
+		handle @authorized {
+			uri replace /comms5/mcp /mcp
+			request_body {
+				max_size 256KB
+			}
+			reverse_proxy 127.0.0.1:11826 {
+				header_up Authorization "Bearer {env.RIVERVIEW_COMMS5_UPSTREAM_AUTH}"
+				header_up X-Riverview-Comms5 1
+				# This marker is injected only after the authenticated
+				# Steward-controlled Comms5 connector bearer is accepted.
+				header_up X-Riverview-Comms5-Principal steward
+				header_up Host 127.0.0.1:11826
+				transport http {
+					read_timeout 20s
+					write_timeout 20s
+				}
+			}
+		}
+		handle {
+			# Validates the OAuth bearer at the existing local OAuth service.
+			# /oauth/verify is intentionally not in the public path matcher above.
+			forward_auth 127.0.0.1:11827 {
+				uri /oauth/verify
+			}
+			uri replace /comms5/mcp /mcp
+			request_body {
+				max_size 256KB
+			}
+			reverse_proxy 127.0.0.1:11826 {
+				header_up Authorization "Bearer {env.RIVERVIEW_COMMS5_UPSTREAM_AUTH}"
+				# Caddy injects this only after OAuth validation succeeds.
+				header_up -X-Riverview-Comms5
+				header_up -X-Riverview-Comms5-Principal
+				header_up X-Riverview-Comms5 1
+				header_up X-Riverview-Comms5-Principal steward
+				header_up Host 127.0.0.1:11826
+				transport http {
+					read_timeout 20s
+					write_timeout 20s
+				}
+			}
+		}
+	}
 }

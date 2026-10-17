@@ -13,7 +13,7 @@ CHECKPOINTS = (
     "RIV-EXE-0001", "RIV-EXE-0003", "RIV-NOT-0001", "RIV-MCP-0006",
     "RIV-ARCH-0001", "RIV-INF-0001", "RIV-SPAT-0004", "RIV-GRC-0008",
     "RIV-COMMS5-0001", "RIV-COMMS5-0002", "RIV-COMMS5-0007", "RIV-COMMS5-0008",
-    "RIV-COMMS5-0009", "RIV-COMMS5-0010", "RIV-COMMS5-0011", "RIV-COMMS5-0012", "RIV-COMMS5-0013", "RIV-COMMS5-0014", "RIV-COMMS5-0015", "RIV-COMMS5-0016", "RIV-RUN-0001",
+    "RIV-COMMS5-0009", "RIV-COMMS5-0010", "RIV-COMMS5-0011", "RIV-COMMS5-0012", "RIV-COMMS5-0013", "RIV-COMMS5-0014", "RIV-COMMS5-0015", "RIV-COMMS5-0016", "RIV-COMMS5-0020", "RIV-RUN-0001",
 )
 
 VIEW_NAMES = {
@@ -54,6 +54,7 @@ CORE_NODES = (
     ("postgres_service", "PostgreSQL service", "service"), ("windows_lifecycle", "Windows Riverview lifecycle boundary", "service"), ("runtime_supervisor", "Unified Riverview runtime supervisor", "service"), ("operator_service", "Operator service 127.0.0.1:18082", "service"),
     ("spatial_service", "Spatial service 192.168.1.88:18443 (deferred/experimental)", "service"),
     ("comms5_http_service", "Comms5 loopback Streamable HTTP 127.0.0.1:11826", "service"),
+    ("comms5_oauth_service", "Comms5 OAuth loopback issuer 127.0.0.1:11827", "service"),
     ("comms5_external_route", "Approved Caddy route /comms5/mcp (deployment boundary)", "service"),
     ("external_ai_clients", "Authorized external AI clients", "external"),
     ("comms4", "Riverview Comms4 (legacy versioned surface)", "module"),
@@ -223,6 +224,9 @@ def build_graph(manifest_dir: Path) -> dict[str, Any]:
     add_edge("comms5", "cme_status_projection", "reads bounded CME status projection", "mcp/comms5.py:cme_status", views=comms + context)
     add_edge("comms5_http_service", "comms5", "hosts versioned MCP tools", "mcp/comms5_http_server.py", views=services + comms)
     add_edge("comms5_external_route", "comms5_http_service", "authenticated HTTPS reverse proxy to loopback", "config/riverview-comms5-ingress.Caddyfile.example", views=services + comms, checkpoint="RIV-COMMS5-0012")
+    add_edge("comms5_external_route", "comms5_oauth_service", "serves OAuth discovery and authorization through Caddy", "config/riverview-comms5-ingress.Caddyfile.example", views=services + comms, checkpoint="RIV-COMMS5-0020")
+    add_edge("comms5_external_route", "comms5_oauth_service", "validates OAuth bearer before injecting Steward transport principal", "config/riverview-comms5-ingress.Caddyfile.example:forward_auth", views=services + comms, checkpoint="RIV-COMMS5-0020")
+    add_edge("comms5_oauth_service", "comms5", "maps existing Steward credential proof to Comms5 principal; tool policy remains authoritative", "mcp/comms5_oauth.py", views=comms + context, checkpoint="RIV-COMMS5-0020")
     add_edge("external_ai_clients", "comms5_external_route", "connects through approved public MCP URL", "config/riverview-comms5.example.json", views=comms + services, checkpoint="RIV-COMMS5-0012")
     add_edge("comms4", "river", "legacy bounded Comms4 reads and seed draft", "mcp/server.py", views=comms + context)
     add_edge("comms5", "comms4", "versioned migration guidance only", "mcp/comms5.py:contract_info", views=modules, manual=True)

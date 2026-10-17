@@ -44,6 +44,7 @@
     "RIV-COMMS5-0014",
     "RIV-COMMS5-0015",
     "RIV-COMMS5-0016",
+    "RIV-COMMS5-0020",
     "RIV-RUN-0001"
   ],
   "edges": [
@@ -1476,6 +1477,47 @@
         "context",
         "comms",
         "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0020",
+      "derivation": "DERIVED",
+      "relation": "serves OAuth discovery and authorization through Caddy",
+      "source": "comms5_external_route",
+      "source_ref": "config/riverview-comms5-ingress.Caddyfile.example",
+      "target": "comms5_oauth_service",
+      "views": [
+        "services",
+        "context",
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0020",
+      "derivation": "DERIVED",
+      "relation": "validates OAuth bearer before injecting Steward transport principal",
+      "source": "comms5_external_route",
+      "source_ref": "config/riverview-comms5-ingress.Caddyfile.example:forward_auth",
+      "target": "comms5_oauth_service",
+      "views": [
+        "services",
+        "context",
+        "comms",
+        "events"
+      ]
+    },
+    {
+      "checkpoint": "RIV-COMMS5-0020",
+      "derivation": "DERIVED",
+      "relation": "maps existing Steward credential proof to Comms5 principal; tool policy remains authoritative",
+      "source": "comms5_oauth_service",
+      "source_ref": "mcp/comms5_oauth.py",
+      "target": "comms5",
+      "views": [
+        "comms",
+        "events",
+        "context"
       ]
     },
     {
@@ -3164,6 +3206,13 @@
       "id": "comms5_http_service",
       "kind": "service",
       "label": "Comms5 loopback Streamable HTTP 127.0.0.1:11826",
+      "source": "src/riverview/topology/graph.py:CORE_NODES",
+      "views": []
+    },
+    {
+      "id": "comms5_oauth_service",
+      "kind": "service",
+      "label": "Comms5 OAuth loopback issuer 127.0.0.1:11827",
       "source": "src/riverview/topology/graph.py:CORE_NODES",
       "views": []
     },

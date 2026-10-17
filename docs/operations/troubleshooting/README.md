@@ -74,6 +74,7 @@ No capability is operationally complete until a new AI conversation can identify
 - `RIV-COMMS-0001` - Riverview Comms connection boundary
 - `RIV-COMMS-0002` - Riverview Comms service runtime
 - `RIV-COMMS-0003` - HTTPS ingress, bearer authentication, and ChatGPT registration
+- `RIV-COMMS5-0020` - ChatGPT OAuth authorization, token validation, and Comms5 principal mapping
 - `RIV-PLY-0001` - bounded doorbell contract
 - `RIV-PLY-0002` - browser and doorbell end-to-end boundary
 - `RIV-MCP-0009` - full-loop mailbox and bounded reasoning response

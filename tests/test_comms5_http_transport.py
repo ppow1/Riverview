@@ -24,5 +24,9 @@ def test_comms5_proxy_template_does_not_change_comms4_route() -> None:
     assert "path /comms5/mcp" in template
     assert "uri replace /comms5/mcp /mcp" in template
     assert "127.0.0.1:11826" in template
+    assert "127.0.0.1:11827" in template
     assert "RIVERVIEW_COMMS5_CLIENT_SECRET" in template
+    assert "forward_auth 127.0.0.1:11827" in template
+    assert "uri /oauth/verify" in template
+    assert "/oauth/verify" not in template.split("@comms5_oauth_public path", 1)[1].split("handle @comms5_oauth_public", 1)[0]
     assert "path /mcp" not in template

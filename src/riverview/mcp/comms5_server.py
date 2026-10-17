@@ -51,6 +51,16 @@ class FormationContractInput(BaseModel):
     write_policy: str = ""
 
 
+class ResourcePolicyParameters(BaseModel):
+    """Closed schema for the existing resource-policy parameter contract."""
+
+    model_config = ConfigDict(extra="forbid")
+    target_seat: str = ""
+    priority_order: list[str] = Field(default_factory=list)
+    fallback: bool = True
+    consume_reset: bool = False
+
+
 _EMPTY_FORMATION_CONTRACT = FormationContractInput()
 
 
@@ -231,16 +241,19 @@ def comms5_resource_policy_status() -> Any:
 @mcp.tool(title="Set resource policy", annotations=_GOVERNED_MUTATION_HINTS)
 def comms5_set_resource_policy(
     mode: str,
-    parameters: dict[str, Any],
+    parameters: ResourcePolicyParameters,
     explicit_steward_confirmation: bool,
     ctx: Context,
     rationale: str = "",
-    expected_revision: int | None = None,
+    expected_revision: int = -1,
 ) -> Any:
     """Set policy only from authenticated Steward transport attestation."""
+    parameters_value = parameters.model_dump(exclude_unset=True)
+    if parameters_value.get("target_seat") == "":
+        parameters_value.pop("target_seat")
     return _invoke(
         service.set_resource_policy,
-        {"mode": mode, "parameters": parameters, "explicit_steward_confirmation": explicit_steward_confirmation, "rationale": rationale, "expected_revision": expected_revision, "source_request_id": _server_request_id(ctx)},
+        {"mode": mode, "parameters": parameters_value, "explicit_steward_confirmation": explicit_steward_confirmation, "rationale": rationale, "expected_revision": None if expected_revision == -1 else expected_revision, "source_request_id": _server_request_id(ctx)},
         transport_principal=_transport_principal(ctx),
     )
 
@@ -425,6 +438,17 @@ def comms5_supersede_seed(
         protocol_version=protocol_version, correlation_id=correlation_id,
         classification=classification,
     ))
+
+
+@mcp._mcp_server.list_tools()
+async def _list_tools_with_oauth_security_schemes() -> list[Any]:
+    """Advertise the OAuth requirement on every authenticated Comms5 tool."""
+    tools = await mcp.list_tools()
+    for tool in tools:
+        # OpenAI's ChatGPT extension currently consumes this top-level field;
+        # MCP's Pydantic Tool model permits protocol extensions.
+        tool.securitySchemes = [{"type": "oauth2", "scopes": ["comms5"]}]
+    return tools
 
 
 def main() -> None:
