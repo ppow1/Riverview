@@ -1,5 +1,9 @@
 # Riverview machine connections and Comms5 recovery — 2026-10-17
 
+**File Revision:** 1.0.1
+**Updated:** 2026-10-17 — record Windows alias acceptance and the Camrui-hosted Codex execution environment.
+**Predecessor SHA-256:** `33233bf090374ca694eec00bb3becc3fd1b0658f35d97a7b07697fcbcea834d9`
+
 **Start here for machine access, Ionoge, Camrui, Comms5 SSH reverse tunnel, and related troubleshooting.** Evidence status is explicit: **VERIFIED** means observed in operator-provided output on 2026-10-17; **DOCUMENTED** means inherited from an existing repository runbook; **CHECK LIVE** means not independently reverified in this commissioning session.
 
 ## Machine and access inventory
@@ -7,10 +11,44 @@
 | Machine / function | Address or name | Access / alias | Evidence and notes |
 |---|---|---|---|
 | Windows development workstation | `DESKTOP-JA3RPNQ` | Windows PowerShell; SSH client | DOCUMENTED in project history. The operator's working shell is `A:\Riverview`. SSH config and keys are local, not stored in Git. |
-| Camrui Ubuntu — resident Grace / Riverview core / Comms5 backend | `192.168.1.155` | From Windows: `ssh camrui`; Linux account `admin1` | VERIFIED alias and Comms5 service access in operator session. Repository checkout: `/home/admin1/projects/Riverview-New-Core`. |
+| Camrui Ubuntu — resident Grace / Riverview core / Comms5 backend | `192.168.1.155` | From Windows: `ssh camrui`; Linux account `admin1` | VERIFIED 2026-10-17: headless Windows alias command returned hostname `admin1-Default-string`, account `admin1`, `/home/admin1`, exit code 0. Repository checkout: `/home/admin1/projects/Riverview-New-Core`. |
 | Ionoge DigitalOcean VPS — public ingress | `64.227.21.54`; `ionoge-control-01` | From Windows: `ssh root@64.227.21.54` | VERIFIED SSH and Comms5 reverse-tunnel endpoint. Public DNS name: `riverview-comms.ionoge.com`. |
 | OctoMiner inference host, referred to as OCTOMINER1 in WOL runbook | `192.168.1.160` | `ssh root@192.168.1.160`; Windows alias `octo1` in recent operations | DOCUMENTED in `docs/operations/octominer/OCTOMINER_REMOTE_POWER_AND_WOL.md` and `CURRENT_RIVERVIEW_AI_MODEL_STARTUP_CONFIGURATION.md`. **Naming warning:** the model guide calls its target “OCTOMINER2 / SSH alias octo1”; confirm hostname and GPU identity live, not from labels alone. |
 | Other OctoMiner | Address not established by this document | Windows alias `octo2` appears in OctoMiner runbook | CHECK LIVE: run `ssh octo2 hostname; ip -br addr` before recording a fixed address or changing service settings. |
+
+## Verified SSH path and Codex execution environment — 2026-10-17
+
+The Steward verified unattended access from Windows PowerShell using the existing alias and existing Windows-managed SSH identity:
+
+```powershell
+ssh.exe -o BatchMode=yes camrui "hostname; whoami; pwd"
+```
+
+Observed Windows output:
+
+```text
+admin1-Default-string
+admin1
+/home/admin1
+ExitCode: 0
+```
+
+The alias is configured on the Windows development workstation, documented as `C:\Users\wille\.ssh\config`. The private key remains on that workstation and was neither read nor copied by the Codex Linux process. The verified output did not include the exact `IdentityFile` setting; inspect it only on Windows with `ssh.exe -G camrui` if the filename is operationally needed. Treat the Windows configuration as the source of truth.
+
+The Codex execution environment for this session is not a separate Windows client: it is a Linux shell on Camrui itself. Independent local observations on 2026-10-17 showed hostname `admin1-Default-string`, user `admin1`, `/home/admin1`, `eno1` configured with `192.168.1.155/24`, and systemd running. Therefore engineering commands in this session use Camrui's local shell and checkout; they do not depend on importing or reusing the Windows SSH identity.
+
+### Earlier alias failure and diagnosis
+
+An earlier attempt to run `ssh -o BatchMode=yes camrui ...` inside a Linux execution context returned `Could not resolve hostname camrui: Temporary failure in name resolution`. That is a client-side name-resolution/configuration failure before SSH authentication; it is not evidence that Camrui's SSH daemon is down or that the Windows key was rejected. In that Linux context, `ssh -G camrui` showed no matching `~/.ssh/config` stanza and left the hostname as the literal alias `camrui`.
+
+Distinguish the failure classes:
+
+- `Could not resolve hostname`: the current client's alias/DNS mapping did not resolve; inspect that client's effective configuration and name resolution.
+- `Connection timed out` or `Connection refused`: the name/address resolved, but network reachability or the target listener failed.
+- `Permission denied (publickey)`: the SSH connection reached an SSH server, but the offered identity was not accepted. Inspect the client's effective identity selection and server authorization only after verifying the target host.
+- Windows `ssh.exe -o BatchMode=yes camrui ...` returning the observed host/account/path with exit code 0: unattended Windows alias access is verified.
+
+Do not repair Camrui SSH based on a missing alias in a separate Linux client, and do not copy the Windows private key into that client. Preserve both access paths: the Windows alias for remote operator access and the Camrui-local shell for this host's Codex execution.
 
 **Security boundary:** these are operational identifiers, not credentials. Never commit private keys, OAuth client secrets, bearer tokens, access tokens, passwords, or the contents of `/etc/riverview/comms5/ionoge-tunnel`.
 
