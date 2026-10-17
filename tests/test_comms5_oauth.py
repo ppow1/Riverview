@@ -286,9 +286,10 @@ def test_real_http_chatgpt_oauth_pkce_browser_exchange(tmp_path, monkeypatch, ca
             csp = response.headers["Content-Security-Policy"]
         assert f'action="{ISSUER}/oauth/authorize"' in page
         assert csp == (
-            "default-src 'none'; form-action https://riverview-comms.ionoge.com; "
+            "default-src 'none'; form-action https://riverview-comms.ionoge.com https://chatgpt.com; "
             "base-uri 'none'; frame-ancestors 'none'"
         )
+        assert "*" not in csp
         assert "Path=/oauth/authorize" in cookie_header_value
         assert "Max-Age=600" in cookie_header_value
         assert "Secure" in cookie_header_value
@@ -309,7 +310,12 @@ def test_real_http_chatgpt_oauth_pkce_browser_exchange(tmp_path, monkeypatch, ca
         with pytest.raises(HTTPError) as redirect:
             opener.open(login)
         assert redirect.value.code == 302
+        assert redirect.value.headers["Location"].startswith(
+            "https://chatgpt.com/connector_platform_oauth_redirect?"
+        )
         callback = parse_qs(urlsplit(redirect.value.headers["Location"]).query)
+        assert urlsplit(redirect.value.headers["Location"]).netloc == "chatgpt.com"
+        assert urlsplit(redirect.value.headers["Location"]).path == "/connector_platform_oauth_redirect"
         assert callback["state"] == [state]
         assert callback["iss"] == [ISSUER]
         token_request = Request(

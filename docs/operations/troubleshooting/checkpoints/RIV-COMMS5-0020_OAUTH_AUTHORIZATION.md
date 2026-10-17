@@ -37,12 +37,15 @@ no trusted Steward principal after the OAuth rollout.
    endpoint. Verify a governed write only with an already-authorized operation
    and its existing explicit confirmation contract.
 
-8. If Chrome blocks the Steward form with a `form-action 'self'` violation,
-   inspect the generated form action, the final document URL/origin, and all
-   response CSP headers. A `self` source is evaluated against the document's
-   effective origin (which may be opaque in an embedded authorization view),
-   not the server that generated the HTML. The form must post to the absolute
-   configured issuer endpoint and the CSP must allow only that issuer origin.
+8. If Chrome blocks the Steward authorization form with a `form-action`
+   violation, inspect the generated form action, final document URL/origin, all
+   response CSP headers, and any POST redirect destination. A `self` source is
+   evaluated against the document's effective origin (which may be opaque in
+   an embedded authorization view), not the server that generated the HTML.
+   The form must post to the absolute configured issuer endpoint. The CSP must
+   permit that issuer and only the ChatGPT origin allowed by the registered
+   callback URI rules: Chrome can enforce `form-action` against the callback
+   redirect after the POST. Do not add origins from arbitrary client metadata.
    For cross-origin authorization POSTs, the short-lived transaction cookie
    must retain `Secure` and `HttpOnly` and use `SameSite=None`; the server must
    continue requiring both the transaction cookie and CSRF form token. Do not

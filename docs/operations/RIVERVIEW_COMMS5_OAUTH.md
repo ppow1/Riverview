@@ -49,13 +49,15 @@ resident, grant, work-order authority, or tool restriction.
   `https://chatgpt.com/connector/oauth/{callback_id}`
 
 The authorization form posts to the absolute issuer authorization endpoint.
-Its CSP permits form submission only to the issuer origin, rather than relying
-on the browser document's effective `'self'` origin. The short-lived
-transaction cookie is `Secure`, `HttpOnly`, and `SameSite=None` so the
-authorization POST can carry the transaction when ChatGPT hosts the page in a
-cross-origin or opaque-origin context. The random transaction cookie and
-hidden CSRF token remain independently checked before credential validation;
-these browser-compatibility settings do not relax either check.
+Its CSP permits only the issuer origin and the ChatGPT origin already required
+by the registered callback URI rules. Chrome may apply `form-action` to the
+destination of the successful POST's 302 redirect as well as to the form's
+initial target. The short-lived transaction cookie is `Secure`, `HttpOnly`, and
+`SameSite=None` so the authorization POST can carry the transaction when
+ChatGPT hosts the page in a cross-origin or opaque-origin context. The random
+transaction cookie and hidden CSRF token remain independently checked before
+credential validation; these browser-compatibility settings do not relax
+either check.
 
 Every Comms5 tool advertises ChatGPT's OAuth `securitySchemes` metadata for the
 `comms5` scope. The issuer advertises RFC 9207 issuer identification and returns `iss` in
