@@ -137,11 +137,13 @@ def create_handler(service: OAuthService) -> type[BaseHTTPRequestHandler]:
                         return
                     self._error(exc)
                     return
+                issuer = urlsplit(service.config.issuer)
+                callback = urlsplit(service.config.stable_redirect_uri)
                 headers = {
                     "Set-Cookie": f"{COOKIE_NAME}={transaction}; Path=/oauth/authorize; Max-Age=600; Secure; HttpOnly; SameSite=None",
                     "Content-Security-Policy": (
                         "default-src 'none'; form-action "
-                        f"{urlsplit(service.config.issuer).scheme}://{urlsplit(service.config.issuer).netloc}; "
+                        f"{issuer.scheme}://{issuer.netloc} {callback.scheme}://{callback.netloc}; "
                         "base-uri 'none'; frame-ancestors 'none'"
                     ),
                 }
