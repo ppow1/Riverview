@@ -22,9 +22,10 @@ confirmation fields, authoritative database checks, and idempotency continue to
 decide each action.
 
 The OAuth service reads the existing Comms5 client credential and the new
-random proxy-hop key from `/etc/riverview/comms5-oauth.env`. The same file must
-be loaded by the Caddy systemd service so its Caddyfile can inject the proxy
-key. It must be root-owned and mode 0600; no values belong in the repository.
+random proxy-hop key from `/etc/riverview/comms5-oauth.env`. Caddy must receive
+the same proxy-hop key through its existing protected environment source; do
+not copy the upstream service credential into the OAuth service file. The
+OAuth file must be root-owned and mode 0600; no values belong in the repository.
 
 This is a migration-compatible path: the existing static-bearer Caddy branch
 continues to work while OAuth is commissioned. OAuth does not create a new
@@ -118,9 +119,11 @@ not evidence that those tests passed.
 4. Create the root-owned mode-0600 `/etc/riverview/comms5-oauth.env` with the
    already-approved Comms5 login credential and a newly generated random
    `RIVERVIEW_COMMS5_OAUTH_PROXY_KEY`. Do not show either value in command
-   output. Add this file as an `EnvironmentFile` to both the OAuth service and
-   the existing Caddy systemd service, then run `systemd-analyze verify` on
-   both units before activation. Do not change the upstream Comms5 credential.
+   output. Add the file to the OAuth unit and add only the same proxy key to
+   Caddy's existing protected environment source. Do not copy the upstream
+   Comms5 service credential into the OAuth unit. Run `systemd-analyze verify`
+   on the OAuth and Caddy units before activation. Do not change the upstream
+   Comms5 credential.
 5. Install the service unit and start the OAuth listener on loopback. Verify
    both metadata documents, `/healthz`, invalid-token rejection, and DCR using
    only a test client in a disposable SQLite database.
