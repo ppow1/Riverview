@@ -1,4 +1,8 @@
 <!-- Version: 0.6.11 -->
+## CODEX OPERATIONAL RECOVERY — MANDATORY
+
+At session start, after context compaction or execution-environment changes, and before troubleshooting SSH, TCP/IP, device connections, authentication, GitHub/worktrees, deployment, or Comms5, read [Codex Operational Recovery](docs/operations/CODEX_OPERATIONAL_RECOVERY.md) and the linked authoritative runbooks. Reuse previously verified procedures for the **actual execution environment**; do not rediscover settled problems or mistake a missing local alias for a remote server failure. Record each newly verified fix in the recovery index and owning runbook in the same engineering change. Never publish secrets.
+
 # Riverview AI Hints
 
 ## EXECUTION-FIRST ENGINEERING POLICY — DO NOT INVENT RESTRICTIONS
