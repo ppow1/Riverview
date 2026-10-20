@@ -1,3 +1,16 @@
+# Riverview~ controlled source
+# File: src/riverview/mcp/comms5_oauth_server.py
+# Component: COMMS5-OAUTH
+# Revision: 1.0.0 (predecessor unversioned; exact bytes in task backup manifest)
+# Purpose: Loopback HTTP frontend for Comms5 OAuth and its opt-in provider JWKS
+# Execution Model: Request-driven HTTP service
+# Observability: /healthz and sanitized request logs
+# Dependencies: sibling OAuth service, stdlib HTTP server
+# Authority: OAuth service validates state; provider JWKS exposed only when profile is configured
+# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Expose conditional provider JWKS and config
+# Tests: tests/test_comms5_oauth.py
+# Backup: /home/admin1/.local/share/riverview/backups/RV-C3-PROVIDER-AUTH-PROOF-20261019/manifest.json
+
 """Loopback HTTP frontend for the Comms5 OAuth service."""
 
 from __future__ import annotations
@@ -114,6 +127,12 @@ def create_handler(service: OAuthService) -> type[BaseHTTPRequestHandler]:
                 return
             if parsed.path == "/.well-known/oauth-authorization-server":
                 self._json(200, service.authorization_metadata())
+                return
+            if parsed.path == "/oauth/jwks":
+                try:
+                    self._json(200, service.provider_jwks())
+                except OAuthError as exc:
+                    self._error(exc)
                 return
             if parsed.path == "/healthz":
                 self._json(200, {"status": "ok", "service": "riverview-comms5-oauth"})
@@ -265,6 +284,10 @@ def main() -> None:
         issuer=os.environ.get("RIVERVIEW_COMMS5_OAUTH_ISSUER", DEFAULT_ISSUER),
         resource=os.environ.get("RIVERVIEW_COMMS5_OAUTH_RESOURCE", DEFAULT_RESOURCE),
         database_path=os.environ.get("RIVERVIEW_COMMS5_OAUTH_DATABASE", "/var/lib/riverview-comms5-oauth/oauth.sqlite3"),
+        provider_resource=os.environ.get("RIVERVIEW_REASONING_OAUTH_RESOURCE") or None,
+        provider_subject=os.environ.get("RIVERVIEW_REASONING_OAUTH_SUBJECT") or None,
+        provider_client_ids=tuple(filter(None, os.environ.get("RIVERVIEW_REASONING_OAUTH_CLIENT_IDS", "").split(","))),
+        provider_signing_key_path=os.environ.get("RIVERVIEW_REASONING_OAUTH_SIGNING_KEY") or None,
     )
     service = OAuthService(config)
     server = ThreadingHTTPServer((host, port), create_handler(service))

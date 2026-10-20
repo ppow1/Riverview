@@ -1,17 +1,18 @@
 # Riverview Python Project Configuration
-# Version: 0.9.3
+# Version: 0.9.4
 [build-system]
 requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
 name = "riverview-kernel"
-version = "0.9.3"
+version = "0.9.4"
 description = "Diagnostics-first kernel for The Estate at Riverview"
 requires-python = ">=3.12"
 dependencies = [
   "psycopg[binary]>=3.2,<4",
   "mcp>=1,<2",
+  "PyJWT[crypto]>=2.10,<3",
 ]
 
 [project.optional-dependencies]

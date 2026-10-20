@@ -1,3 +1,17 @@
+# Riverview~ controlled source
+# File: src/riverview/mcp/comms5_oauth.py
+# Component: COMMS5-OAUTH
+# Revision: 1.0.0 (predecessor unversioned; exact bytes in task backup manifest)
+# Purpose: Existing Comms5 OAuth issuer with an opt-in, audience-isolated provider profile
+# Execution Model: Request-driven OAuth authorization and token service
+# Observability: Sanitized OAuth HTTP logs and health endpoint in sibling server module
+# Dependencies: Python 3.12, SQLite, PyJWT/cryptography for optional provider JWT profile
+# Authority: Comms5 tokens remain Steward; provider issuance requires exact client/resource allowlists
+# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Add opt-in signed provider profile
+# Contracts: docs/operations/RIVERVIEW_COMMS5_OAUTH.md
+# Tests: tests/test_comms5_oauth.py
+# Backup: /home/admin1/.local/share/riverview/backups/RV-C3-PROVIDER-AUTH-PROOF-20261019/manifest.json
+
 """Small OAuth authorization server for the existing Comms5 Steward identity.
 
 The browser login proves possession of the existing Caddy-held Comms5
@@ -19,15 +33,22 @@ import re
 import secrets
 import sqlite3
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
+import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
 SCOPE = "comms5"
+PROVIDER_SCOPE = "reasoning:exchange"
 AUTHORIZATION_CODE_TTL = 180
 AUTH_TRANSACTION_TTL = 600
 ACCESS_TOKEN_TTL = 3600
+PROVIDER_ACCESS_TOKEN_TTL = 300
 REFRESH_TOKEN_TTL = 30 * 24 * 3600
 MAX_REQUEST_BYTES = 65536
 _B64URL_SHA256 = re.compile(r"^[A-Za-z0-9_-]{43}$")
@@ -52,6 +73,10 @@ class OAuthConfig:
     resource: str
     database_path: str
     stable_redirect_uri: str = "https://chatgpt.com/connector_platform_oauth_redirect"
+    provider_resource: str | None = None
+    provider_subject: str | None = None
+    provider_client_ids: tuple[str, ...] = ()
+    provider_signing_key_path: str | None = None
 
     def __post_init__(self) -> None:
         for label, value in (("issuer", self.issuer), ("resource", self.resource)):
@@ -64,6 +89,20 @@ class OAuthConfig:
             raise ValueError("RIV-COMMS5-OAUTH-0001: issuer must use its canonical no-trailing-slash form.")
         if self.stable_redirect_uri != "https://chatgpt.com/connector_platform_oauth_redirect":
             raise ValueError("RIV-COMMS5-OAUTH-0001: unsupported ChatGPT redirect URI.")
+        provider_config = (self.provider_resource, self.provider_subject,
+                           self.provider_signing_key_path, bool(self.provider_client_ids))
+        if any(provider_config) and not all(provider_config):
+            raise ValueError("RIV-COMMS5-OAUTH-0001: provider profile configuration is incomplete.")
+        if self.provider_resource:
+            parsed = urlsplit(self.provider_resource)
+            if (parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password
+                    or parsed.fragment or self.provider_resource == self.resource):
+                raise ValueError("RIV-COMMS5-OAUTH-0001: provider resource must be a distinct HTTPS URL.")
+        if self.provider_subject and (self.provider_subject == "steward" or not self.provider_subject.strip()):
+            raise ValueError("RIV-COMMS5-OAUTH-0001: provider subject must be explicit and non-Steward.")
+        if (len(set(self.provider_client_ids)) != len(self.provider_client_ids)
+                or any(not isinstance(item, str) or not item for item in self.provider_client_ids)):
+            raise ValueError("RIV-COMMS5-OAUTH-0001: provider client allowlist is invalid.")
 
 
 def _digest(value: str) -> str:
@@ -176,7 +215,7 @@ class OAuthService:
         }
 
     def authorization_metadata(self) -> dict[str, Any]:
-        return {
+        metadata = {
             "issuer": self.config.issuer,
             "authorization_response_iss_parameter_supported": True,
             "authorization_endpoint": f"{self.config.issuer}/oauth/authorize",
@@ -190,6 +229,32 @@ class OAuthService:
             "scopes_supported": [SCOPE],
             "client_id_metadata_document_supported": False,
         }
+        if self.config.provider_resource:
+            metadata["scopes_supported"] = [SCOPE, PROVIDER_SCOPE]
+            metadata["jwks_uri"] = f"{self.config.issuer}/oauth/jwks"
+        return metadata
+
+    def provider_jwks(self) -> dict[str, Any]:
+        key = self._provider_private_key().public_key().public_numbers()
+        def encode(number: int) -> str:
+            raw = number.to_bytes((number.bit_length() + 7) // 8, "big")
+            return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+        return {"keys": [{"kty": "RSA", "use": "sig", "alg": "RS256",
+            "kid": "rv-comms5-provider-rs256-v1", "n": encode(key.n), "e": encode(key.e)}]}
+
+    def _provider_private_key(self):
+        if not self.config.provider_signing_key_path:
+            raise OAuthError("server_error", "Provider authorization is not configured.", 503)
+        try:
+            path = Path(self.config.provider_signing_key_path)
+            if path.stat().st_mode & 0o077:
+                raise ValueError("key permissions are too broad")
+            key = serialization.load_pem_private_key(path.read_bytes(), password=None)
+            if not isinstance(key, rsa.RSAPrivateKey) or key.key_size < 2048:
+                raise ValueError("RSA key with at least 2048 bits required")
+            return key
+        except Exception as exc:
+            raise OAuthError("server_error", "Provider signing key is unavailable.", 503) from exc
 
     def register_client(self, metadata: dict[str, Any]) -> dict[str, Any]:
         redirect_uris = metadata.get("redirect_uris")
@@ -253,24 +318,35 @@ class OAuthService:
             raise self._authorization_error(params, OAuthError("invalid_request", "Authorization code with PKCE S256 is required."))
         if not response_state or len(response_state) > 512 or not _B64URL_SHA256.fullmatch(challenge):
             raise self._authorization_error(params, OAuthError("invalid_request", "OAuth state or PKCE challenge is invalid."))
-        if scope != SCOPE or resource != self.config.resource:
+        provider_request = bool(
+            self.config.provider_resource and scope == PROVIDER_SCOPE
+            and resource == self.config.provider_resource
+            and client_id in self.config.provider_client_ids
+        )
+        if not provider_request and (scope != SCOPE or resource != self.config.resource):
             raise self._authorization_error(params, OAuthError("invalid_scope", "The Comms5 resource and scope must be requested exactly."))
         transaction = _random_token(32)
         csrf = _random_token(24)
         with self._connect() as db:
             db.execute(
-                "INSERT INTO oauth_transactions(transaction_hash,csrf_hash,client_id,redirect_uri,response_state,code_challenge,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO oauth_transactions(transaction_hash,csrf_hash,client_id,redirect_uri,response_state,code_challenge,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?,?)",
                 (_digest(transaction), _digest(csrf), client_id, redirect_uri, response_state, challenge, scope, resource, int(time.time()) + AUTH_TRANSACTION_TTL),
             )
+        if scope == PROVIDER_SCOPE:
+            title, heading, prompt, button = ("External reasoning authorization", "Authorize provider",
+                "Enter the existing Steward credential to authorize this registered provider client.", "Authorize provider")
+        else:
+            title, heading, prompt, button = ("Riverview Comms5 authorization", "Connect Riverview Comms5",
+                "Enter the existing Steward-controlled Comms5 connector credential to authorize this connection.",
+                "Authorize ChatGPT for Comms5")
         form = (
-            "<!doctype html><html><head><meta charset=\"utf-8\"><title>Riverview Comms5 authorization</title></head>"
-            "<body><main><h1>Connect Riverview Comms5</h1>"
-            "<p>Enter the existing Steward-controlled Comms5 connector credential to authorize this connection.</p>"
+            "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + html.escape(title) + "</title></head>"
+            "<body><main><h1>" + html.escape(heading) + "</h1><p>" + html.escape(prompt) + "</p>"
             f"<form method=\"post\" action=\"{html.escape(self.config.issuer + '/oauth/authorize', quote=True)}\">"
             f"<input type=\"hidden\" name=\"csrf\" value=\"{html.escape(csrf, quote=True)}\">"
             "<label for=\"credential\">Steward credential</label>"
             "<input id=\"credential\" name=\"credential\" type=\"password\" autocomplete=\"current-password\" required>"
-            "<button type=\"submit\">Authorize ChatGPT for Comms5</button></form></main></body></html>"
+            "<button type=\"submit\">" + html.escape(button) + "</button></form></main></body></html>"
         )
         return transaction, csrf, form
 
@@ -331,14 +407,21 @@ class OAuthService:
                     "SELECT c.*, p.grant_types_json FROM oauth_codes c JOIN oauth_clients p USING(client_id) WHERE c.code_hash=?",
                     (_digest(code),),
                 ).fetchone()
+                provider_code = bool(row and row["scope"] == PROVIDER_SCOPE)
+                provider_valid = bool(
+                    provider_code and self.config.provider_resource
+                    and row["resource"] == self.config.provider_resource
+                    and client_id in self.config.provider_client_ids
+                )
                 valid = bool(
                     row
                     and row["consumed_at"] is None
                     and row["expires_at"] >= now
                     and row["client_id"] == client_id
                     and row["redirect_uri"] == redirect_uri
-                    and row["resource"] == resource == self.config.resource
-                    and row["scope"] == SCOPE
+                    and row["resource"] == resource
+                    and ((row["resource"] == self.config.resource and row["scope"] == SCOPE)
+                         or (provider_valid and row["scope"] == PROVIDER_SCOPE))
                     and hmac.compare_digest(row["code_challenge"], _pkce_s256(verifier))
                 )
                 if not valid:
@@ -349,18 +432,28 @@ class OAuthService:
                 access = _random_token(32)
                 refresh = _random_token(48)
                 grant_types = json.loads(row["grant_types_json"])
-                db.execute(
-                    "INSERT INTO oauth_tokens(token_hash,token_type,family_id,client_id,subject,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (_digest(access), "access", family, client_id, "steward", SCOPE, resource, now + ACCESS_TOKEN_TTL),
-                )
-                if "refresh_token" in grant_types:
+                if provider_code:
+                    access = jwt.encode({"iss": self.config.issuer, "aud": self.config.provider_resource,
+                        "sub": self.config.provider_subject, "client_id": client_id,
+                        "scope": PROVIDER_SCOPE, "iat": now, "exp": now + PROVIDER_ACCESS_TOKEN_TTL,
+                        "jti": str(uuid.uuid4())}, self._provider_private_key(), algorithm="RS256",
+                        headers={"kid": "rv-comms5-provider-rs256-v1"})
+                else:
+                    db.execute(
+                        "INSERT INTO oauth_tokens(token_hash,token_type,family_id,client_id,subject,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?)",
+                        (_digest(access), "access", family, client_id, "steward", SCOPE, resource, now + ACCESS_TOKEN_TTL),
+                    )
+                if "refresh_token" in grant_types and not provider_code:
                     db.execute(
                         "INSERT INTO oauth_tokens(token_hash,token_type,family_id,client_id,subject,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?)",
                         (_digest(refresh), "refresh", family, client_id, "steward", SCOPE, resource, now + REFRESH_TOKEN_TTL),
                     )
                 db.commit()
-            result = {"access_token": access, "token_type": "Bearer", "expires_in": ACCESS_TOKEN_TTL, "scope": SCOPE}
-            if "refresh_token" in grant_types:
+            issued_scope = PROVIDER_SCOPE if provider_code else SCOPE
+            result = {"access_token": access, "token_type": "Bearer",
+                      "expires_in": PROVIDER_ACCESS_TOKEN_TTL if provider_code else ACCESS_TOKEN_TTL,
+                      "scope": issued_scope}
+            if "refresh_token" in grant_types and not provider_code:
                 result["refresh_token"] = refresh
             return result
         if grant_type == "refresh_token":

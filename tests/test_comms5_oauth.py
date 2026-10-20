@@ -1,3 +1,14 @@
+# Riverview~ controlled test source
+# File: tests/test_comms5_oauth.py
+# Component: COMMS5-OAUTH
+# Revision: 1.0.0 (predecessor unversioned; exact bytes in task backup manifest)
+# Purpose: OAuth protocol, identity mapping, and additive provider profile qualification
+# Execution Model: Disposable request-driven tests
+# Dependencies: OAuth issuer modules, pytest, PyJWT/cryptography
+# Authority: Synthetic identities and keys only; no production registration or grants
+# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Cover provider identity and JWT boundary
+# Backup: /home/admin1/.local/share/riverview/backups/RV-C3-PROVIDER-AUTH-PROOF-20261019/manifest.json
+
 """OAuth protocol and credential-to-Comms5 identity mapping tests."""
 
 from __future__ import annotations
@@ -74,6 +85,8 @@ def test_metadata_advertises_chatgpt_pkce_resource_and_issuer_contract(tmp_path)
     assert metadata["code_challenge_methods_supported"] == ["S256"]
     assert metadata["token_endpoint_auth_methods_supported"] == ["none"]
     assert metadata["client_id_metadata_document_supported"] is False
+    assert metadata["scopes_supported"] == [SCOPE]
+    assert "jwks_uri" not in metadata
 
 
 def test_dcr_rejects_non_chatgpt_redirects(tmp_path) -> None:
@@ -200,6 +213,127 @@ def test_refresh_rotates_token_and_revocation_disables_access(tmp_path) -> None:
         })
 
 
+def test_additive_provider_profile_issues_separate_signed_audience_and_subject(tmp_path) -> None:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    import jwt
+
+    key_path = tmp_path / "provider-signing-key.pem"
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    key_path.chmod(0o600)
+    db_path = str(tmp_path / "provider.sqlite3")
+    base = OAuthConfig(ISSUER, RESOURCE, db_path)
+    bootstrap = OAuthService(base)
+    client = bootstrap.register_client({"client_name": "ChatGPT reasoning test",
+        "redirect_uris": [STABLE_REDIRECT], "grant_types": ["authorization_code", "refresh_token"]})
+    client_id = client["client_id"]
+    provider_resource = "https://reasoning.example.test/mcp"
+    service = OAuthService(OAuthConfig(ISSUER, RESOURCE, db_path,
+        provider_resource=provider_resource, provider_subject="provider:synthetic-chatgpt",
+        provider_client_ids=(client_id,), provider_signing_key_path=str(key_path)))
+    verifier = "m6FjZYXBh2kA3-4.wSTed8h0EgzXfK9rR1tYUQwP6Dc"
+    transaction, csrf, page = service.begin_authorization({
+        "client_id": client_id, "redirect_uri": STABLE_REDIRECT,
+        "response_type": "code", "state": "provider-state",
+        "code_challenge": _challenge(verifier), "code_challenge_method": "S256",
+        "scope": "reasoning:exchange", "resource": provider_resource,
+    })
+    assert "Authorize provider" in page
+    location, _ = service.complete_authorization(transaction, csrf,
+        STEWARD_CREDENTIAL, STEWARD_CREDENTIAL)
+    code = parse_qs(urlsplit(location).query)["code"][0]
+    issued = service.exchange_token({"grant_type": "authorization_code", "client_id": client_id,
+        "code": code, "redirect_uri": STABLE_REDIRECT, "code_verifier": verifier,
+        "resource": provider_resource})
+    assert issued["scope"] == "reasoning:exchange"
+    assert "refresh_token" not in issued
+    published_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(service.provider_jwks()["keys"][0]))
+    claims = jwt.decode(issued["access_token"], published_key, algorithms=["RS256"],
+        audience=provider_resource, issuer=ISSUER)
+    assert claims["sub"] == "provider:synthetic-chatgpt"
+    assert claims["client_id"] == client_id
+    assert claims["scope"] == "reasoning:exchange"
+    assert service.provider_jwks()["keys"][0]["kid"] == "rv-comms5-provider-rs256-v1"
+    assert issued["expires_in"] == 300
+    metadata = service.authorization_metadata()
+    assert metadata["jwks_uri"] == ISSUER + "/oauth/jwks"
+    assert "reasoning:exchange" in metadata["scopes_supported"]
+    assert service.validate_access_token(issued["access_token"], resource=RESOURCE) is None
+
+
+def test_provider_profile_rejects_unregistered_client_wrong_resource_and_steward_subject(tmp_path) -> None:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key_path = tmp_path / "provider-signing-key.pem"
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    key_path.chmod(0o600)
+    db_path = str(tmp_path / "provider-deny.sqlite3")
+    bootstrap = OAuthService(OAuthConfig(ISSUER, RESOURCE, db_path))
+    approved_client = bootstrap.register_client({"redirect_uris": [STABLE_REDIRECT]})["client_id"]
+    service = OAuthService(OAuthConfig(ISSUER, RESOURCE, db_path,
+        provider_resource="https://reasoning.example.test/mcp",
+        provider_subject="provider:synthetic-chatgpt", provider_client_ids=(approved_client,),
+        provider_signing_key_path=str(key_path)))
+    client = service.register_client({"redirect_uris": [STABLE_REDIRECT]})
+    args = {"client_id": client["client_id"], "redirect_uri": STABLE_REDIRECT,
+        "response_type": "code", "state": "denied-state",
+        "code_challenge": _challenge("m6FjZYXBh2kA3-4.wSTed8h0EgzXfK9rR1tYUQwP6Dc"),
+        "code_challenge_method": "S256", "scope": "reasoning:exchange",
+        "resource": "https://reasoning.example.test/mcp"}
+    with pytest.raises(OAuthError, match="scope"):
+        service.begin_authorization(args)
+    args["client_id"] = approved_client
+    args["resource"] = "https://wrong.example/mcp"
+    with pytest.raises(OAuthError, match="scope"):
+        service.begin_authorization(args)
+    args["resource"] = "https://reasoning.example.test/mcp"
+    args["scope"] = SCOPE
+    with pytest.raises(OAuthError, match="scope"):
+        service.begin_authorization(args)
+    with pytest.raises(ValueError, match="non-Steward"):
+        OAuthConfig(ISSUER, RESOURCE, db_path, provider_resource="https://reasoning.example.test/mcp",
+            provider_subject="steward", provider_client_ids=("approved-test-client",),
+            provider_signing_key_path=str(key_path))
+    with pytest.raises(ValueError, match="distinct HTTPS"):
+        OAuthConfig(ISSUER, RESOURCE, db_path, provider_resource=RESOURCE,
+            provider_subject="provider:test", provider_client_ids=("approved-test-client",),
+            provider_signing_key_path=str(key_path))
+
+
+def test_provider_discovery_and_jwks_are_exposed_only_with_profile_enabled(tmp_path) -> None:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key_path = tmp_path / "provider-signing-key.pem"
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    key_path.chmod(0o600)
+    service = OAuthService(OAuthConfig(ISSUER, RESOURCE, str(tmp_path / "provider-http.sqlite3"),
+        provider_resource="https://reasoning.example.test/mcp", provider_subject="provider:test",
+        provider_client_ids=("registered-test-client",), provider_signing_key_path=str(key_path)))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(service))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        root = f"http://127.0.0.1:{server.server_port}"
+        with urlopen(root + "/.well-known/oauth-authorization-server") as response:
+            metadata = json.load(response)
+        with urlopen(root + "/oauth/jwks") as response:
+            jwks = json.load(response)
+        assert metadata["jwks_uri"] == ISSUER + "/oauth/jwks"
+        assert jwks["keys"][0]["kid"] == "rv-comms5-provider-rs256-v1"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
 def test_real_http_metadata_registration_and_forward_auth_boundary(tmp_path) -> None:
     service = OAuthService(OAuthConfig(ISSUER, RESOURCE, str(tmp_path / "oauth.sqlite3")))
     server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(service))
@@ -212,6 +346,10 @@ def test_real_http_metadata_registration_and_forward_auth_boundary(tmp_path) -> 
         with urlopen(root + "/.well-known/oauth-authorization-server") as response:
             metadata = json.load(response)
             assert metadata["code_challenge_methods_supported"] == ["S256"]
+            assert "jwks_uri" not in metadata
+        with pytest.raises(HTTPError) as disabled_jwks:
+            urlopen(root + "/oauth/jwks")
+        assert disabled_jwks.value.code == 503
         request = Request(root + "/oauth/register", data=json.dumps({"redirect_uris": [STABLE_REDIRECT]}).encode(), headers={"Content-Type": "application/json"})
         with urlopen(request) as response:
             client_id = json.load(response)["client_id"]

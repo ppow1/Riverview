@@ -1,3 +1,9 @@
+# Riverview~ controlled configuration
+# File: config/riverview-comms5-ingress.Caddyfile.example
+# Component: COMMS5-OAUTH
+# Revision: 1.0.0 (predecessor unversioned; exact bytes in task backup manifest)
+# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Route conditional provider JWKS endpoint
+# Restore: task backup manifest records the exact predecessor bytes and hash.
 # Riverview Comms5 OAuth-compatible ingress.
 # Keep the existing Comms4 route unchanged. The OAuth authorization service is
 # loopback-only on Ionoge :11827; the existing Comms5 backend remains reachable
@@ -14,7 +20,7 @@ riverview-comms.ionoge.com {
 		}
 	}
 
-	@comms5_oauth_public path /.well-known/oauth-protected-resource /.well-known/oauth-authorization-server /oauth/register /oauth/token /oauth/revoke
+	@comms5_oauth_public path /.well-known/oauth-protected-resource /.well-known/oauth-authorization-server /oauth/register /oauth/token /oauth/revoke /oauth/jwks
 	handle @comms5_oauth_public {
 		reverse_proxy 127.0.0.1:11827
 	}
