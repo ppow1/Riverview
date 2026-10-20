@@ -1,12 +1,13 @@
 # Riverview~ controlled test source
 # File: tests/test_comms5_oauth.py
 # Component: COMMS5-OAUTH
-# Revision: 1.0.0 (predecessor unversioned; exact bytes in task backup manifest)
+# Revision: 1.0.1 (predecessor 1.0.0 bytes in task backup manifest revision-1.0.0)
 # Purpose: OAuth protocol, identity mapping, and additive provider profile qualification
 # Execution Model: Disposable request-driven tests
+# Observability: Pytest assertions and sanitized test runner output
 # Dependencies: OAuth issuer modules, pytest, PyJWT/cryptography
 # Authority: Synthetic identities and keys only; no production registration or grants
-# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Cover provider identity and JWT boundary
+# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Cover provider refresh rotation
 # Backup: /home/admin1/.local/share/riverview/backups/RV-C3-PROVIDER-AUTH-PROOF-20261019/manifest.json
 
 """OAuth protocol and credential-to-Comms5 identity mapping tests."""
@@ -214,9 +215,9 @@ def test_refresh_rotates_token_and_revocation_disables_access(tmp_path) -> None:
 
 
 def test_additive_provider_profile_issues_separate_signed_audience_and_subject(tmp_path) -> None:
+    import jwt
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
-    import jwt
 
     key_path = tmp_path / "provider-signing-key.pem"
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -248,7 +249,7 @@ def test_additive_provider_profile_issues_separate_signed_audience_and_subject(t
         "code": code, "redirect_uri": STABLE_REDIRECT, "code_verifier": verifier,
         "resource": provider_resource})
     assert issued["scope"] == "reasoning:exchange"
-    assert "refresh_token" not in issued
+    assert issued["refresh_token"]
     published_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(service.provider_jwks()["keys"][0]))
     claims = jwt.decode(issued["access_token"], published_key, algorithms=["RS256"],
         audience=provider_resource, issuer=ISSUER)
@@ -261,6 +262,26 @@ def test_additive_provider_profile_issues_separate_signed_audience_and_subject(t
     assert metadata["jwks_uri"] == ISSUER + "/oauth/jwks"
     assert "reasoning:exchange" in metadata["scopes_supported"]
     assert service.validate_access_token(issued["access_token"], resource=RESOURCE) is None
+    for invalid_refresh in (
+        {"client_id": "other-client", "resource": provider_resource, "scope": "reasoning:exchange"},
+        {"client_id": client_id, "resource": RESOURCE, "scope": "reasoning:exchange"},
+        {"client_id": client_id, "resource": provider_resource, "scope": SCOPE},
+    ):
+        with pytest.raises(OAuthError, match="Refresh token"):
+            service.exchange_token({"grant_type": "refresh_token",
+                "refresh_token": issued["refresh_token"], **invalid_refresh})
+    refreshed = service.exchange_token({"grant_type": "refresh_token", "client_id": client_id,
+        "refresh_token": issued["refresh_token"], "resource": provider_resource,
+        "scope": "reasoning:exchange"})
+    refreshed_claims = jwt.decode(refreshed["access_token"], published_key, algorithms=["RS256"],
+        audience=provider_resource, issuer=ISSUER)
+    assert refreshed_claims["sub"] == "provider:synthetic-chatgpt"
+    assert refreshed["scope"] == "reasoning:exchange"
+    assert refreshed["refresh_token"] != issued["refresh_token"]
+    with pytest.raises(OAuthError, match="Refresh token"):
+        service.exchange_token({"grant_type": "refresh_token", "client_id": client_id,
+            "refresh_token": issued["refresh_token"], "resource": provider_resource,
+            "scope": "reasoning:exchange"})
 
 
 def test_provider_profile_rejects_unregistered_client_wrong_resource_and_steward_subject(tmp_path) -> None:

@@ -1,7 +1,7 @@
 <!-- Riverview~ Controlled Document
 File: docs/operations/RIVERVIEW_COMMS5_OAUTH.md
 Component: COMMS5-OAUTH
-File Revision: 1.0.0 (predecessor unversioned; exact bytes in task backup manifest)
+File Revision: 1.0.1 (predecessor 1.0.0 bytes in task backup manifest revision-1.0.0)
 Purpose: Document existing Comms5 OAuth and isolated provider-profile proof
 Authority: Existing Comms5 remains Steward; provider profile requires separate explicit allowlists
 Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Document additive provider authorization profile
@@ -166,7 +166,7 @@ is claimed by source tests.
 
 The current issuer source is `ppow1/Riverview`, in `src/riverview/mcp/comms5_oauth.py` and `src/riverview/mcp/comms5_oauth_server.py`. Its existing Comms5 profile remains the default: `comms5` scope, Comms5 audience, opaque random bearer tokens stored by digest, and subject `steward` after the existing Steward credential check.
 
-The opt-in provider profile adds a separate configured resource URL, scope `reasoning:exchange`, an exact registered-client-ID allowlist, a configured provider subject that cannot equal `steward`, an RSA signing key, and conditional same-origin JWKS discovery at `/oauth/jwks`. Provider access tokens are RS256 JWTs with exact `iss`, `aud`, `sub`, `client_id`, `scope`, `iat`, `exp`, and `jti`. Provider tokens expire after five minutes and do not receive refresh tokens in this proof. A request for the wrong audience, scope, or client is rejected. The OAuth login still requires the existing Steward credential as the human authorization act; the issued provider `sub` is a distinct configured provider identity and is never mapped to `steward`. No identity or client ID is provisioned by source defaults.
+The opt-in provider profile adds a separate configured resource URL, scope `reasoning:exchange`, an exact registered-client-ID allowlist, a configured provider subject that cannot equal `steward`, an RSA signing key, and conditional same-origin JWKS discovery at `/oauth/jwks`. Provider access tokens are RS256 JWTs with exact `iss`, `aud`, `sub`, `client_id`, `scope`, `iat`, `exp`, and `jti`. Provider access tokens expire after five minutes; refresh tokens retain the issuer's existing rotation and 30-day expiry behavior. A request for the wrong audience, scope, or client is rejected. The OAuth login still requires the existing Steward credential as the human authorization act; the issued provider `sub` is a distinct configured provider identity and is never mapped to `steward`. No identity or client ID is provisioned by source defaults.
 
 The issuer environment accepts the following optional settings; enabling the profile requires all four and leaves the profile disabled when they are absent:
 
@@ -187,9 +187,11 @@ Environment=RIVERVIEW_REASONING_OAUTH_SIGNING_KEY=%d/reasoning-provider-signing-
 
 Install this drop-in only after the protected credential and all three identity/resource settings are ready, then validate the systemd unit before any service change. The checked-in Caddy ingress routes `/oauth/jwks` to the issuer; the issuer publishes `jwks_uri` only when the profile is configured and returns 503 for the JWKS request while disabled. Never put a signing key in the environment value itself, source tree, OAuth SQLite database, or logs.
 
+Key rotation must change the configured JWKS key ID when the key changes. Keep the previous public key published through the maximum five-minute access-token lifetime and JWKS cache interval before removing it. This proof does not automate signing-key rotation.
+
 The external resource-server provider map must pin the same issuer, exact external MCP audience, exact provider `sub` + `client_id`, provider ID, and external principal ID with scope ceiling `reasoning:exchange`. This issuer profile does not create that map, a Riverview provider registration, or the exact Grace authority grant (`resident:grace`, `resident.reasoning.escalate`, `provider:<registered-provider-id>`). Those remain separate steps in the existing authorization workflow.
 
-This change has only disposable tests. Production Comms5 access, login, clients, token rows, and OAuth state were not touched. Provider refresh and immediate JWT revocation are not included: external JWT acceptance ends within the five-minute lifetime, but revocation does not take effect immediately at the external resource. Production commissioning must explicitly accept that bounded revocation behavior or require an online revocation check before issuing these tokens. No production activation should occur from this proof alone.
+This change has only disposable tests. Production Comms5 access, login, clients, token rows, and OAuth state were not touched. Provider refresh tokens rotate and can be revoked by the issuer. Immediate access-token revocation is not included: an already issued external JWT may remain usable for up to five minutes after revocation. Production commissioning must explicitly accept that bounded revocation behavior or require an online revocation check before issuing these tokens. No production activation should occur from this proof alone.
 
 ## Rollback
 

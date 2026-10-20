@@ -1,13 +1,13 @@
 # Riverview~ controlled source
 # File: src/riverview/mcp/comms5_oauth.py
 # Component: COMMS5-OAUTH
-# Revision: 1.0.0 (predecessor unversioned; exact bytes in task backup manifest)
+# Revision: 1.0.1 (predecessor 1.0.0 bytes in task backup manifest revision-1.0.0)
 # Purpose: Existing Comms5 OAuth issuer with an opt-in, audience-isolated provider profile
 # Execution Model: Request-driven OAuth authorization and token service
 # Observability: Sanitized OAuth HTTP logs and health endpoint in sibling server module
 # Dependencies: Python 3.12, SQLite, PyJWT/cryptography for optional provider JWT profile
 # Authority: Comms5 tokens remain Steward; provider issuance requires exact client/resource allowlists
-# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Add opt-in signed provider profile
+# Changed: 2026-10-19 UTC | RV-C3-PROVIDER-AUTH-PROOF-20261019 | Rotate bounded provider refresh tokens
 # Contracts: docs/operations/RIVERVIEW_COMMS5_OAUTH.md
 # Tests: tests/test_comms5_oauth.py
 # Backup: /home/admin1/.local/share/riverview/backups/RV-C3-PROVIDER-AUTH-PROOF-20261019/manifest.json
@@ -256,6 +256,13 @@ class OAuthService:
         except Exception as exc:
             raise OAuthError("server_error", "Provider signing key is unavailable.", 503) from exc
 
+    def _provider_access_token(self, client_id: str, now: int) -> str:
+        return jwt.encode({"iss": self.config.issuer, "aud": self.config.provider_resource,
+            "sub": self.config.provider_subject, "client_id": client_id,
+            "scope": PROVIDER_SCOPE, "iat": now, "exp": now + PROVIDER_ACCESS_TOKEN_TTL,
+            "jti": str(uuid.uuid4())}, self._provider_private_key(), algorithm="RS256",
+            headers={"kid": "rv-comms5-provider-rs256-v1"})
+
     def register_client(self, metadata: dict[str, Any]) -> dict[str, Any]:
         redirect_uris = metadata.get("redirect_uris")
         if not isinstance(redirect_uris, list) or not redirect_uris or len(redirect_uris) > 4:
@@ -433,11 +440,13 @@ class OAuthService:
                 refresh = _random_token(48)
                 grant_types = json.loads(row["grant_types_json"])
                 if provider_code:
-                    access = jwt.encode({"iss": self.config.issuer, "aud": self.config.provider_resource,
-                        "sub": self.config.provider_subject, "client_id": client_id,
-                        "scope": PROVIDER_SCOPE, "iat": now, "exp": now + PROVIDER_ACCESS_TOKEN_TTL,
-                        "jti": str(uuid.uuid4())}, self._provider_private_key(), algorithm="RS256",
-                        headers={"kid": "rv-comms5-provider-rs256-v1"})
+                    access = self._provider_access_token(client_id, now)
+                    if "refresh_token" in grant_types:
+                        db.execute(
+                            "INSERT INTO oauth_tokens(token_hash,token_type,family_id,client_id,subject,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?)",
+                            (_digest(refresh), "refresh", family, client_id, self.config.provider_subject,
+                             PROVIDER_SCOPE, resource, now + REFRESH_TOKEN_TTL),
+                        )
                 else:
                     db.execute(
                         "INSERT INTO oauth_tokens(token_hash,token_type,family_id,client_id,subject,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?)",
@@ -453,7 +462,7 @@ class OAuthService:
             result = {"access_token": access, "token_type": "Bearer",
                       "expires_in": PROVIDER_ACCESS_TOKEN_TTL if provider_code else ACCESS_TOKEN_TTL,
                       "scope": issued_scope}
-            if "refresh_token" in grant_types and not provider_code:
+            if "refresh_token" in grant_types:
                 result["refresh_token"] = refresh
             return result
         if grant_type == "refresh_token":
@@ -464,6 +473,36 @@ class OAuthService:
                 db.execute("BEGIN IMMEDIATE")
                 old = db.execute("SELECT * FROM oauth_tokens WHERE token_hash=?", (_digest(refresh),)).fetchone()
                 requested_scope = form.get("scope", old["scope"] if old else "")
+                provider_refresh = bool(old and old["scope"] == PROVIDER_SCOPE)
+                if provider_refresh:
+                    client_row = db.execute(
+                        "SELECT grant_types_json FROM oauth_clients WHERE client_id=?", (client_id,)
+                    ).fetchone()
+                    valid_provider_refresh = bool(
+                        self.config.provider_resource and client_row
+                        and old["token_type"] == "refresh" and old["revoked_at"] is None
+                        and old["expires_at"] >= now and old["client_id"] == client_id
+                        and client_id in self.config.provider_client_ids
+                        and old["subject"] == self.config.provider_subject
+                        and old["resource"] == resource == self.config.provider_resource
+                        and requested_scope == PROVIDER_SCOPE
+                        and "refresh_token" in json.loads(client_row["grant_types_json"])
+                    )
+                    if not valid_provider_refresh:
+                        db.rollback()
+                        raise OAuthError("invalid_grant", "Refresh token is invalid, expired, revoked, or out of scope.")
+                    db.execute("UPDATE oauth_tokens SET revoked_at=? WHERE token_hash=?", (now, _digest(refresh)))
+                    replacement = _random_token(48)
+                    access = self._provider_access_token(client_id, now)
+                    db.execute(
+                        "INSERT INTO oauth_tokens(token_hash,token_type,family_id,client_id,subject,scope,resource,expires_at) VALUES(?,?,?,?,?,?,?,?)",
+                        (_digest(replacement), "refresh", old["family_id"], client_id,
+                         self.config.provider_subject, PROVIDER_SCOPE, resource, now + REFRESH_TOKEN_TTL),
+                    )
+                    db.commit()
+                    return {"access_token": access, "token_type": "Bearer",
+                            "expires_in": PROVIDER_ACCESS_TOKEN_TTL,
+                            "refresh_token": replacement, "scope": PROVIDER_SCOPE}
                 if not (
                     old and old["token_type"] == "refresh" and old["revoked_at"] is None and old["expires_at"] >= now
                     and old["client_id"] == client_id and old["resource"] == resource == self.config.resource
