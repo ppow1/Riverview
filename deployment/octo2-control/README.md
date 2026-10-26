@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 | Date: 2026-10-26 -->
+<!-- Version: 1.0.1 | Date: 2026-10-26 -->
 # OCTOMINER2 OCTO Control source and deployment notes
 
 The `server.py` and `instance_manager.py` files are the source snapshot retrieved
@@ -14,6 +14,14 @@ boot and retains its existing `Restart=on-failure` recovery behavior. New
 selectable workloads can be added as explicit records in
 `managed_services.MANAGED_WORKLOADS` after their unit, identity, and health
 endpoint are known.
+
+Version 0.6.3 was deployed on 2026-10-26 from commit
+`dcdb350611ec2b7f469b44cccc71aca3cb9049d3`. The dashboard returned HTTP 200
+with the Managed Workloads card, authenticated workload status returned Qwen
+running/ready and boot-enabled, and the deployed source hashes matched this
+checkout. The controller service was restarted; the Qwen PID remained 180620
+and its health endpoint returned HTTP 200. Live start/stop actions were not
+invoked; explicit Steward authorization is required for that acceptance test.
 
 ## Host inventory verified 2026-10-26
 

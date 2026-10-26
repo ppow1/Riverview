@@ -52,12 +52,17 @@ configuration was changed.
 
 The existing Riverview OCTO Control dashboard and authenticated API run at
 `http://192.168.1.162:8180/`. The versioned controller source is in
-`deployment/octo2-control/`. Version 0.6.3 adds a managed-workload surface that
-reports the systemd unit state and `/health` readiness, and starts or stops
-only explicitly allowlisted units. For Qwen 30B Vision it uses
-`systemctl start/stop qwen30b-vision.service`; neither action changes the
-unit's boot-enabled state. The dashboard does not expose a general systemd
-command interface.
+`deployment/octo2-control/`. Version 0.6.3 was deployed on 2026-10-26. The
+dashboard returned HTTP 200 with the Managed Workloads card, and the
+authenticated API reported Qwen running, ready, and enabled at boot. The
+controller source hashes matched the local commit. The controller restart did
+not interrupt Qwen: its PID remained 180620 and `/health` returned HTTP 200.
+
+The managed-workload surface reports the systemd unit state and `/health`
+readiness, and starts or stops only explicitly allowlisted units. For Qwen 30B
+Vision it uses `systemctl start/stop qwen30b-vision.service`; neither action
+changes the unit's boot-enabled state. The dashboard does not expose a general
+systemd command interface.
 
 Controller API start/stop actions are not live-tested against Qwen without the
 Steward's explicit authorization. Local tests use mocked systemd results.

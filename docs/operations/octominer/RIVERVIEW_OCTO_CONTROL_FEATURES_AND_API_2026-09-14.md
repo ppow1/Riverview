@@ -1,13 +1,13 @@
 <!--
 File: docs/operations/octominer/RIVERVIEW_OCTO_CONTROL_FEATURES_AND_API_2026-09-14.md
-Version: 0.6.3
+Version: 0.6.4
 Date: 2026-10-26
 Purpose: OCTOMINER2 controller capabilities, managed workload API, and historical profile context.
 -->
 
 # Riverview OCTO Control v0.6.3 — Features and Remote API
 
-Status: Updated source documentation. Check the live controller version and deployment separately.
+Status: Controller v0.6.3 deployed and verified on OCTOMINER2 2026-10-26. Live model start/stop actions remain untested.
 
 > The v0.6.1 feature inventory and three-GPU snapshot below were captured on
 > 2026-09-14 and are retained as historical evidence. Current OCTOMINER2 has one
