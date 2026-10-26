@@ -1,4 +1,4 @@
-<!-- Version: 0.1.1 -->
+<!-- Version: 0.1.2 -->
 # Project Riverview
 
 > **AI MODEL EXECUTIVE HANDOFF / CODEX:** [2026-10-13 runtime inventory and handoff](docs/handoffs/RIVERVIEW_AI_MODELS_EXECUTIVE_HANDOFF_2026-10-13.md) · [Grace Open Eyes Codex work order](docs/operations/GRACE_OPEN_EYES_CODEX_IMPLEMENTATION.md).
@@ -25,11 +25,15 @@ The River is local-first, event-driven, durable, diagnostics-first, and designed
 
 ## OCTOMINER2 local-AI control
 
-The dated inventory of Riverview OCTO Control v0.6.1 features, remotely
-queryable API routes, authentication, independent multi-model instances, GPU
-allocation, fan/PSU telemetry, monitoring, snapshots, Hermes integration, and
-PowerShell examples is:
+Current OCTOMINER2 hardware and active workload state is documented in
+[`OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`](docs/operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md).
+The dated OCTO Control feature/API guide also records its historical profile
+catalog, authentication, instances, telemetry, monitoring, snapshots, and
+Hermes integration:
 
 [`docs/operations/octominer/RIVERVIEW_OCTO_CONTROL_FEATURES_AND_API_2026-09-14.md`](docs/operations/octominer/RIVERVIEW_OCTO_CONTROL_FEATURES_AND_API_2026-09-14.md)
+
+The versioned controller source, deployment notes, and managed-workload tests
+are in [`deployment/octo2-control`](deployment/octo2-control/README.md).
 
 Start with `AI_HINTS.md` and `docs/operations/RIVERVIEW_EXECUTION_PLAN.md`.

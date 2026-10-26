@@ -1,4 +1,4 @@
-<!-- Version: 0.6.11 -->
+<!-- Version: 0.6.12 -->
 ## CODEX OPERATIONAL RECOVERY — MANDATORY
 
 At session start, after context compaction or execution-environment changes, and before troubleshooting SSH, TCP/IP, device connections, authentication, GitHub/worktrees, deployment, or Comms5, read [Codex Operational Recovery](docs/operations/CODEX_OPERATIONAL_RECOVERY.md) and the linked authoritative runbooks. Reuse previously verified procedures for the **actual execution environment**; do not rediscover settled problems or mistake a missing local alias for a remote server failure. Record each newly verified fix in the recovery index and owning runbook in the same engineering change. Never publish secrets.
@@ -612,6 +612,8 @@ For OCTOMINER1 BIOS recovery, Intel EFI FPT, SPI/BIOS-region hashes, stock rollb
 
 For physical node identity, MAC/IP mapping, CPU/RAM/DIMM configuration, board revisions, stale hostname diagnosis, or the post-recovery OCTOMINER1-versus-OCTOMINER2 performance control baseline, read **`docs/operations/octominer/OCTOMINER1_OCTOMINER2_HARDWARE_SCAN_2026-09-14.md`**. Physical identity is MAC-authoritative when hostname state is stale or duplicated.
 
+**Current OCTOMINER2 inventory (verified 2026-10-26):** one NVIDIA Tesla P100 16 GB (GPU 0), running Qwen 30B Vision through enabled `qwen30b-vision.service` on port 8080. The earlier RTX 3060 Ti + 2x P100 OCTOMINER2 layout is superseded; those GPUs were moved to OCTOMINER1. Read `docs/operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md` for live evidence before planning workloads. Preserve the dated multi-GPU records as history.
+
 ### OCTOMINER SSH STANDARD — CURRENT VERIFIED CONNECTION\n\nSearch: Octo1 SSH, Octo2 SSH, OCTOMINER1 SSH, OCTOMINER2 SSH, passwordless SSH, ssh octo1, ssh octo2, or octominer1_nopass.\n\nThe canonical SSH convention for both OctoMiners is now documented in:\n\n`docs/operations/network/RIVERVIEW_SSH_STANDARD.md`\n\nBoth hosts use named Windows OpenSSH aliases with the same explicit identity-file pattern:\n\n```text\nHost octo1\n    HostName 192.168.1.160\n    User root\n    IdentityFile C:/Users/wille/.ssh/octominer1_nopass\n    IdentitiesOnly yes\n    ServerAliveInterval 30\n    ServerAliveCountMax 3\n\nHost octo2\n    HostName 192.168.1.162\n    User root\n    IdentityFile C:/Users/wille/.ssh/octominer1_nopass\n    IdentitiesOnly yes\n    ServerAliveInterval 30\n    ServerAliveCountMax 3\n```\n\nOCTOMINER1 was explicitly re-tested on 2026-09-21. The Windows private key was accepted by 192.168.1.160, authentication succeeded using publickey, and the remote command ran as root on OCTOMINER1. Therefore the older recovery note claiming that this key was rejected by OCTOMINER1 is superseded.\n\nNormal connections:\n\n```powershell\nClear-Host\nssh octo1\n```\n\n```powershell\nClear-Host\nssh octo2\n```\n\nDo not change the OctoMiner SSH configuration merely to make the two hosts look different. They already use the same working client-side convention.\n\nThe normal-HiveOS OCTOMINER1 endpoint is distinct from the temporary direct-recovery shell previously exposed at `192.168.1.164:2222`; do not treat the recovery endpoint as the normal boot connection. Physical identity remains MAC-authoritative when hostname state is stale.\n\nFor the broader standard and the required Camrui/PiKVM/PiCam/dev-machine setup, read `docs/operations/network/RIVERVIEW_SSH_STANDARD.md`.\n\n### OCTOMINER2 PASSWORDLESS SSH — VERIFIED CONNECTION
 
 Search: `Octo2 SSH`, `OCTOMINER2 SSH`, `passwordless SSH`, `ssh octo2`, `192.168.1.162`, or `octominer1_nopass`.
@@ -651,13 +653,15 @@ Clear-Host
 ssh octo2 "nvidia-smi"
 ```
 
-Verified OCTOMINER2 identity/state when configured:
+Verified OCTOMINER2 access and current hardware/workload state (2026-10-26):
 
 - hostname: `OCTOMINER2`
 - IPv4: `192.168.1.162`
 - SSH user: `root`
 - passwordless key authentication: working
-- GPU layout: RTX 3060 Ti + 2x Tesla P100 16 GB
+- GPU inventory: one Tesla P100 PCIe 16 GB, UUID `GPU-83125857-5cbe-b7b3-4861-479383b01613`
+- Active workload: Qwen 30B Vision through enabled `qwen30b-vision.service`, port 8080
+- Current inventory: `docs/operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`
 
 Do not ask the Steward for an SSH password when operating from the configured dev machine. Use `ssh octo2` first; if the alias is unavailable, use the explicit identity-file command above. Do not copy or expose the private-key contents.
 

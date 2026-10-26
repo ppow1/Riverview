@@ -1,11 +1,17 @@
 <!--
 File: docs/hardware/gpu/OCTOMINER_THREE_NODE_COMPUTE_AND_DISPLAY_DECOUPLING_2026-09-18.md
-Version: 1.0.0
+Version: 1.0.1
 Date: 2026-09-18
-Status: Milestone / verified capability and expansion topology
+Status: Historical milestone / current OCTOMINER2 layout superseded 2026-10-26
 -->
 
 # Riverview Milestone — Three-Device Compute Topology and RTX 4090 Display Decoupling
+
+> **Historical topology snapshot:** This record preserves the September 18 display
+> decoupling and expansion plan. Its OCTOMINER2 multi-GPU placement is superseded
+> as of 2026-10-26; the additional GPUs were moved to OCTOMINER1. Current OCTOMINER2
+> inventory is one Tesla P100 16 GB with Qwen 30B Vision on `qwen30b-vision.service`
+> port 8080. See [`OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`](../../operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md).
 
 **Event date:** 2026-09-18  
 **Status:** Major infrastructure milestone  
