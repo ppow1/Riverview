@@ -1,4 +1,13 @@
-# CURRENT RIVERVIEW AI MODEL STARTUP AND LOADING CONFIGURATION
+<!-- Revision: 1.0.1 | Current-status note added 2026-10-26 -->
+# HISTORICAL RIVERVIEW AI MODEL STARTUP AND LOADING CONFIGURATION
+
+> **Superseded for current OCTOMINER2 operations on 2026-10-26.** This document
+> preserves the October 13 GPU allocation and deployment evidence; it is not the
+> current hardware inventory or startup authority. OCTOMINER2 now has one Tesla
+> P100 16 GB running Qwen 30B Vision through enabled `qwen30b-vision.service` on
+> port 8080. The additional GPUs were moved to OCTOMINER1. Read
+> [`OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`](docs/operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md)
+> for current evidence.
 
 > **START HERE for every Riverview model-loading, GPU-allocation, service-restart, or AI-worker change.** This is the canonical *documented target configuration*, not proof of current runtime state. Before changing anything, check the live launcher and systemd services. Updated 2026-10-13. Detailed evidence: [Huihui P100 baseline](docs/model-evaluations/results/2026-10-13-huihui-p100-startup-baseline.md); [model evaluation registry](docs/model-evaluations/README.md).
 

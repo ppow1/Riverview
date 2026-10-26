@@ -1,10 +1,17 @@
 <!--
 File: docs/hardware/gpu/OCTOMINER_TWO_NODE_96GB_LOCAL_AI_MILESTONE_2026-09-16.md
-Version: 1.0.0
+Version: 1.0.1
 Date: 2026-09-16
-Status: Milestone / verified capability record
+Status: Historical milestone / configuration superseded 2026-10-26
 -->
 # Riverview Milestone — Two-Node 96 GB Local AI Compute Pool
+
+> **Historical topology snapshot:** The 2026-09-16 measurements and demonstrated
+> workloads below are retained as useful history. The OCTOMINER2 GPU layout and
+> 96 GB current-pool description are superseded as of 2026-10-26: OCTOMINER2 now
+> has one Tesla P100 16 GB, and the additional GPUs described here were moved to
+> OCTOMINER1. See [`OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`](../../operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md)
+> before making current allocation or scheduling decisions.
 
 **Event date:** 2026-09-16  
 **Status:** Major local-compute milestone  

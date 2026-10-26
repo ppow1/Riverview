@@ -1,5 +1,11 @@
 # OCTOMINER1 / OCTOMINER2 Hardware Control Scan — 2026-09-14
 
+> **Historical record:** This dated scan remains valid evidence for the CPU/RAM and
+> physical-identity comparison it captured. For current OCTOMINER2 GPU and
+> workload state, use [`OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`](OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md).
+> Any older OCTOMINER2 multi-GPU placement is superseded as of 2026-10-26;
+> the additional GPUs were moved to OCTOMINER1.
+
 Status: **Post-recovery physical identity and CPU/RAM control baseline.**
 
 Purpose: preserve the hardware scan used to establish that restored physical OCTOMINER1 is operating normally relative to physical OCTOMINER2 and prevent stale HiveOS hostnames from being mistaken for physical machine identity.

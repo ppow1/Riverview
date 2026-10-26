@@ -2,8 +2,8 @@
 
 Status: Canonical operational SSH convention for the Windows development machine and managed Riverview machines.
 
-**File Revision:** 1.0.1
-**Updated:** 2026-10-17 — record verified Camrui access and distinguish the Windows SSH client from the Camrui-hosted Codex execution environment. The predecessor contained literal `\n` separators rather than Markdown line breaks; its text was preserved and normalized for readability.
+**File Revision:** 1.0.2
+**Updated:** 2026-10-26 — record the current OCTOMINER2 hardware and active inference endpoint without changing its established SSH alias or identity.
 **Predecessor SHA-256:** `230307b57b442dab0c5156222ec5c9e026c4522291fa6bfb177fd21ff180a896`
 
 ## Purpose
@@ -87,6 +87,14 @@ ssh octo2 "nvidia-smi"
 ```
 
 The same Windows private identity is used for OCTOMINER1 and OCTOMINER2. This is intentional and verified.
+
+Current hardware and service inventory, verified over this alias on 2026-10-26:
+one NVIDIA Tesla P100 PCIe 16 GB at `192.168.1.162`; Qwen 30B Vision runs
+through enabled `qwen30b-vision.service` on port 8080. The former OCTOMINER2
+RTX 3060 Ti + 2x P100 placement is superseded; those GPUs were moved to
+OCTOMINER1. See
+`docs/operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md` for
+the current evidence. Keep this SSH alias and identity unchanged.
 
 ### Camrui
 

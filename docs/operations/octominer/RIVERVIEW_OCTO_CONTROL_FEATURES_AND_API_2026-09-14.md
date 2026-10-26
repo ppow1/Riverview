@@ -1,22 +1,36 @@
 <!--
 File: docs/operations/octominer/RIVERVIEW_OCTO_CONTROL_FEATURES_AND_API_2026-09-14.md
-Version: 0.6.1
-Date: 2026-09-14
-Purpose: Current OCTOMINER2 controller capabilities and remotely queryable API.
+Version: 0.6.4
+Date: 2026-10-26
+Purpose: OCTOMINER2 controller capabilities, managed workload API, and historical profile context.
 -->
 
-# Riverview OCTO Control v0.6.1 — Features and Remote API
+# Riverview OCTO Control v0.6.3 — Features and Remote API
 
-Status: Installed and live on OCTOMINER2.
+Status: Controller v0.6.3 deployed and verified on OCTOMINER2 2026-10-26. Live model start/stop actions remain untested.
+
+> The v0.6.1 feature inventory and three-GPU snapshot below were captured on
+> 2026-09-14 and are retained as historical evidence. Current OCTOMINER2 has one
+> Tesla P100 16 GB; Qwen 30B Vision runs through `qwen30b-vision.service` on
+> port 8080. Its additional GPUs were moved to OCTOMINER1. Current inventory:
+> [`OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`](OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md).
 
 - Dashboard: `http://192.168.1.162:8180/`
 - API base: `http://192.168.1.162:8180/api/v1`
 - Host: `OCTOMINER2`
-- Installed GPU layout: GPU 0 RTX 3060 Ti 8 GB; GPUs 1–2 Tesla P100 16 GB
+- Current GPU layout (verified 2026-10-26): GPU 0 Tesla P100 PCIe 16 GB
+- Current inference workload: Qwen 30B Vision, `qwen30b-vision.service`, port 8080
+- Dashboard/API: `http://192.168.1.162:8180/`, control token required for API routes
 - Persistent monitor storage: `/mnt/octo-models-stage/riverview-octo-monitor/`
 
-This document records implemented v0.6.1 behavior. Planned control-plane routes
-are explicitly separated from live routes.
+The feature descriptions inherited from the 2026-09-14 capture record v0.6.1
+behavior. The managed workload endpoints below are the v0.6.3 source additions.
+Other v0.6.1 profile examples remain historical and are not a current GPU
+allocation recommendation.
+
+The old multi-GPU model-profile examples later in this document are historical.
+The managed workload API described below is separate from that profile catalog
+and does not rewrite `models.json` or GPU assignments.
 
 ## Authentication
 
@@ -52,6 +66,23 @@ storage after Save. Each browser or device is provisioned separately.
   tensor split, port, capabilities, reservation defaults, and Hermes status.
 - Download Snapshot captures rendered UI state and synchronized diagnostics.
 - F1 and **API Help (F1)** open `/help`.
+
+### Managed systemd workloads
+
+The authenticated **Managed Workloads** dashboard card reports each
+allowlisted service's systemd state, HTTP readiness, PID, and boot-enabled
+state. It provides start and stop controls for Qwen 30B Vision and renders
+additional workload records from the same allowlist as they are added.
+
+- `qwen30b-vision` maps only to `qwen30b-vision.service` and port 8080.
+- Start and stop call only `systemctl start` or `systemctl stop`; they never
+  enable or disable the service.
+- The unit remains enabled at boot and retains `Restart=on-failure` for
+  automatic startup after reboot and recovery after process failure.
+- The workload status GET route is safe to poll. Start/stop controls require
+  the existing Bearer token and are not live-tested without Steward
+  authorization.
+- Versioned source is in `deployment/octo2-control/`.
 
 ### Expandable independent instances
 
@@ -110,6 +141,9 @@ Every route below requires the Bearer token.
 | GET | `/api/v1/monitoring` | Persistent monitor state and load history |
 | GET | `/api/v1/hermes` | Hermes installation and routing state |
 | GET | `/api/v1/instances` | Independent instances and readiness |
+| GET | `/api/v1/workloads` | Allowlisted systemd workload and readiness state |
+| POST | `/api/v1/workloads/{id}/start` | Start an allowlisted workload without changing boot enablement |
+| POST | `/api/v1/workloads/{id}/stop` | Stop an allowlisted workload without changing boot enablement |
 | POST | `/api/v1/deployments` | Replace active models with Quick Deployment |
 | DELETE | `/api/v1/deployments/current` | Stop Quick Deployment |
 | POST | `/api/v1/instances` | Create an independent instance |
@@ -218,7 +252,7 @@ server exposes an OpenAI-compatible API beneath `/v1` and browser UI at its
 
 ## Verification evidence
 
-Snapshot `octo2-snapshot-2026-09-14T19-39-19Z.zip` verified controller v0.6.1,
-both services active, successful HTTP 200 API polling, three GPUs, complete
-fan/PSU telemetry, eight configured profiles, no active instances at capture,
-and Hermes configured for `qwen3-coder-30b-all` at 65,536 context.
+Snapshot `octo2-snapshot-2026-09-14T19-39-19Z.zip` is historical evidence for
+controller v0.6.1, its then-observed three GPUs, telemetry, profile catalog,
+and Hermes configuration. It does not describe the current OCTOMINER2 hardware
+or workload state.

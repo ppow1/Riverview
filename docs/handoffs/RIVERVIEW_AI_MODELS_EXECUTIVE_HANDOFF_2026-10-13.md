@@ -1,4 +1,13 @@
-# EXECUTIVE HANDOFF — Riverview AI model runtime and Grace Open Eyes
+# HISTORICAL EXECUTIVE HANDOFF — Riverview AI model runtime and Grace Open Eyes
+
+<!-- Current OCTOMINER2 status note added 2026-10-26; original handoff evidence retained below. -->
+
+> **Superseded for current OCTOMINER2 inventory on 2026-10-26.** The six-GPU
+> OCTOMINER2 layout and October 13 service assignments below are historical
+> evidence. Current OCTOMINER2 has one Tesla P100 16 GB running Qwen 30B Vision
+> through enabled `qwen30b-vision.service` on port 8080; the additional GPUs were
+> moved to OCTOMINER1. See
+> [`OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md`](../operations/octominer/OCTOMINER2_CURRENT_CONFIGURATION_2026-10-26.md).
 
 **As of 2026-10-13.** Prepared for another ChatGPT conversation and Codex. This is a record of verified evidence, not a claim that every planned integration has been installed.
 
