@@ -1,4 +1,4 @@
-<!-- Version: 1.9.0 | Date: 2026-10-02 | Status: Active -->
+<!-- Version: 1.10.0 | Date: 2026-10-14 | Status: Active -->
 # Riverview Parking Lot
 
 The Parking Lot preserves valuable ideas without committing Riverview to implementation or interrupting current execution.
@@ -25,5 +25,7 @@ This is not a backlog and not an execution queue. Capturing an item does not aut
 | PL-0014 | Local Repository Governor and Task-Workspace Admission Gate | Repository Governance / Local Infrastructure / Agent Enforcement | High | Steward | 2026-08-28 | CAPTURED | Promote after the current Monday-afternoon engineering-use objective reaches a stable checkpoint, when serial `main` materially blocks parallel work, after another branch/worktree discipline incident, when local-first repository authority becomes active work, or upon explicit Steward direction. |
 | PL-0015 | Hermes Multimodal Vision Accuracy, Latency, and Context-Aware Follow-Up | Hermes / Local AI / Vision / Multimodal Architecture | High | Steward | 2026-09-22 | CAPTURED | Promote when vision accuracy or image-only context becomes a practical blocker, latency becomes unacceptable, a Hermes upgrade requires reintegration, or upon explicit Steward direction. |
 | PL-0016 | Mission Assurance Floor Walker and Completion Verification | Agent Reliability / Mission Assurance / Event-Driven Supervision / Acceptance Governance | High | Steward | 2026-10-02 | CAPTURED | Promote when the Steward requests cross-agent mission-assurance design, another action-success/objective-success incident occurs, completion authority is formalized, unattended autonomous work makes unsupported all-clear claims a material risk, or supervisory event consumers become active architecture work. |
+
+| PL-0017 | Recover Archived ChatGPT Business Account Business Ideas | Archive Recovery / Business Ideas / Institutional Memory | Normal | Steward | 2026-10-14 | CAPTURED | Promote when Steward explicitly requests a bounded recovery of backed-up ChatGPT Business conversations and review of recovered business ideas; see `docs/operations/parking_lot/PL-0017-chatgpt-business-ideas-archive-recovery.md`. |
 
 For substantial entries, read the corresponding detailed artifact under `docs/operations/parking_lot/` before acting.
