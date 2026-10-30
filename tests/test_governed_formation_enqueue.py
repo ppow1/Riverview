@@ -37,6 +37,35 @@ def test_existing_acceptance_repository_identity_is_valid() -> None:
     _intent().validate()
 
 
+def test_engineering_intent_accepts_valid_linked_git_worktree(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    git_dir = tmp_path / "repository.git" / "worktrees" / "worktree"
+    common_dir = tmp_path / "repository.git"
+    git_dir.mkdir(parents=True)
+    common_dir.mkdir(parents=True, exist_ok=True)
+    worktree.mkdir()
+    (git_dir / "HEAD").write_text("ref: refs/heads/test\n", encoding="utf-8")
+    (git_dir / "commondir").write_text("../..\n", encoding="utf-8")
+    (worktree / ".git").write_text(f"gitdir: {git_dir}\n", encoding="utf-8")
+
+    _intent(repository_root=worktree).validate()
+
+
+@pytest.mark.parametrize(
+    "marker_contents",
+    ["not a gitdir pointer\n", "gitdir: missing-worktree-metadata\n"],
+)
+def test_engineering_intent_rejects_invalid_linked_git_worktree_marker(
+    tmp_path: Path, marker_contents: str
+) -> None:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    (worktree / ".git").write_text(marker_contents, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not an approved Git repository"):
+        _intent(repository_root=worktree).validate()
+
+
 def test_comms5_describes_and_exposes_governed_formation_enqueue() -> None:
     operation = Comms5Service().describe_operation("form_and_queue_work")
     assert operation["authorization"] == "STEWARD-GATED_WRITE"

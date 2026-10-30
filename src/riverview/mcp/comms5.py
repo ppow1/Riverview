@@ -388,11 +388,11 @@ class Comms5Service:
         except Comms5Error as exc:
             raise Comms5Error(exc.code, exc.reason, operation, retry_safe=False, steward_action_required=True, checkpoint=exc.checkpoint) from exc
 
-    def cancel_draft(self, request: dict[str, Any]) -> dict[str, Any]:
+    def cancel_draft(self, request: dict[str, Any], *, transport_principal: str | None = None) -> dict[str, Any]:
         operation = "cancel_draft"
         context = self._lifecycle_context(request, operation)
-        if request.get("explicit_steward_confirmation") is not True:
-            raise Comms5Error("RIV-COMMS5-0009", "explicit Steward authorization is required", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0009")
+        if transport_principal != "steward" or request.get("explicit_steward_confirmation") is not True:
+            raise Comms5Error("RIV-COMMS5-0009", "authenticated Steward transport and explicit confirmation are required", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0009")
         try:
             seed_id = UUID(str(request["seed_id"]))
         except (KeyError, ValueError) as exc:
@@ -401,18 +401,18 @@ class Comms5Service:
         if not key:
             raise Comms5Error("RIV-COMMS5-0003", "idempotency_key is required", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0015")
         try:
-            result = StewardSeedStore().cancel_draft(seed_id, actor=context.authenticated_principal, explicit_steward_confirmation=True, reason=str(request.get("reason", "")), classification=context.classification, correlation_id=context.correlation_id, idempotency_key=key)
+            result = StewardSeedStore().cancel_draft(seed_id, actor="steward", explicit_steward_confirmation=True, reason=str(request.get("reason", "")), classification=context.classification, correlation_id=context.correlation_id, idempotency_key=key)
         except SeedLifecycleError as exc:
             detail = f"; objective_id={exc.objective_id}" if exc.objective_id else ""
             raise Comms5Error(exc.code, exc.reason + detail, operation, retry_safe=exc.code == "RIV-COMMS5-0015", steward_action_required=exc.code == "RIV-COMMS5-0009", checkpoint="RIV-COMMS5-0014") from exc
         self._append_lifecycle_event(result, "steward.seed.cancelled")
         return _json({**result, "status": "cancelled", "objective_id": None, "steward_action_required": False})
 
-    def supersede_seed(self, request: dict[str, Any]) -> dict[str, Any]:
+    def supersede_seed(self, request: dict[str, Any], *, transport_principal: str | None = None) -> dict[str, Any]:
         operation = "supersede_seed"
         context = self._lifecycle_context(request, operation)
-        if request.get("explicit_steward_confirmation") is not True:
-            raise Comms5Error("RIV-COMMS5-0009", "explicit Steward authorization is required", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0009")
+        if transport_principal != "steward" or request.get("explicit_steward_confirmation") is not True:
+            raise Comms5Error("RIV-COMMS5-0009", "authenticated Steward transport and explicit confirmation are required", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0009")
         try:
             seed_id = UUID(str(request["seed_id"]))
             replacement_seed_id = UUID(str(request["replacement_seed_id"]))
@@ -422,7 +422,7 @@ class Comms5Service:
         if not key:
             raise Comms5Error("RIV-COMMS5-0003", "idempotency_key is required", operation, retry_safe=False, steward_action_required=True, checkpoint="RIV-COMMS5-0015")
         try:
-            result = StewardSeedStore().supersede_seed(seed_id, replacement_seed_id, actor=context.authenticated_principal, explicit_steward_confirmation=True, reason=str(request.get("reason", "")), classification=context.classification, correlation_id=context.correlation_id, idempotency_key=key)
+            result = StewardSeedStore().supersede_seed(seed_id, replacement_seed_id, actor="steward", explicit_steward_confirmation=True, reason=str(request.get("reason", "")), classification=context.classification, correlation_id=context.correlation_id, idempotency_key=key)
         except SeedLifecycleError as exc:
             detail = f"; objective_id={exc.objective_id}" if exc.objective_id else ""
             raise Comms5Error(exc.code, exc.reason + detail, operation, retry_safe=exc.code == "RIV-COMMS5-0015", steward_action_required=exc.code == "RIV-COMMS5-0009", checkpoint="RIV-COMMS5-0014") from exc

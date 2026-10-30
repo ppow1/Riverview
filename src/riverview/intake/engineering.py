@@ -19,6 +19,40 @@ from riverview.intake.policy import (
 )
 
 
+def _is_git_repository_root(root: Path) -> bool:
+    """Accept ordinary Git roots and linked worktrees, rejecting broken markers."""
+    marker = root / ".git"
+    if marker.is_dir():
+        return True
+    if not marker.is_file():
+        return False
+    try:
+        contents = marker.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return False
+    prefix, separator, target = contents.partition(":")
+    if prefix.strip().lower() != "gitdir" or not separator or not target.strip():
+        return False
+    git_dir = Path(target.strip())
+    if not git_dir.is_absolute():
+        git_dir = root / git_dir
+    try:
+        resolved_git_dir = git_dir.resolve(strict=True)
+        common_dir_marker = resolved_git_dir / "commondir"
+        if (
+            not resolved_git_dir.is_dir()
+            or not (resolved_git_dir / "HEAD").is_file()
+            or not common_dir_marker.is_file()
+        ):
+            return False
+        common_dir = Path(common_dir_marker.read_text(encoding="utf-8").strip())
+        if not common_dir.is_absolute():
+            common_dir = resolved_git_dir / common_dir
+        return common_dir.resolve(strict=True).is_dir()
+    except (OSError, RuntimeError):
+        return False
+
+
 @dataclass(frozen=True, slots=True)
 class RepositoryMap:
     repository_identity: str
@@ -88,7 +122,7 @@ class EngineeringIntent:
     def validate(self) -> None:
         if not self.repository_identity or self.repository_identity not in {"ppow1/Riverview", "Riverview standalone"}:
             raise ValueError("RIV-INT-0004: repository identity is not approved.")
-        if not self.repository_root.is_absolute() or not (self.repository_root / ".git").is_dir():
+        if not self.repository_root.is_absolute() or not _is_git_repository_root(self.repository_root):
             raise ValueError("RIV-INT-0004: repository root is not an approved Git repository.")
         if len(self.expected_base_sha) != 40 or any(ch not in "0123456789abcdef" for ch in self.expected_base_sha.lower()):
             raise ValueError("RIV-INT-0004: expected base SHA is invalid.")
