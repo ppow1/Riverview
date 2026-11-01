@@ -1,6 +1,6 @@
 """Local HTTP surface for Riverview Steward status.
 
-Version: 0.7.1
+Version: 0.8.0
 """
 
 from __future__ import annotations
@@ -18,12 +18,17 @@ from typing import Any
 from riverview.snail.store import DurableStore
 from riverview.status.snapshot import status_snapshot
 
+CAMPAIGN_DOCS = {
+    "/campaign/requirements": "PROJECT_REQUIREMENTS.md",
+    "/campaign/process-map": "PROCESS_MAP.md",
+}
+
 HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Estate at Riverview — Steward Status</title>
 <style>
-:root{color-scheme:dark;font-family:Segoe UI,Arial,sans-serif;background:#071713;color:#e7f4ec}body{margin:0;padding:20px}h1{margin:0 0 4px;color:#8fe0bc}.sub{color:#9db8ad;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.card{background:#10251f;border:1px solid #285443;border-radius:10px;padding:14px}.wide{grid-column:1/-1}h2{font-size:16px;margin:0 0 10px;color:#b9edd6}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:7px;border-bottom:1px solid #28483e;vertical-align:top}.ok{color:#71e2a5}.warn{color:#ffd166}.bad{color:#ff7b7b}code{color:#b7d9ff}#stamp{font-size:12px;color:#93aa9f}</style></head>
-<body><h1>The Estate at Riverview</h1><div class="sub">Steward Status · River + SNAIL operational projection · <span id="stamp">loading</span></div><main class="grid" id="view"></main><section class="card wide" id="snail"><h2>SNAIL · OctoMiner BIOS Campaign</h2><div id="snail-view">loading</div></section>
+:root{color-scheme:dark;font-family:Segoe UI,Arial,sans-serif;background:#071713;color:#e7f4ec}body{margin:0;padding:20px}h1{margin:0 0 4px;color:#8fe0bc}.sub{color:#9db8ad;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.card{background:#10251f;border:1px solid #285443;border-radius:10px;padding:14px}.wide{grid-column:1/-1}h2{font-size:16px;margin:0 0 10px;color:#b9edd6}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:7px;border-bottom:1px solid #28483e;vertical-align:top}.ok{color:#71e2a5}.warn{color:#ffd166}.bad{color:#ff7b7b}.target{font-size:18px;font-weight:700;color:#ffd166}.anchors a{margin-right:18px;color:#b7d9ff}code{color:#b7d9ff}#stamp{font-size:12px;color:#93aa9f}</style></head>
+<body><h1>The Estate at Riverview</h1><div class="sub">Steward Status · River + SNAIL operational projection · <span id="stamp">loading</span></div><main class="grid" id="view"></main><section class="card wide"><h2>OctoMiner BIOS Campaign Authority</h2><div class="target">TARGET: stable operation with 10+ Tesla P100 16 GB GPUs</div><p>Boot/POST latency is a secondary acceptance and diagnostic metric; it is not the campaign objective.</p><p class="anchors"><a href="/campaign/requirements" target="_blank">PROJECT REQUIREMENTS</a><a href="/campaign/process-map" target="_blank">PROCESS MAP</a></p></section><section class="card wide" id="snail"><h2>SNAIL · OctoMiner BIOS Campaign</h2><div id="snail-view">loading</div></section>
 <script>
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const table=(rows,cols)=>`<table><thead><tr>${cols.map(c=>`<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c[1]] ?? '--')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
@@ -35,7 +40,7 @@ refresh();refreshSnail();setInterval(refresh,3000);setInterval(refreshSnail,3000
 
 
 class StatusHandler(BaseHTTPRequestHandler):
-    server_version = "RiverviewStatus/0.7.1"
+    server_version = "RiverviewStatus/0.8.0"
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -53,14 +58,28 @@ class StatusHandler(BaseHTTPRequestHandler):
         try:
             if self.path == "/":
                 self._send(HTTPStatus.OK, "text/html; charset=utf-8", HTML.encode())
-            elif self.path == "/healthz":
+                return
+            if self.path in CAMPAIGN_DOCS:
+                repository = getattr(self.server, "repository_path", None)
+                if repository is None:
+                    self._send(HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"campaign document root unavailable")
+                    return
+                path = repository / "docs" / "operations" / "octominer" / "campaign" / CAMPAIGN_DOCS[self.path]
+                if not path.exists():
+                    self._send(HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"campaign document unavailable")
+                    return
+                self._send(HTTPStatus.OK, "text/plain; charset=utf-8", path.read_bytes())
+                return
+            if self.path == "/healthz":
                 snapshot = status_snapshot()
                 body = json.dumps({"status":snapshot["status"],"authority":snapshot["authority"]}).encode()
                 self._send(HTTPStatus.OK, "application/json", body)
-            elif self.path == "/api/status":
+                return
+            if self.path == "/api/status":
                 body = json.dumps(status_snapshot(), default=str, sort_keys=True).encode()
                 self._send(HTTPStatus.OK, "application/json", body)
-            elif self.path == "/api/snail/status":
+                return
+            if self.path == "/api/snail/status":
                 root = getattr(self.server, "snail_runtime", None)
                 if root is None or not (root / "state.json").exists():
                     self._send(HTTPStatus.NOT_FOUND, "application/json", b'{"status":"not_configured"}')
@@ -72,7 +91,8 @@ class StatusHandler(BaseHTTPRequestHandler):
                 payload["frame"] = _frame_status(frame)
                 body = json.dumps(payload, default=str, sort_keys=True).encode()
                 self._send(HTTPStatus.OK, "application/json", body)
-            elif self.path == "/api/snail/frame":
+                return
+            if self.path == "/api/snail/frame":
                 root = getattr(self.server, "snail_runtime", None)
                 if root is None or not (root / "state.json").exists():
                     self._send(HTTPStatus.NOT_FOUND, "application/json", b'{"status":"not_configured"}')
@@ -82,8 +102,8 @@ class StatusHandler(BaseHTTPRequestHandler):
                     self._send(HTTPStatus.NOT_FOUND, "application/json", b'{"status":"frame_unavailable"}')
                     return
                 self._send(HTTPStatus.OK, mimetypes.guess_type(frame.name)[0] or "image/jpeg", frame.read_bytes())
-            else:
-                self._send(HTTPStatus.NOT_FOUND, "application/json", b'{"checkpoint_id":"RIV-UI-0001","status":"not_found"}')
+                return
+            self._send(HTTPStatus.NOT_FOUND, "application/json", b'{"checkpoint_id":"RIV-UI-0001","status":"not_found"}')
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             body = json.dumps({"checkpoint_id":"RIV-UI-0002","status":"failed","summary":str(exc)}).encode()
             self._send(HTTPStatus.SERVICE_UNAVAILABLE, "application/json", body)
@@ -118,11 +138,12 @@ def _frame_status(frame: Path, freshness_seconds: float = 10.0) -> dict[str, Any
     return {"available": True, "stale": age > freshness_seconds, "age_seconds": round(age, 1), "source": str(frame)}
 
 
-def build_server(host: str="127.0.0.1",port: int=8770, *, snail_runtime: Path | None=None) -> ThreadingHTTPServer:
+def build_server(host: str="127.0.0.1",port: int=8770, *, snail_runtime: Path | None=None, repository_path: Path | None=None) -> ThreadingHTTPServer:
     if host not in {"127.0.0.1","localhost"}:
         raise ValueError("RIV-UI-0003: Steward Status must bind to localhost.")
     server = ThreadingHTTPServer((host,port),StatusHandler)
     server.snail_runtime = snail_runtime  # type: ignore[attr-defined]
+    server.repository_path = repository_path  # type: ignore[attr-defined]
     return server
 
 
@@ -131,8 +152,9 @@ def main() -> None:
     parser.add_argument("--host",default="127.0.0.1")
     parser.add_argument("--port",type=int,default=8770)
     parser.add_argument("--snail-runtime",type=Path,default=os.environ.get("RIVERVIEW_SNAIL_RUNTIME"))
+    parser.add_argument("--repository-path",type=Path,default=Path.cwd())
     args=parser.parse_args()
-    server=build_server(args.host,args.port,snail_runtime=args.snail_runtime)
+    server=build_server(args.host,args.port,snail_runtime=args.snail_runtime,repository_path=args.repository_path)
     print(f"Riverview Steward Status: http://{args.host}:{server.server_port}/",flush=True)
     try:
         server.serve_forever(poll_interval=0.25)

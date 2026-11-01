@@ -143,7 +143,7 @@ def test_frame_staleness_and_immutable_preservation(snail, tmp_path):
     assert json.loads((snail.store.evidence / f"{record['evidence_id']}.json").read_text())["class"] == "OBSERVED"
 
 
-def test_snapshot_contains_review_packet_and_evidence(snail, tmp_path):
+def test_snapshot_contains_review_packet_evidence_and_campaign_anchors(snail, tmp_path):
     frame = tmp_path / "latest.jpg"
     frame.write_bytes(b"frame")
     snail.preserve_frame(frame)
@@ -151,8 +151,14 @@ def test_snapshot_contains_review_packet_and_evidence(snail, tmp_path):
     with zipfile.ZipFile(archive) as package:
         names = package.namelist()
         review = package.read("REVIEW_PACKET.md").decode()
+        requirements = package.read("PROJECT_REQUIREMENTS.md").decode()
+        process_map = package.read("PROCESS_MAP.md").decode()
     assert "Is SNAIL still on the correct engineering path?" in review
     assert any(name.startswith("evidence/EVD-") for name in names)
+    assert "PROJECT_REQUIREMENTS.md" in names
+    assert "PROCESS_MAP.md" in names
+    assert "10+" in requirements and "P100" in requirements
+    assert "reground" in process_map.lower()
 
 
 def test_harmless_recovery_qualification_without_conversation_memory(tmp_path):
